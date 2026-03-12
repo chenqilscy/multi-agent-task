@@ -60,21 +60,22 @@ docs/specs/
 │   ├── 03-task-scheduling-design.md             # 任务调度系统 ⭐ 59KB
 │   ├── 04-langgraph-comparison.md               # LangGraph对比 11KB
 │   ├── 05-industry-frameworks-comparison.md     # 业界框架对比 14KB
-│   └── 12-layered-architecture.md               # 分层依赖架构 ⭐ 32KB
+│   └── 12-layered-architecture.md               # 分层依赖架构 ⭐ 22KB
 │
 ├── 📐 规范文档（3个）
-│   ├── 06-interface-design-spec.md              # 接口设计规范 72KB
+│   ├── 06-interface-design-spec.md              # 接口设计规范 51KB
 │   ├── 07-ui-design-spec.md                     # UI设计规范 20KB
 │   └── 08-deployment-guide.md                   # 部署指南 20KB
 │
-└── 💻 实现文档（4个）
+└── 💻 实现文档（5个）
     ├── 09-implementation-guide.md               # 实现指南 43KB
-    ├── 10-testing-guide.md                      # 测试指南 31KB
+    ├── 10-testing-guide.md                      # 测试指南 27KB
     ├── 11-implementation-roadmap.md             # 实施路线图 20KB
-    └── 12-layered-architecture.md               # 分层依赖架构 22KB
+    ├── 13-performance-benchmarks.md             # 性能基准测试 17KB
+    └── 14-error-handling-guide.md               # 错误处理指南 ⭐ 36KB
 ```
 
-**总计**: 13个核心文档，约352KB
+**总计**: 14个核心文档，约384KB
 
 ---
 
@@ -105,8 +106,10 @@ docs/specs/
 ### 🔧 运维人员
 1. [01-架构设计概览](./01-architecture-overview.md)
 2. [08-部署指南](./08-deployment-guide.md) ⭐ **重点**
-3. [02-架构图表集](./02-architecture-diagrams.md)
-4. [11-实施路线图](./11-implementation-roadmap.md)
+3. [13-性能基准测试](./13-performance-benchmarks.md) ⭐ **重点**
+4. [14-错误处理指南](./14-error-handling-guide.md) ⭐ **重点**
+5. [02-架构图表集](./02-architecture-diagrams.md)
+6. [11-实施路线图](./11-implementation-roadmap.md)
 
 ---
 
@@ -275,7 +278,7 @@ docs/specs/
 ---
 
 ### 12. 分层依赖架构 ⭐ NEW
-**文件**: `12-layered-architecture.md` | **大小**: 32KB
+**文件**: `12-layered-architecture.md` | **大小**: 22KB
 
 **内容**：
 - 依赖倒置原则（DIP）应用
@@ -287,6 +290,37 @@ docs/specs/
 - 扩展性指南
 
 **适合人群**: 架构师、Tech Lead、开发人员 ⭐ **重点**
+
+---
+
+### 13. 性能基准测试
+**文件**: `13-performance-benchmarks.md` | **大小**: 17KB
+
+**内容**：
+- 响应时间指标（P50/P95/P99目标值）
+- 吞吐量和并发指标
+- 资源占用限制（CPU/内存/GC）
+- 基准测试方法（BenchmarkDotNet）
+- 性能优化策略
+- 监控指标定义
+
+**适合人群**: 架构师、运维人员、性能工程师
+
+---
+
+### 14. 错误处理指南 ⭐ NEW
+**文件**: `14-error-handling-guide.md` | **大小**: 36KB
+
+**内容**：
+- 错误分类体系（异常类型、错误码）
+- 重试策略（指数退避+抖动，各服务推荐配置）
+- 熔断器模式（LLM/Redis/PostgreSQL/Qdrant各组件参数）
+- 服务降级策略（5个级别，从禁用推荐到规则引擎兜底）
+- 各组件错误处理规范（LLM、Redis、PostgreSQL）
+- 日志与监控（结构化日志、Prometheus指标、告警规则）
+- 错误处理测试策略（单元测试+集成测试示例）
+
+**适合人群**: 架构师、后端开发人员、运维人员 ⭐ **重点**
 
 ---
 
@@ -305,15 +339,32 @@ docs/specs/
 - [x] 10-测试指南
 - [x] 11-实施路线图
 - [x] 12-分层依赖架构 ⭐ NEW
+- [x] 13-性能基准测试
+- [x] 14-错误处理指南 ⭐ NEW
 
 ### 进行中 🔄
 - [ ] API文档
-- [ ] 性能基准测试
-- [ ] 故障排查手册
 
 ---
 
 ## 📝 文档更新日志
+
+### 2026-03-13 重大更新（错误处理指南新增）
+
+**文档新增**:
+- ✅ [14-错误处理指南](./14-error-handling-guide.md) - 36KB ⭐ NEW
+  - 错误分类体系（异常类型层次、统一错误码）
+  - 重试策略（指数退避+抖动，各服务推荐配置）
+  - 熔断器模式（状态机、各组件参数、完整实现）
+  - 服务降级策略（5个级别，渐进式降级）
+  - Prometheus指标和告警规则
+  - 完整单元测试和集成测试示例
+
+- ✅ [13-性能基准测试](./13-performance-benchmarks.md) - 17KB
+  - 响应时间、吞吐量、资源占用指标
+
+**文档更新**:
+- ✅ [README.md](./README.md) - 补全文档目录，更新导航
 
 ### 2026-03-13 重大更新（依赖倒置重构）
 
