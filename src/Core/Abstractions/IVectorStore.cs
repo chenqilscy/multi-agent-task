@@ -1,0 +1,80 @@
+namespace CKY.MultiAgentFramework.Core.Abstractions
+{
+    /// <summary>
+    /// 向量点
+    /// </summary>
+    public class VectorPoint
+    {
+        /// <summary>向量ID</summary>
+        public string Id { get; set; } = string.Empty;
+
+        /// <summary>向量数据</summary>
+        public float[] Vector { get; set; } = Array.Empty<float>();
+
+        /// <summary>附加元数据</summary>
+        public Dictionary<string, object> Metadata { get; set; } = new();
+    }
+
+    /// <summary>
+    /// 向量搜索结果
+    /// </summary>
+    public class VectorSearchResult
+    {
+        /// <summary>向量ID</summary>
+        public string Id { get; set; } = string.Empty;
+
+        /// <summary>相似度评分</summary>
+        public float Score { get; set; }
+
+        /// <summary>附加元数据</summary>
+        public Dictionary<string, object> Metadata { get; set; } = new();
+    }
+
+    /// <summary>
+    /// 向量存储抽象接口
+    /// 支持语义检索和RAG（检索增强生成）
+    /// </summary>
+    public interface IVectorStore
+    {
+        /// <summary>
+        /// 创建集合
+        /// </summary>
+        Task CreateCollectionAsync(
+            string collectionName,
+            int vectorSize,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// 插入向量
+        /// </summary>
+        Task InsertAsync(
+            string collectionName,
+            IEnumerable<VectorPoint> points,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// 相似度检索
+        /// </summary>
+        Task<List<VectorSearchResult>> SearchAsync(
+            string collectionName,
+            float[] vector,
+            int topK = 10,
+            Dictionary<string, object>? filter = null,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// 删除向量
+        /// </summary>
+        Task DeleteAsync(
+            string collectionName,
+            IEnumerable<string> ids,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// 删除集合
+        /// </summary>
+        Task DeleteCollectionAsync(
+            string collectionName,
+            CancellationToken ct = default);
+    }
+}
