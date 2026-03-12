@@ -48,24 +48,27 @@ namespace CKY.MultiAgentFramework.Infrastructure.Relational
             Expression<Func<T, bool>>? predicate = null,
             CancellationToken ct = default) where T : class
         {
-            // 注意：完整实现需要表达式树转SQL，这里提供基本骨架
+            // TODO: 完整实现需要将LINQ表达式树转换为SQL WHERE子句
+            // 可使用 System.Linq.Dynamic.Core 或手动映射实现
+            // 当前简化实现返回空列表，需要在生产使用前实现
             var tableName = GetTableName<T>();
             _logger.LogDebug("GetListAsync for table {TableName}", tableName);
 
             // 简化实现：返回空列表
-            // 实际实现需要根据predicate生成WHERE子句
             return Task.FromResult(new List<T>());
         }
 
         /// <inheritdoc />
         public async Task<T> InsertAsync<T>(T entity, CancellationToken ct = default) where T : class
         {
+            // TODO: 实现真实的INSERT SQL，使用Dapper或Dapper.Contrib
+            // 例如：await conn.InsertAsync(entity) 或手动构建INSERT语句
             _logger.LogDebug("Inserting {Type}", typeof(T).Name);
 
             try
             {
                 await using var conn = CreateConnection();
-                // 简化实现：实际应该使用Dapper.Contrib或手动构建INSERT语句
+                // TODO: 替换为真实的INSERT实现
                 return entity;
             }
             catch (Exception ex)
@@ -78,12 +81,13 @@ namespace CKY.MultiAgentFramework.Infrastructure.Relational
         /// <inheritdoc />
         public async Task UpdateAsync<T>(T entity, CancellationToken ct = default) where T : class
         {
+            // TODO: 实现真实的UPDATE SQL，使用Dapper或Dapper.Contrib
             _logger.LogDebug("Updating {Type}", typeof(T).Name);
 
             try
             {
                 await using var conn = CreateConnection();
-                // 简化实现：实际应该使用Dapper.Contrib或手动构建UPDATE语句
+                // TODO: 替换为真实的UPDATE实现
             }
             catch (Exception ex)
             {
@@ -95,12 +99,13 @@ namespace CKY.MultiAgentFramework.Infrastructure.Relational
         /// <inheritdoc />
         public async Task DeleteAsync<T>(T entity, CancellationToken ct = default) where T : class
         {
+            // TODO: 实现真实的DELETE SQL，使用Dapper或Dapper.Contrib
             _logger.LogDebug("Deleting {Type}", typeof(T).Name);
 
             try
             {
                 await using var conn = CreateConnection();
-                // 简化实现：实际应该使用Dapper.Contrib或手动构建DELETE语句
+                // TODO: 替换为真实的DELETE实现
             }
             catch (Exception ex)
             {

@@ -70,8 +70,8 @@ namespace CKY.MultiAgentFramework.Services.Storage
         /// <inheritdoc />
         public async Task<List<AgentRegistration>> GetAllAsync(CancellationToken ct = default)
         {
-            // 注意：这是简化实现，实际上应该有一个专门存储所有AgentId的键
-            // 完整实现需要维护一个Agent ID列表
+            // TODO: 完整实现需要维护一个专门存储所有AgentId的键（如 maf:agent:_all_ids）
+            // 当前简化实现返回空列表，需要在生产使用前实现完整版本
             _logger.LogDebug("Getting all registered agents");
             return new List<AgentRegistration>();
         }
