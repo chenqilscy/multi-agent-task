@@ -1,0 +1,119 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1773341391526,
+  "projectRoot": "g:\\work\\agent\\multi-agent-task",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {},
+  "hotPaths": [
+    {
+      "path": "docs\\specs\\README.md",
+      "accessCount": 6,
+      "lastAccessed": 1773341669758,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341435628,
+      "type": "file"
+    },
+    {
+      "path": "05-industry-frameworks-comparison.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341435840,
+      "type": "file"
+    },
+    {
+      "path": "01-architecture-overview.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341436476,
+      "type": "file"
+    },
+    {
+      "path": "07-ui-design-spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341437803,
+      "type": "file"
+    },
+    {
+      "path": "04-langgraph-comparison.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341438010,
+      "type": "file"
+    },
+    {
+      "path": "02-architecture-diagrams.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341438303,
+      "type": "file"
+    },
+    {
+      "path": "09-implementation-guide.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341438392,
+      "type": "file"
+    },
+    {
+      "path": "08-deployment-guide.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341438620,
+      "type": "file"
+    },
+    {
+      "path": "06-interface-design-spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341438785,
+      "type": "file"
+    },
+    {
+      "path": "03-task-scheduling-design.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341439253,
+      "type": "file"
+    },
+    {
+      "path": "docs\\specs\\12-layered-architecture.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341504464,
+      "type": "file"
+    },
+    {
+      "path": "docs\\specs\\10-testing-guide.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341505149,
+      "type": "file"
+    },
+    {
+      "path": "docs\\specs\\13-performance-benchmarks.md",
+      "accessCount": 1,
+      "lastAccessed": 1773341729738,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
