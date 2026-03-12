@@ -283,7 +283,7 @@ coverage*.xml
 coverage*.info
 
 # Project-specific directories
-.github/
+
 .claude/
 .imc/
 .omc/
