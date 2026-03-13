@@ -1,9 +1,10 @@
 # CKY.MAF实现指南
 
-> **文档版本**: v1.2
+> **文档版本**: v1.3
 > **创建日期**: 2026-03-12
 > **最后更新**: 2026-03-13
 > **用途**: 基于Microsoft Agent Framework的代码实现细节
+> **最新更新**: 新增 LLM Agent 实现章节（2026-03-13）
 
 ---
 
@@ -38,7 +39,7 @@
 <!-- 项目文件 -->
 <ItemGroup>
   <!-- MS Agent Framework (必须) -->
-  <PackageReference Include="Microsoft.AgentFramework" Version="1.0.0-preview" />
+  <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-preview.251001.1" />
 
   <!-- CKY.MAF增强功能 -->
   <ProjectReference Include="..\Core\MafCore.csproj" />
@@ -460,9 +461,341 @@ namespace CKY.MultiAgentFramework.Services.Agents.Main
 
 ---
 
-## 五、Agent实现模式
+## 五、LLM Agent 实现
 
-### 5.1 智能家居Agent示例
+> **新增功能（2026-03-13）**：CKY.MAF 提供完整的 LLM Agent 架构，支持智谱AI、通义千问等多个提供商，内置弹性保护。
+
+### 5.1 LLM Agent 架构概览
+
+```mermaid
+classDiagram
+    class AIAgent {
+        <<MS AF基类>>
+        +ExecuteAsync(messages) Task~AgentResponse~
+    }
+
+    class LlmAgent {
+        <<LLM Agent基类>>
+        +LlmProviderConfig Config
+        +ExecuteAsync(modelId, prompt, scenario) Task~string~
+        +SupportsScenario(scenario) bool
+        +ExecuteBatchAsync(prompts) Task~List~string~~
+    }
+
+    class ZhipuAIAgent {
+        <<智谱AI>>
+        +ExecuteAsync(...) Task~string~
+    }
+
+    class QwenAIAgent {
+        <<通义千问>>
+        +ExecuteAsync(...) Task~string~
+    }
+
+    AIAgent <|-- LlmAgent
+    LlmAgent <|-- ZhipuAIAgent
+    LlmAgent <|-- QwenAIAgent
+```
+
+### 5.2 创建 LlmAgent 实例
+
+```csharp
+// ===== 1. 配置 LLM 提供商 =====
+var config = new LlmProviderConfig
+{
+    ProviderName = "zhipuai",
+    ProviderDisplayName = "智谱AI",
+    ModelId = "glm-4",
+    ApiKey = "your-api-key",  // 从环境变量读取
+    ApiBaseUrl = "https://open.bigmodel.cn/api/paas/v4",
+    SupportedScenarios = new List<LlmScenario>
+    {
+        LlmScenario.Chat,
+        LlmScenario.Intent
+    },
+    Temperature = 0.7,
+    MaxTokens = 2000,
+    Priority = 0,  // 优先级（数字越小优先级越高）
+    IsEnabled = true
+};
+
+// 验证配置（启动时检查）
+config.Validate();
+
+// ===== 2. 配置依赖注入 =====
+services.AddHttpClient<ZhipuAIAgent>(client =>
+{
+    client.BaseAddress = new Uri("https://open.bigmodel.cn/api/paas/v4/chat/completions");
+    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+    client.DefaultRequestHeaders.Add("Content-Type", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
+services.AddSingleton<LlmResiliencePipeline>();
+
+// ===== 3. 创建 Agent 实例 =====
+var agent = new ZhipuAIAgent(
+    config,
+    logger,
+    httpClient,
+    resiliencePipeline
+);
+```
+
+### 5.3 基本 LLM 调用
+
+```csharp
+// ===== 1. 简单对话 =====
+var response = await agent.ExecuteAsync(
+    modelId: "glm-4",
+    prompt: "你好，请介绍一下你自己",
+    scenario: LlmScenario.Chat,
+    systemPrompt: "你是一个友好的AI助手",
+    ct: CancellationToken.None
+);
+
+Console.WriteLine(response);
+// => "你好！我是智谱AI开发的大型语言模型..."
+
+// ===== 2. 意图识别 =====
+var intentResponse = await agent.ExecuteAsync(
+    modelId: "glm-4",
+    prompt: "打开客厅的灯",
+    scenario: LlmScenario.Intent,
+    systemPrompt: "你是意图识别专家，请识别用户意图",
+    ct: CancellationToken.None
+);
+
+Console.WriteLine(intentResponse);
+// => "{\"intent\": \"lighting.control\", \"confidence\": 0.95}"
+
+// ===== 3. 批量调用（并行执行） =====
+var prompts = new List<string>
+{
+    "介绍Python",
+    "介绍C#",
+    "介绍JavaScript"
+};
+
+var responses = await agent.ExecuteBatchAsync(
+    modelId: "glm-4",
+    prompts: prompts,
+    scenario: LlmScenario.Chat,
+    ct: CancellationToken.None
+);
+
+// 批量调用自动并行执行，提高效率
+foreach (var (prompt, response) in prompts.Zip(responses))
+{
+    Console.WriteLine($"Prompt: {prompt}");
+    Console.WriteLine($"Response: {response}\n");
+}
+```
+
+### 5.4 使用 LlmAgentRegistry（故障转移）
+
+```csharp
+// ===== 1. 注册多个 LLM Agent =====
+var registry = new LlmAgentRegistry(logger);
+
+// 注册智谱AI
+var zhipuConfig = new LlmProviderConfig
+{
+    ProviderName = "zhipuai",
+    ModelId = "glm-4",
+    ApiKey = "zhipu-api-key",
+    Priority = 0,  // 主力模型
+    IsEnabled = true
+};
+
+// 注册通义千问（备选）
+var qwenConfig = new LlmProviderConfig
+{
+    ProviderName = "qwen",
+    ModelId = "qwen-plus",
+    ApiKey = "qwen-api-key",
+    Priority = 1,  // 备选模型
+    IsEnabled = true
+};
+
+registry.RegisterAgents(new[] { zhipuAgent, qwenAgent });
+
+// ===== 2. 使用注册表（自动故障转移） =====
+try
+{
+    // 自动选择最佳 Agent（按优先级）
+    var bestAgent = await registry.GetBestAgentAsync(
+        scenario: LlmScenario.Chat,
+        ct: CancellationToken.None
+    );
+
+    var response = await bestAgent.ExecuteAsync(
+        modelId: bestAgent.Config.ModelId,
+        prompt: "你好",
+        scenario: LlmScenario.Chat
+    );
+
+    Console.WriteLine($"使用 {bestAgent.Config.ProviderName}: {response}");
+}
+catch (InvalidOperationException ex)
+{
+    // 所有 Agent 都不可用
+    Console.WriteLine($"错误: {ex.Message}");
+}
+
+// ===== 3. 动态禁用 Agent =====
+await registry.SetAgentEnabledAsync(
+    providerName: "zhipuai",
+    enabled: false,
+    ct: CancellationToken.None
+);
+
+// 下次调用会自动使用 qwen（优先级第2）
+```
+
+### 5.5 弹性保护（自动生效）
+
+所有 LLM 调用自动通过 `LlmResiliencePipeline`，提供三层保护：
+
+```csharp
+// 在 ZhipuAIAgent.ExecuteAsync() 中自动应用
+public override async Task<string> ExecuteAsync(...)
+{
+    return await _resiliencePipeline.ExecuteAsync(
+        AgentId,
+        async (innerCt) => await ExecuteInternalAsync(...),
+        timeout: TimeSpan.FromSeconds(30),
+        ct
+    );
+}
+
+// 三层防护：
+// 1. 熔断器检查 → 连续失败 3 次后打开
+// 2. 超时保护 → 30 秒后自动取消
+// 3. 指数退避重试 → 最多 3 次，延迟：1s, 2s, 4s
+```
+
+**熔断器状态监控**：
+
+```csharp
+// 获取熔断器状态
+var circuitBreaker = pipeline.GetCircuitBreaker("zhipuai");
+var status = circuitBreaker.GetStatus();
+
+Console.WriteLine($"状态: {status.State}");
+Console.WriteLine($"失败次数: {status.FailureCount}/{status.FailureThreshold}");
+Console.WriteLine($"最后状态变更: {status.LastStateChangeTime}");
+
+// 手动重置熔断器（例如在管理员确认后）
+circuitBreaker.Reset("zhipuai");
+```
+
+### 5.6 异常处理
+
+```csharp
+try
+{
+    var response = await agent.ExecuteAsync(...);
+}
+catch (LlmCircuitBreakerOpenException ex)
+{
+    // 熔断器已打开，请求被拒绝
+    logger.LogWarning(ex, "熔断器已打开，请稍后重试");
+
+    // 建议：使用备选模型或降级服务
+    var fallbackResponse = await UseFallbackModel();
+}
+catch (LlmResilienceException ex)
+{
+    // 所有重试都失败
+    logger.LogError(ex, "LLM 调用失败，已重试 3 次");
+
+    // 建议：使用规则引擎或返回友好错误
+    return "抱歉，服务暂时不可用，请稍后重试";
+}
+catch (LlmServiceException ex) when (ex.IsRateLimited)
+{
+    // 速率限制（429 Too Many Requests）
+    logger.LogWarning(ex, "LLM API 速率限制");
+
+    // 建议：延迟后重试或切换提供商
+    await Task.Delay(5000);
+}
+catch (LlmServiceException ex) when (ex.StatusCode == 401)
+{
+    // 认证失败（401 Unauthorized）
+    logger.LogError(ex, "LLM API 认证失败");
+
+    // 建议：检查 API Key 配置
+    return "服务配置错误，请联系管理员";
+}
+```
+
+### 5.7 最佳实践
+
+#### ✅ 推荐做法
+
+```csharp
+// 1. 使用依赖注入
+services.AddHttpClient<ZhipuAIAgent>(...);
+services.AddSingleton<LlmResiliencePipeline>();
+
+// 2. 从环境变量读取 API Key
+var apiKey = Environment.GetEnvironmentVariable("ZHIPU_API_KEY");
+var config = new LlmProviderConfig { ApiKey = apiKey };
+
+// 3. 启动时验证配置
+config.Validate();
+
+// 4. 使用场景指定 system prompt
+var response = await agent.ExecuteAsync(
+    modelId: "glm-4",
+    prompt: userInput,
+    scenario: LlmScenario.Intent,  // 自动添加意图识别的 system prompt
+    systemPrompt: customSystemPrompt  // 可选自定义
+);
+
+// 5. 监控熔断器状态
+var status = circuitBreaker.GetStatus();
+logger.LogInformation("熔断器状态: {State}, 失败: {Failures}/{Threshold}",
+    status.State, status.FailureCount, status.FailureThreshold);
+```
+
+#### ❌ 避免的做法
+
+```csharp
+// 1. ❌ 不要硬编码 API Key
+var config = new LlmProviderConfig
+{
+    ApiKey = "sk-xxxx"  // 危险！
+};
+
+// 2. ❌ 不要创建自己的 HttpClient
+public class MyAgent : LlmAgent
+{
+    private readonly HttpClient _httpClient = new();  // 错误！会导致 socket 耗尽
+}
+
+// 3. ❌ 不要忽略配置验证
+var config = new LlmProviderConfig { ... };
+// config.Validate();  // 不要跳过验证！
+
+// 4. ❌ 不要捕获所有异常
+try
+{
+    await agent.ExecuteAsync(...);
+}
+catch (Exception ex)  // 太宽泛
+{
+    // 应该区分处理不同类型的异常
+}
+```
+
+---
+
+## 六、传统 Agent 实现模式
+
+### 6.1 智能家居Agent示例
 
 ```csharp
 namespace CKY.MultiAgentFramework.Services.NLP

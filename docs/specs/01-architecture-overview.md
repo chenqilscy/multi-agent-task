@@ -1,11 +1,12 @@
 # CKY.MAF框架架构设计概览
 
-> **文档版本**: v1.2
+> **文档版本**: v1.3
 > **创建日期**: 2026-03-12
 > **最后更新**: 2026-03-13
 > **设计原则**: 基于Microsoft Agent Framework的企业级增强
 > **核心依赖**: Microsoft Agent Framework (Preview)
 > **目标**: 构建生产级多Agent应用系统
+> **最新更新**: 新增 LLM Agent 架构（2026-03-13）
 
 ---
 
@@ -122,7 +123,7 @@ graph TB
 - ✅ 所有Agent**继承**自MS AF的`AIAgent`
 - ✅ Agent间通信使用MS AF的**A2A机制**
 - ✅ CKY.MAF**增强**MS AF的能力（调度、存储、监控）
-- ✅ LLM调用使用MS AF的`IChatClient`接口
+- ✅ LLM服务通过继承`AIAgent`并实现`ILlmService`接口（**不使用**SemanticKernel）
 
 ---
 
@@ -187,17 +188,141 @@ classDiagram
         +ExecuteAsync(request) Task~AIResponse~
     }
 
-    class MafMainAgent {
-        <<主控Agent>>
-        +DecomposeTaskAsync()
-        +OrchestrateAgentsAsync()
+    class LlmAgent {
+        <<LLM Agent基类>>
+        +LlmProviderConfig Config
+        +ExecuteAsync(modelId, prompt, scenario) Task~string~
+        +SupportsScenario(scenario) bool
     }
 
-    class LightingAgent {
-        <<领域Agent>>
-        +ControlLightAsync()
-        +SetBrightnessAsync()
+    class ZhipuAIAgent {
+        <<智谱AI实现>>
+        +ExecuteAsync(modelId, prompt, scenario) Task~string~
     }
+
+    class QwenAIAgent {
+        <<通义千问实现>>
+        +ExecuteAsync(modelId, prompt, scenario) Task~string~
+    }
+
+    AIAgent <|-- MafAgentBase : 继承
+    AIAgent <|-- LlmAgent : 继承
+    LlmAgent <|-- ZhipuAIAgent : 继承
+    LlmAgent <|-- QwenAIAgent : 继承
+```
+
+### 2.3.1 LLM Agent 架构
+
+> **新增功能（2026-03-13）**：CKY.MAF 提供完整的 LLM Agent 架构，支持多个 LLM 提供商，内置弹性保护和故障转移。
+
+**核心设计**：
+
+```mermaid
+graph TB
+    subgraph "LLM Agent 架构"
+        LlmBase[LlmAgent<br/>抽象基类]
+
+        subgraph "具体实现"
+            Zhipu[ZhipuAIAgent<br/>智谱AI]
+            Qwen[QwenAIAgent<br/>通义千问]
+            Future[DeepSeekAIAgent<br/>文心一言]
+        end
+
+        subgraph "弹性保护"
+            Resilience[LlmResiliencePipeline<br/>弹性管道]
+            CB[LlmCircuitBreaker<br/>熔断器]
+            Retry[指数退避重试<br/>1s, 2s, 4s]
+            Timeout[超时保护<br/>30s default]
+        end
+
+        subgraph "配置与注册"
+            Config[LlmProviderConfig<br/>配置模型]
+            Registry[ILlmAgentRegistry<br/>注册表]
+        end
+    end
+
+    Zhipu --> LlmBase
+    Qwen --> LlmBase
+    Future --> LlmBase
+
+    LlmBase --> Resilience
+    Resilience --> CB
+    Resilience --> Retry
+    Resilience --> Timeout
+
+    Registry --> Zhipu
+    Registry --> Qwen
+
+    style LlmBase fill:#e1f5ff
+    style Resilience fill:#fff4e1
+    style CB fill:#ffcccc
+```
+
+**LLM Agent 特性**：
+
+| 特性 | 说明 | 实现位置 |
+|------|------|---------|
+| **多提供商支持** | 智谱AI、通义千问、文心一言等 | `ZhipuAIAgent`, `QwenAIAgent` |
+| **场景支持** | Chat、Intent、Image、Video | `LlmScenario` 枚举 |
+| **弹性保护** | 熔断器、重试、超时 | `LlmResiliencePipeline` |
+| **配置验证** | 启动时验证配置有效性 | `LlmProviderConfig.Validate()` |
+| **API Key 脱敏** | 日志中自动隐藏敏感信息 | `GetApiKeyForLogging()` |
+| **故障转移** | 自动切换到备用提供商 | `ILlmAgentRegistry.GetBestAgentAsync()` |
+| **独立熔断器** | 每个 AgentId 独立的熔断器实例 | `ConcurrentDictionary<string, LlmCircuitBreaker>` |
+
+**使用示例**：
+
+```csharp
+// 1. 配置 LLM 提供商
+var config = new LlmProviderConfig
+{
+    ProviderName = "zhipuai",
+    ProviderDisplayName = "智谱AI",
+    ModelId = "glm-4",
+    ApiKey = "your-api-key",
+    ApiBaseUrl = "https://open.bigmodel.cn/api/paas/v4",
+    SupportedScenarios = new List<LlmScenario> { LlmScenario.Chat },
+    Temperature = 0.7,
+    MaxTokens = 2000
+};
+config.Validate(); // 启动时验证
+
+// 2. 创建 Agent（通过依赖注入）
+services.AddHttpClient<ZhipuAIAgent>(client =>
+{
+    client.BaseAddress = new Uri("https://open.bigmodel.cn/api/paas/v4/chat/completions");
+    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+});
+services.AddSingleton<LlmResiliencePipeline>();
+
+// 3. 使用 Agent
+var agent = new ZhipuAIAgent(config, logger, httpClient, resiliencePipeline);
+var response = await agent.ExecuteAsync(
+    modelId: "glm-4",
+    prompt: "你好",
+    scenario: LlmScenario.Chat,
+    systemPrompt: "你是一个友好的助手"
+);
+```
+
+**弹性保护自动生效**：
+
+```csharp
+// 所有 LLM 调用自动通过弹性管道
+return await _resiliencePipeline.ExecuteAsync(
+    AgentId,
+    async (innerCt) => await ExecuteInternalAsync(...),
+    timeout: TimeSpan.FromSeconds(30),
+    ct
+);
+
+// 三层防护：
+// 1. 熔断器检查 → 连续失败3次后打开
+// 2. 超时保护 → 30秒后自动取消
+// 3. 指数退避重试 → 最多3次，延迟：1s, 2s, 4s
+```
+
+---
 
     class ClimateAgent {
         <<领域Agent>>
@@ -234,7 +359,10 @@ classDiagram
 Agent框架:
   基类: AIAgent (MS AF提供)
   通信: Agent-to-Agent (MS AF A2A)
-  LLM: Microsoft.Extensions.AI (MS AF集成)
+  LLM: 自定义ILlmService接口，实现类继承AIAgent
+       智谱AI (GLM-4/GLM-4-Plus) - 主力模型
+       通义千问、文心一言、讯飞星火 - 备选模型
+       **重要**: 不使用SemanticKernel，基于MS AF原生能力
 
 CKY.MAF增强:
   调度: 智能任务调度系统
@@ -242,10 +370,6 @@ CKY.MAF增强:
   优先级: 多维优先级评分 (0-100)
   依赖管理: 5种依赖类型
   监控: Prometheus + 分布式追踪
-
-LLM提供商:
-  首选: 智谱AI (GLM-4 / GLM-4-Plus)
-  备选: 通义千问、文心一言、讯飞星火
 
 数据库:
   关系型: PostgreSQL 16

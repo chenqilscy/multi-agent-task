@@ -363,206 +363,234 @@ public static class RetryPolicies
 
 ---
 
-## 三、熔断器模式
+## 三、LLM 弹性管道与熔断器模式
 
-### 3.1 熔断器状态机
+> **重要更新（2026-03-13）**：CKY.MAF 已实现完整的 LLM 弹性管道，包含熔断器、重试机制和超时保护。所有实现位于 `Core/Resilience/` 命名空间。
+
+### 3.1 LLM 弹性管道架构
+
+```mermaid
+graph TD
+    Request[LLM 请求] --> CB[熔断器检查<br/>LlmCircuitBreaker]
+    CB -->|通过| Timeout[超时保护<br/>30s default]
+    CB -->|拒绝| Reject[抛出异常<br/>CircuitBreakerOpenException]
+    Timeout --> Retry[指数退避重试<br/>最多 3 次<br/>1s, 2s, 4s]
+    Retry --> LLM[LLM API 调用]
+    LLM -->|成功| RecordSuccess[记录成功]
+    LLM -->|失败| RecordFailure[记录失败]
+    RecordSuccess --> Response[返回响应]
+    RecordFailure -->|达到阈值| Open[熔断器打开]
+```
+
+**核心组件**：
+1. **LlmCircuitBreaker** - 每个独立的 AgentId 使用独立的熔断器实例
+2. **LlmResiliencePipeline** - 整合熔断器、超时、重试的完整管道
+3. **LlmCircuitBreakerOptions** - 配置选项
+
+### 3.2 熔断器状态机
 
 ```mermaid
 stateDiagram-v2
     [*] --> Closed : 初始状态
-    Closed --> Open : 失败次数超过阈值
-    Open --> HalfOpen : 等待恢复时间
+    Closed --> Open : 连续失败 ≥ FailureThreshold (默认 3)
+    Open --> HalfOpen : 等待 BreakDuration (默认 5 分钟)
     HalfOpen --> Closed : 测试请求成功
     HalfOpen --> Open : 测试请求失败
 ```
 
 **状态说明**：
-- **Closed（关闭）**: 正常运行，记录失败次数
-- **Open（断开）**: 停止发送请求，快速失败返回
-- **HalfOpen（半开）**: 允许一个测试请求，验证服务是否恢复
+- **Closed（关闭）**: 正常运行，允许所有请求，跟踪失败次数
+- **Open（断开）**: 停止发送请求，快速失败返回 `LlmCircuitBreakerOpenException`
+- **HalfOpen（半开）**: 等待恢复时间后，允许测试请求验证服务是否恢复
 
-### 3.2 熔断器配置
+### 3.3 LLM 熔断器配置
 
 ```csharp
-namespace CKY.MAF.Core.Resilience
+namespace CKY.MultiAgentFramework.Core.Models.Resilience
 {
     /// <summary>
-    /// 熔断器配置
+    /// LLM 熔断器配置选项
     /// </summary>
-    public class CircuitBreakerOptions
+    public class LlmCircuitBreakerOptions
     {
-        /// <summary>触发熔断的失败次数阈值（在统计时间窗口内）</summary>
-        public int FailureThreshold { get; init; }
+        /// <summary>失败阈值：连续失败多少次后熔断（默认 3 次）</summary>
+        public int FailureThreshold { get; set; } = 3;
 
-        /// <summary>统计时间窗口（秒）</summary>
-        public int SamplingDurationSeconds { get; init; }
+        /// <summary>熔断持续时间（默认 5 分钟）</summary>
+        public TimeSpan BreakDuration { get; set; } = TimeSpan.FromMinutes(5);
 
-        /// <summary>熔断持续时间（秒）</summary>
-        public int BreakDurationSeconds { get; init; }
+        /// <summary>半开状态的测试请求超时（默认 30 秒）</summary>
+        public TimeSpan HalfOpenTimeout { get; set; } = TimeSpan.FromSeconds(30);
     }
 }
 ```
 
-### 3.3 各服务熔断器参数
+### 3.4 各 LLM 服务熔断器参数
 
-| 服务 | 失败次数阈值 | 统计窗口 | 熔断持续时间 | 说明 |
-|------|------------|---------|------------|------|
-| **LLM API** | 10次 | 60秒 | 120秒 | 保护API配额，防止级联失败 |
-| **Redis缓存** | 20次 | 30秒 | 60秒 | 快速恢复，退到L1缓存 |
-| **PostgreSQL** | 5次 | 60秒 | 180秒 | 连接错误影响面大，延长恢复窗口 |
-| **Qdrant向量存储** | 10次 | 60秒 | 90秒 | 退到关键词搜索降级 |
+| LLM 服务 | 失败阈值 | 熔断持续时间 | 半开超时 | 说明 |
+|---------|---------|------------|---------|------|
+| **智谱AI (GLM-4)** | 3 次 | 5 分钟 | 30 秒 | 主力模型，快速恢复 |
+| **通义千问 (Qwen)** | 3 次 | 5 分钟 | 30 秒 | 备选模型，独立熔断 |
+| **文心一言** | 3 次 | 5 分钟 | 30 秒 | 备选模型，独立熔断 |
 
-```csharp
-// 各服务预定义熔断器配置
-public static class CircuitBreakerConfigs
-{
-    public static readonly CircuitBreakerOptions LlmApi = new()
-    {
-        FailureThreshold = 10,
-        SamplingDurationSeconds = 60,
-        BreakDurationSeconds = 120
-    };
+**关键设计**：每个 LLM AgentId 使用独立的熔断器实例，互不影响。
 
-    public static readonly CircuitBreakerOptions Redis = new()
-    {
-        FailureThreshold = 20,
-        SamplingDurationSeconds = 30,
-        BreakDurationSeconds = 60
-    };
-
-    public static readonly CircuitBreakerOptions PostgreSql = new()
-    {
-        FailureThreshold = 5,
-        SamplingDurationSeconds = 60,
-        BreakDurationSeconds = 180
-    };
-
-    public static readonly CircuitBreakerOptions QdrantVectorStore = new()
-    {
-        FailureThreshold = 10,
-        SamplingDurationSeconds = 60,
-        BreakDurationSeconds = 90
-    };
-}
-```
-
-### 3.4 熔断器实现
+### 3.5 LLM 熔断器实现
 
 ```csharp
-namespace CKY.MAF.Core.Resilience
+namespace CKY.MultiAgentFramework.Core.Resilience
 {
     /// <summary>
-    /// 熔断器状态
+    /// LLM 熔断器状态
     /// </summary>
-    public enum CircuitBreakerState { Closed, Open, HalfOpen }
+    public enum LlmCircuitState
+    {
+        Closed,     // 正常状态
+        Open,       // 熔断状态
+        HalfOpen    // 半开状态（尝试恢复）
+    }
 
     /// <summary>
-    /// 熔断器
+    /// LLM 熔断器（完整实现）
     /// </summary>
-    public class CircuitBreaker
+    public class LlmCircuitBreaker
     {
-        private readonly CircuitBreakerOptions _options;
-        private readonly ILogger<CircuitBreaker> _logger;
-        private readonly string _serviceName;
+        private readonly ILogger _logger;
+        private readonly LlmCircuitBreakerOptions _options;
         private readonly object _lock = new();
 
-        private CircuitBreakerState _state = CircuitBreakerState.Closed;
+        private LlmCircuitState _state = LlmCircuitState.Closed;
         private int _failureCount;
-        private DateTime _lastFailureTime;
-        private DateTime _openedAt;
+        private int _successCount;
+        private DateTime? _lastStateChangeTime;
+        private DateTime? _lastFailureTime;
 
-        public CircuitBreakerState State => _state;
-
-        public CircuitBreaker(string serviceName, CircuitBreakerOptions options, ILogger<CircuitBreaker> logger)
+        /// <summary>
+        /// 执行操作（带熔断保护）
+        /// </summary>
+        public async Task<T> ExecuteAsync<T>(
+            string agentId,
+            Func<CancellationToken, Task<T>> operation,
+            CancellationToken ct = default)
         {
-            _serviceName = serviceName;
-            _options = options;
-            _logger = logger;
-        }
-
-        public async Task<T> ExecuteAsync<T>(Func<Task<T>> operation)
-        {
-            lock (_lock)
+            // 检查是否允许执行
+            if (!CanExecute(agentId))
             {
-                if (_state == CircuitBreakerState.Open)
-                {
-                    if (DateTime.UtcNow - _openedAt < TimeSpan.FromSeconds(_options.BreakDurationSeconds))
-                    {
-                        throw new CircuitBreakerOpenException(_serviceName);
-                    }
-
-                    // 进入半开状态，允许一次测试请求
-                    _state = CircuitBreakerState.HalfOpen;
-                    _logger.LogInformation("熔断器 [{Service}] 进入半开状态", _serviceName);
-                }
+                throw new LlmCircuitBreakerOpenException(
+                    $"Circuit breaker is OPEN for {agentId}");
             }
 
             try
             {
-                var result = await operation();
-                OnSuccess();
+                var result = await operation(ct);
+                RecordSuccess(agentId);
                 return result;
-            }
-            catch (CircuitBreakerOpenException)
-            {
-                throw;
             }
             catch (Exception ex)
             {
-                OnFailure(ex);
+                RecordFailure(agentId, ex);
                 throw;
             }
         }
 
-        private void OnSuccess()
+        /// <summary>
+        /// 手动重置熔断器
+        /// </summary>
+        public void Reset(string agentId)
         {
             lock (_lock)
             {
-                if (_state == CircuitBreakerState.HalfOpen)
-                {
-                    _logger.LogInformation("熔断器 [{Service}] 恢复关闭状态", _serviceName);
-                }
-                _state = CircuitBreakerState.Closed;
+                _state = LlmCircuitState.Closed;
                 _failureCount = 0;
-            }
-        }
-
-        private void OnFailure(Exception ex)
-        {
-            lock (_lock)
-            {
-                // 重置超出时间窗口的计数
-                if (DateTime.UtcNow - _lastFailureTime > TimeSpan.FromSeconds(_options.SamplingDurationSeconds))
-                {
-                    _failureCount = 0;
-                }
-
-                _failureCount++;
-                _lastFailureTime = DateTime.UtcNow;
-
-                if (_state == CircuitBreakerState.HalfOpen || _failureCount >= _options.FailureThreshold)
-                {
-                    _state = CircuitBreakerState.Open;
-                    _openedAt = DateTime.UtcNow;
-                    _logger.LogError(
-                        ex,
-                        "熔断器 [{Service}] 触发断开（失败次数: {Count}/{Threshold}），将在 {BreakDuration}s 后恢复",
-                        _serviceName, _failureCount, _options.FailureThreshold, _options.BreakDurationSeconds);
-                }
+                _successCount = 0;
+                _lastStateChangeTime = DateTime.UtcNow;
             }
         }
     }
 
     /// <summary>
-    /// 熔断器开路异常
+    /// LLM 熔断器开启异常
     /// </summary>
-    public class CircuitBreakerOpenException : MafException
+    public class LlmCircuitBreakerOpenException : Exception
     {
-        public CircuitBreakerOpenException(string serviceName)
-            : base(MafErrorCode.Unknown, $"服务 '{serviceName}' 熔断器已断开，请稍后重试", isRetryable: false)
+        public LlmCircuitBreakerOpenException(string message) : base(message) { }
+    }
+}
+```
+
+### 3.6 LLM 弹性管道集成
+
+```csharp
+namespace CKY.MultiAgentFramework.Core.Resilience
+{
+    /// <summary>
+    /// LLM 弹性管道（完整实现）
+    /// 整合：熔断器 → 超时保护 → 指数退避重试
+    /// </summary>
+    public class LlmResiliencePipeline : ILlmResiliencePipeline
+    {
+        private readonly ConcurrentDictionary<string, LlmCircuitBreaker> _circuitBreakers;
+
+        public async Task<T> ExecuteAsync<T>(
+            string agentId,
+            Func<CancellationToken, Task<T>> operation,
+            TimeSpan? timeout = null,
+            CancellationToken ct = default)
         {
+            var circuitBreaker = GetCircuitBreaker(agentId);
+
+            // 步骤 1: 熔断器检查（第一道防线）
+            return await circuitBreaker.ExecuteAsync(
+                agentId,
+                async (innerCt) => await ExecuteWithRetryAsync(
+                    agentId, operation, timeout ?? TimeSpan.FromSeconds(30), innerCt),
+                ct);
+        }
+
+        private async Task<T> ExecuteWithRetryAsync<T>(...)
+        {
+            // 步骤 2: 超时保护（第二道防线）
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(timeout);
+
+            // 步骤 3: 指数退避重试（第三道防线）
+            // 最多 3 次，延迟：1s, 2s, 4s
+            ...
         }
     }
+}
+```
+
+### 3.7 使用示例
+
+```csharp
+// 1. 创建弹性管道
+var options = new LlmCircuitBreakerOptions
+{
+    FailureThreshold = 5,
+    BreakDuration = TimeSpan.FromMinutes(10),
+    HalfOpenTimeout = TimeSpan.FromSeconds(30)
+};
+var pipeline = new LlmResiliencePipeline(logger, options);
+
+// 2. 使用弹性管道执行 LLM 调用
+try
+{
+    var response = await pipeline.ExecuteAsync(
+        agentId: "zhipuai",
+        async (ct) => await agent.ExecuteAsync(...),
+        timeout: TimeSpan.FromSeconds(30)
+    );
+}
+catch (LlmCircuitBreakerOpenException ex)
+{
+    // 熔断器已打开，请求被拒绝
+    logger.LogWarning(ex, "Circuit breaker is open");
+}
+catch (LlmResilienceException ex)
+{
+    // 所有重试都失败
+    logger.LogError(ex, "All retries failed");
 }
 ```
 
