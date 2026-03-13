@@ -1,196 +1,119 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
-using CKY.MultiAgentFramework.Core.Enums;
-using CKY.MultiAgentFramework.Core.Models.Agent;
-using CKY.MultiAgentFramework.Core.Models.Task;
+using CKY.MultiAgentFramework.Core.Models.LLM;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace CKY.MultiAgentFramework.Core.Agents
 {
     /// <summary>
-    /// CKY.MAF Agent增强基类
-    /// 提供会话存储、优先级计算和监控功能
-    /// 注意：实际应用中此类应继承自MS Agent Framework的AIAgent
+    /// MAF Agent 基类（使用组合模式而非继承 AIAgent）
     /// </summary>
+    /// <remarks>
+    /// 设计调整：
+    /// 由于 Microsoft.Agents.AI 的 AIAgent 基类 API 与预期不同，
+    /// 采用组合模式而非继承模式来构建 LLM Agent。
+    ///
+    /// 架构设计：
+    /// 1. 不继承 AIAgent，而是使用 AIContextProvider 管道
+    /// 2. MafAgentBase 提供统一的 LLM 调用接口
+    /// 3. 具体厂商实现（智谱AI、通义千问等）继承此类
+    /// </remarks>
     public abstract class MafAgentBase
     {
-        /// <summary>会话存储（CKY.MAF增强）</summary>
-        protected readonly IMafSessionStorage SessionStorage;
-
-        /// <summary>优先级计算器（CKY.MAF增强）</summary>
-        protected readonly IPriorityCalculator PriorityCalculator;
-
-        /// <summary>监控指标收集器（CKY.MAF增强）</summary>
-        protected readonly IMetricsCollector MetricsCollector;
+        /// <summary>LLM 配置</summary>
+        public readonly LlmProviderConfig Config;
 
         /// <summary>日志记录器</summary>
         protected readonly ILogger Logger;
 
-        /// <summary>Agent当前状态</summary>
-        public MafAgentStatus Status { get; private set; } = MafAgentStatus.Initializing;
-
-        /// <summary>最后健康检查时间</summary>
-        public DateTime? LastHealthCheck { get; private set; }
-
-        /// <summary>Agent统计信息</summary>
-        public AgentStatistics Statistics { get; } = new();
-
-        /// <summary>Agent唯一标识</summary>
-        public abstract string AgentId { get; }
-
-        /// <summary>Agent名称</summary>
-        public abstract string Name { get; }
-
-        /// <summary>Agent描述</summary>
-        public abstract string Description { get; }
-
-        /// <summary>Agent版本</summary>
-        public virtual string Version => "1.0.0";
-
-        /// <summary>Agent能力列表</summary>
-        public abstract IReadOnlyList<string> Capabilities { get; }
-
+        /// <summary>
+        /// 构造函数
+        /// </summary>
         protected MafAgentBase(
-            IMafSessionStorage sessionStorage,
-            IPriorityCalculator priorityCalculator,
-            IMetricsCollector metricsCollector,
+            LlmProviderConfig config,
             ILogger logger)
         {
-            SessionStorage = sessionStorage ?? throw new ArgumentNullException(nameof(sessionStorage));
-            PriorityCalculator = priorityCalculator ?? throw new ArgumentNullException(nameof(priorityCalculator));
-            MetricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
+            Config = config ?? throw new ArgumentNullException(nameof(config));
             Logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <summary>
-        /// 执行任务（模板方法）
+        /// Agent 唯一标识
         /// </summary>
-        public async Task<MafTaskResponse> ExecuteAsync(
-            MafTaskRequest request,
-            CancellationToken ct = default)
-        {
-            Status = MafAgentStatus.Busy;
-            var startTime = DateTime.UtcNow;
-
-            try
-            {
-                Logger.LogInformation("Agent {AgentName} starting task {TaskId}", Name, request.TaskId);
-
-                // 1. 前置处理（子类可重写）
-                await OnBeforeExecuteAsync(request, ct);
-
-                // 2. 加载会话上下文（CKY.MAF增强）
-                var session = await SessionStorage.LoadSessionAsync(request.ConversationId, ct);
-
-                // 3. 执行业务逻辑（子类必须实现）
-                var result = await ExecuteBusinessLogicAsync(request, session, ct);
-
-                // 4. 保存会话上下文（CKY.MAF增强）
-                await SessionStorage.SaveSessionAsync(session, ct);
-
-                // 5. 后置处理（子类可重写）
-                await OnAfterExecuteAsync(request, result, ct);
-
-                // 6. 更新统计
-                Statistics.TotalExecutions++;
-                Statistics.SuccessfulExecutions++;
-                Statistics.LastExecutionTime = DateTime.UtcNow;
-
-                // 7. 记录指标（CKY.MAF增强）
-                await MetricsCollector.RecordExecutionAsync(Name, startTime, result.Success, ct);
-
-                Logger.LogInformation("Agent {AgentName} completed task {TaskId}", Name, request.TaskId);
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                Statistics.TotalExecutions++;
-                Statistics.FailedExecutions++;
-
-                Logger.LogError(ex, "Agent {AgentName} failed task {TaskId}", Name, request.TaskId);
-                await MetricsCollector.RecordErrorAsync(Name, ex, ct);
-
-                return await HandleExceptionAsync(request, ex, ct);
-            }
-            finally
-            {
-                Status = MafAgentStatus.Idle;
-            }
-        }
+        public virtual string Id => $"{Config.ProviderName}-{Config.ModelId}".ToLowerInvariant();
 
         /// <summary>
-        /// 子类实现具体的业务逻辑
+        /// Agent 显示名称
         /// </summary>
-        protected abstract Task<MafTaskResponse> ExecuteBusinessLogicAsync(
-            MafTaskRequest request,
-            IAgentSession session,
+        public virtual string Name => $"{Config.ProviderDisplayName} ({Config.ModelId})";
+
+        /// <summary>
+        /// Agent 描述
+        /// </summary>
+        public virtual string Description => $"LLM Agent for {Config.ProviderName} - {Config.ModelId}";
+
+        #region LLM 调用核心方法
+
+        /// <summary>
+        /// 执行 LLM 调用（核心抽象方法）
+        /// </summary>
+        public abstract Task<string> ExecuteAsync(
+            string modelId,
+            string prompt,
+            LlmScenario scenario = LlmScenario.Chat,
+            string? systemPrompt = null,
             CancellationToken ct = default);
 
         /// <summary>
-        /// 执行前置处理（子类可重写）
+        /// 批量执行 LLM 调用
         /// </summary>
-        protected virtual Task OnBeforeExecuteAsync(
-            MafTaskRequest request,
-            CancellationToken ct = default)
-            => Task.CompletedTask;
-
-        /// <summary>
-        /// 执行后置处理（子类可重写）
-        /// </summary>
-        protected virtual Task OnAfterExecuteAsync(
-            MafTaskRequest request,
-            MafTaskResponse result,
-            CancellationToken ct = default)
-            => Task.CompletedTask;
-
-        /// <summary>
-        /// 异常处理（子类可重写）
-        /// </summary>
-        protected virtual Task<MafTaskResponse> HandleExceptionAsync(
-            MafTaskRequest request,
-            Exception exception,
+        public virtual async Task<string[]> ExecuteBatchAsync(
+            string modelId,
+            string[] prompts,
+            LlmScenario scenario = LlmScenario.Chat,
+            string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            return Task.FromResult(new MafTaskResponse
-            {
-                TaskId = request.TaskId,
-                Success = false,
-                Error = exception.Message,
-                Result = $"处理您的请求时遇到问题：{exception.Message}"
-            });
+            if (prompts == null || prompts.Length == 0)
+                return Array.Empty<string>();
+
+            var tasks = prompts.Select(prompt =>
+                ExecuteAsync(modelId, prompt, scenario, systemPrompt, ct));
+
+            return await Task.WhenAll(tasks);
         }
 
         /// <summary>
-        /// 初始化Agent
+        /// 检查模型是否支持指定场景
         /// </summary>
-        public virtual Task InitializeAsync(CancellationToken ct = default)
+        public virtual bool SupportsScenario(LlmScenario scenario)
         {
-            Status = MafAgentStatus.Idle;
-            return Task.CompletedTask;
+            return Config.SupportedScenarios.Contains(scenario);
+        }
+
+        #endregion
+
+        #region 辅助方法
+
+        /// <summary>
+        /// 获取当前配置的模型 ID
+        /// </summary>
+        public string GetCurrentModelId()
+        {
+            return Config.ModelId;
         }
 
         /// <summary>
-        /// 关闭Agent
+        /// 获取 API 密钥
         /// </summary>
-        public virtual Task ShutdownAsync(CancellationToken ct = default)
+        protected string GetApiKey()
         {
-            Status = MafAgentStatus.Shutdown;
-            return Task.CompletedTask;
+            if (string.IsNullOrWhiteSpace(Config.ApiKey))
+                throw new InvalidOperationException($"API Key is not configured for {Config.ProviderName}");
+
+            return Config.ApiKey;
         }
 
-        /// <summary>
-        /// 健康检查
-        /// </summary>
-        public virtual Task<AgentHealthReport> CheckHealthAsync(CancellationToken ct = default)
-        {
-            LastHealthCheck = DateTime.UtcNow;
-            return Task.FromResult(new AgentHealthReport
-            {
-                AgentId = AgentId,
-                Status = Status == MafAgentStatus.Error ? MafHealthStatus.Unhealthy : MafHealthStatus.Healthy,
-                CheckedAt = LastHealthCheck.Value,
-                Description = $"Agent {Name} is {Status}"
-            });
-        }
+        #endregion
     }
 }
