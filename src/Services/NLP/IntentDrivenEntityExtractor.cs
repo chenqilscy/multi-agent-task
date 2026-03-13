@@ -1,6 +1,7 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using Microsoft.Extensions.Logging;
 using Polly;
+using Polly.CircuitBreaker;
 using System.Diagnostics;
 
 namespace CKY.MultiAgentFramework.Services.NLP
@@ -85,9 +86,31 @@ namespace CKY.MultiAgentFramework.Services.NLP
                     return keywordResult;
                 }
 
-                // Stage 5: LLM 提取（带熔断器）- TODO: Task 5
-                _logger.LogDebug("LLM extraction not yet implemented, returning keyword result");
-                return keywordResult;
+                // Stage 5: LLM 提取（带熔断器）
+                EntityExtractionResult llmResult;
+                try
+                {
+                    llmResult = await _circuitBreakerPolicy.ExecuteAsync(async () =>
+                    {
+                        return await ExtractByLlmAsync(userInput, provider, ct);
+                    });
+                }
+                catch (BrokenCircuitException)
+                {
+                    _logger.LogWarning("LLM circuit breaker is open, using keyword-only result");
+                    return keywordResult;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "LLM extraction failed, using keyword-only result");
+                    return keywordResult;
+                }
+
+                // Stage 6: 合并结果
+                var mergedResult = MergeResults(keywordResult, llmResult);
+                _logger.LogDebug("Final merged result has {Count} entities",
+                    mergedResult.Entities.Count);
+                return mergedResult;
             }
             catch (Exception ex)
             {
@@ -182,6 +205,155 @@ namespace CKY.MultiAgentFramework.Services.NLP
             };
 
             return vagueWords.Any(word => input.Contains(word));
+        }
+
+        private async Task<EntityExtractionResult> ExtractByLlmAsync(
+            string userInput,
+            IEntityPatternProvider provider,
+            CancellationToken ct)
+        {
+            var supportedTypes = provider.GetSupportedEntityTypes();
+            var fewShotExamples = provider.GetFewShotExamples();
+
+            var systemPrompt = $@"你是实体提取助手。请从用户输入中提取以下类型的实体：
+{string.Join(", ", supportedTypes)}
+
+要求：
+1. 只提取明确存在的实体类型，不要编造
+2. 返回JSON格式，键为实体类型，值为提取的值
+3. 如果某个实体类型不存在于输入中，不要包含该字段
+4. 数值类型（如温度、亮度）只提取数字部分
+
+示例：
+{fewShotExamples}
+
+返回格式：{{""实体类型"": ""实体值""}}";
+
+            try
+            {
+                var response = await _llmService.CompleteAsync(systemPrompt, userInput, ct);
+                _logger.LogDebug("LLM response: {Response}", response);
+
+                return ParseLlmResponse(response, supportedTypes);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to parse LLM response");
+                throw;
+            }
+        }
+
+        private EntityExtractionResult ParseLlmResponse(
+            string response,
+            IEnumerable<string> supportedTypes)
+        {
+            var result = new EntityExtractionResult();
+
+            try
+            {
+                // 尝试提取 JSON（处理可能的 markdown 代码块）
+                var jsonMatch = System.Text.RegularExpressions.Regex.Match(
+                    response,
+                    @"```json\s*(\{.*?\})\s*```",
+                    System.Text.RegularExpressions.RegexOptions.Singleline);
+
+                var jsonString = jsonMatch.Success
+                    ? jsonMatch.Groups[1].Value
+                    : response.Trim();
+
+                // 去除可能的 markdown 标记
+                jsonString = System.Text.RegularExpressions.Regex.Replace(
+                    jsonString,
+                    @"```.*?```",
+                    "",
+                    System.Text.RegularExpressions.RegexOptions.Singleline).Trim();
+
+                // 解析 JSON
+                using var document = System.Text.Json.JsonDocument.Parse(jsonString);
+                var root = document.RootElement;
+
+                foreach (var property in root.EnumerateObject())
+                {
+                    var entityType = property.Name.Trim();
+                    var entityValue = property.Value.GetString();
+
+                    if (!string.IsNullOrEmpty(entityValue) &&
+                        supportedTypes.Contains(entityType, StringComparer.OrdinalIgnoreCase))
+                    {
+                        result.Entities[entityType] = entityValue!;
+                        result.ExtractedEntities.Add(new Entity
+                        {
+                            EntityType = entityType,
+                            EntityValue = entityValue!,
+                            StartPosition = -1, // LLM 无法提供位置信息
+                            EndPosition = -1,
+                            Confidence = 0.95 // LLM 默认置信度
+                        });
+                    }
+                }
+
+                _logger.LogDebug("Parsed {Count} entities from LLM response",
+                    result.Entities.Count);
+            }
+            catch (System.Text.Json.JsonException ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse LLM response as JSON: {Response}", response);
+                throw;
+            }
+
+            return result;
+        }
+
+        private EntityExtractionResult MergeResults(
+            EntityExtractionResult keywordResult,
+            EntityExtractionResult llmResult)
+        {
+            var merged = new EntityExtractionResult();
+
+            // 获取所有实体类型的并集
+            var allTypes = keywordResult.Entities.Keys
+                .Concat(llmResult.Entities.Keys)
+                .Distinct();
+
+            foreach (var entityType in allTypes)
+            {
+                bool hasKeyword = keywordResult.Entities.ContainsKey(entityType);
+                bool hasLlm = llmResult.Entities.ContainsKey(entityType);
+
+                if (hasKeyword && hasLlm)
+                {
+                    // 两者都有：选择置信度高的
+                    var keywordEntity = keywordResult.ExtractedEntities
+                        .First(e => e.EntityType == entityType);
+                    var llmEntity = llmResult.ExtractedEntities
+                        .First(e => e.EntityType == entityType);
+
+                    var winner = llmEntity.Confidence > keywordEntity.Confidence
+                        ? llmEntity
+                        : keywordEntity;
+
+                    merged.Entities[entityType] = winner.EntityValue;
+                    merged.ExtractedEntities.Add(winner);
+                }
+                else if (hasKeyword)
+                {
+                    // 仅关键字有：使用关键字结果
+                    var keywordEntity = keywordResult.ExtractedEntities
+                        .First(e => e.EntityType == entityType);
+                    merged.Entities[entityType] = keywordEntity.EntityValue;
+                    merged.ExtractedEntities.Add(keywordEntity);
+                }
+                else if (hasLlm)
+                {
+                    // 仅 LLM 有：使用 LLM 结果（补充）
+                    var llmEntity = llmResult.ExtractedEntities
+                        .First(e => e.EntityType == entityType);
+                    merged.Entities[entityType] = llmEntity.EntityValue;
+                    merged.ExtractedEntities.Add(llmEntity);
+                }
+            }
+
+            return merged;
         }
     }
 }
