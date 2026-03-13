@@ -1,11 +1,17 @@
+using System.Linq;
+
 namespace CKY.MultiAgentFramework.Core.Abstractions
 {
     /// <summary>
     /// 意图到实体模式提供者的映射实现
     /// </summary>
+    /// <remarks>
+    /// Intent matching is case-insensitive for user convenience.
+    /// Registering the same intent (different case) will overwrite the previous mapping.
+    /// </remarks>
     public class IntentProviderMapping : IIntentProviderMapping
     {
-        private readonly Dictionary<string, Type> _mapping = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Type> _mapping = new(StringComparer.OrdinalIgnoreCase); // Case-insensitive intent matching
 
         /// <inheritdoc />
         public void Register(string intent, Type providerType)
@@ -17,7 +23,7 @@ namespace CKY.MultiAgentFramework.Core.Abstractions
                 throw new ArgumentNullException(nameof(providerType));
 
             if (!typeof(IEntityPatternProvider).IsAssignableFrom(providerType))
-                throw new ArgumentException($"Type must implement IEntityPatternProvider: {providerType.Name}", nameof(providerType));
+                throw new ArgumentException($"Type must implement {nameof(IEntityPatternProvider)}: {providerType.Name}", nameof(providerType));
 
             _mapping[intent] = providerType;
         }
@@ -34,7 +40,7 @@ namespace CKY.MultiAgentFramework.Core.Abstractions
         /// <inheritdoc />
         public IEnumerable<string> GetRegisteredIntents()
         {
-            return _mapping.Keys;
+            return _mapping.Keys.ToList();
         }
     }
 }

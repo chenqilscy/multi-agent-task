@@ -6,17 +6,31 @@ namespace CKY.MultiAgentFramework.Tests.NLP
     // Mock providers for testing
     public class LightControlEntityPatternProvider : IEntityPatternProvider
     {
-        public IEnumerable<EntityPattern> GetPatterns()
+        public string?[]? GetPatterns(string entityType)
         {
-            yield return new EntityPattern("device", @"\b(灯|light)\b");
+            if (entityType == "device")
+                return new[] { "灯", "light" };
+            return null;
+        }
+
+        public IEnumerable<string> GetSupportedEntityTypes()
+        {
+            return new[] { "device" };
         }
     }
 
     public class ACControlEntityPatternProvider : IEntityPatternProvider
     {
-        public IEnumerable<EntityPattern> GetPatterns()
+        public string?[]? GetPatterns(string entityType)
         {
-            yield return new EntityPattern("device", @"\b(空调|air conditioner)\b");
+            if (entityType == "device")
+                return new[] { "空调", "AC" };
+            return null;
+        }
+
+        public IEnumerable<string> GetSupportedEntityTypes()
+        {
+            return new[] { "device" };
         }
     }
 
