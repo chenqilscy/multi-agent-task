@@ -37,11 +37,14 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
             return _entityPatternMap.Keys;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取 Few-shot 示例（用于 LLM Prompt）
+        /// 由业务层实现，提供该场景的示例
+        /// 注意：输出格式使用双引号表示JSON结构，便于LLM理解
+        /// </summary>
         public string GetFewShotExamples()
         {
-            return @"
-输入：""打开客厅的灯""
+            return @"输入：""打开客厅的灯""
 输出：{""Room"": ""客厅"", ""Device"": ""灯"", ""Action"": ""打开""}
 
 输入：""把卧室空调调到26度""
