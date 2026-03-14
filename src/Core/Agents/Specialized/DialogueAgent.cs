@@ -2,6 +2,7 @@ using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Agents;
 using CKY.MultiAgentFramework.Core.Models.LLM;
 using CKY.MultiAgentFramework.Core.Models.Task;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
