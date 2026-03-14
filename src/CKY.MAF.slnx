@@ -8,8 +8,19 @@
   <Folder Name="/src/Demos/SmartHome/">
     <Project Path="Demos/SmartHome/CKY.MAF.Demos.SmartHome.csproj" />
   </Folder> -->
-  <Folder Name="/src/Repository/">
-    <Project Path="Repository/CKY.MAF.Repository.csproj" />
+  <Folder Name="/src/Infrastructure/">
+    <Folder Name="/src/Infrastructure/Caching/">
+      <Project Path="Infrastructure/Caching/CKY.MAF.Infrastructure.Caching.csproj" />
+    </Folder>
+    <Folder Name="/src/Infrastructure/DependencyInjection/">
+      <Project Path="Infrastructure/DependencyInjection/CKY.MAF.Infrastructure.DependencyInjection.csproj" />
+    </Folder>
+    <Folder Name="/src/Infrastructure/Repository/">
+      <Project Path="Infrastructure/Repository/CKY.MAF.Repository.csproj" />
+    </Folder>
+    <Folder Name="/src/Infrastructure/Vectorization/">
+      <Project Path="Infrastructure/Vectorization/CKY.MAF.Infrastructure.Vectorization.csproj" />
+    </Folder>
   </Folder>
   <Folder Name="/src/Services/">
     <Project Path="Services/CKY.MAF.Services.csproj" />

@@ -29,6 +29,42 @@ namespace CKY.MultiAgentFramework.Infrastructure.Caching.Redis
         // Redis Key 前缀
         private const string SessionKeyPrefix = "maf:session:";
 
+        /// <summary>
+        /// 使用 SCAN 命令安全地获取匹配模式的所有键（避免 KEYS 命令阻塞）
+        /// </summary>
+        private async Task<List<RedisKey>> ScanKeysAsync(string pattern, CancellationToken cancellationToken = default)
+        {
+            var keys = new List<RedisKey>();
+            var cursor = 0;
+            var nextCursor = (RedisValue)cursor;
+
+            do
+            {
+                // 使用 SCAN 命令分批迭代，避免阻塞
+                var scanResult = await _database.ExecuteAsync("SCAN", nextCursor, "MATCH", pattern, "COUNT", 100);
+
+                // 解析 SCAN 结果
+                var resultParts = scanResult.ToString().Split('\n');
+                nextCursor = resultParts.Length > 0 ? resultParts[0] : (RedisValue)"0";
+
+                // 如果有键返回，添加到列表
+                if (resultParts.Length > 1 && !string.IsNullOrEmpty(resultParts[1]))
+                {
+                    var keyArray = resultParts[1].Split(' ').Where(k => !string.IsNullOrEmpty(k));
+                    foreach (var key in keyArray)
+                    {
+                        keys.Add(key);
+                    }
+                }
+
+                // 检查取消请求
+                cancellationToken.ThrowIfCancellationRequested();
+
+            } while (int.Parse(nextCursor!) != 0);
+
+            return keys;
+        }
+
         public RedisMafAiSessionStore(
             IDatabase database,
             ILogger<RedisMafAiSessionStore> logger,
@@ -121,17 +157,8 @@ namespace CKY.MultiAgentFramework.Infrastructure.Caching.Redis
             try
             {
                 var pattern = $"{SessionKeyPrefix}*";
-                var keys = new List<RedisKey>();
-
-                // 使用 ExecuteAsync 执行 KEYS 命令
-                var redisKeys = await _database.ExecuteAsync("KEYS", new object[] { pattern });
-                if (redisKeys != null && redisKeys.Length > 0)
-                {
-                    foreach (var key in (RedisKey[])redisKeys)
-                    {
-                        keys.Add(key);
-                    }
-                }
+                // 使用 SCAN 命令安全地获取键（避免 KEYS 阻塞 Redis）
+                var keys = await ScanKeysAsync(pattern, cancellationToken);
 
                 var sessions = new List<MafSessionState>();
                 foreach (var key in keys)
@@ -161,17 +188,8 @@ namespace CKY.MultiAgentFramework.Infrastructure.Caching.Redis
             try
             {
                 var pattern = $"{SessionKeyPrefix}*";
-                var keys = new List<RedisKey>();
-
-                // 使用 ExecuteAsync 执行 KEYS 命令
-                var redisKeys = await _database.ExecuteAsync("KEYS", new object[] { pattern });
-                if (redisKeys != null && redisKeys.Length > 0)
-                {
-                    foreach (var key in (RedisKey[])redisKeys)
-                    {
-                        keys.Add(key);
-                    }
-                }
+                // 使用 SCAN 命令安全地获取键（避免 KEYS 阻塞 Redis）
+                var keys = await ScanKeysAsync(pattern, cancellationToken);
 
                 var sessions = new List<MafSessionState>();
                 foreach (var key in keys)
@@ -201,17 +219,8 @@ namespace CKY.MultiAgentFramework.Infrastructure.Caching.Redis
             try
             {
                 var pattern = $"{SessionKeyPrefix}*";
-                var keys = new List<RedisKey>();
-
-                // 使用 ExecuteAsync 执行 KEYS 命令
-                var redisKeys = await _database.ExecuteAsync("KEYS", new object[] { pattern });
-                if (redisKeys != null && redisKeys.Length > 0)
-                {
-                    foreach (var key in (RedisKey[])redisKeys)
-                    {
-                        keys.Add(key);
-                    }
-                }
+                // 使用 SCAN 命令安全地获取键（避免 KEYS 阻塞 Redis）
+                var keys = await ScanKeysAsync(pattern, cancellationToken);
 
                 var deletedCount = 0;
                 foreach (var key in keys)

@@ -45,7 +45,7 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
                 _metrics.IncrementCounter(MafMetrics.GcCount, gen2Count, new[] { "2" });
 
                 // CPU使用率（简化计算）
-                var cpuUsage = CalculateCpuUsage();
+                var cpuUsage = CalculateCpuUsageInternal();
                 if (cpuUsage.HasValue)
                 {
                     _metrics.RecordGauge(MafMetrics.CpuUsage, cpuUsage.Value);
@@ -61,15 +61,15 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
             }
         }
 
-        private double? CalculateCpuUsage()
+        private double? CalculateCpuUsageInternal()
         {
             try
             {
                 var startTime = DateTime.UtcNow;
                 var startCpuUsage = _currentProcess.TotalProcessorTime;
 
-                // 短暂等待以计算CPU使用率
-                Thread.Sleep(100);
+                // 异步等待以计算CPU使用率（避免阻塞线程）
+                Task.Delay(100).Wait();
 
                 var endTime = DateTime.UtcNow;
                 var endCpuUsage = _currentProcess.TotalProcessorTime;
