@@ -70,5 +70,29 @@ public class MafServiceRegistrationExtensionsTests
         cacheDescriptor?.Lifetime.Should().Be(ServiceLifetime.Singleton);
     }
 
-    // TODO: Add multiple implementation scenario tests in Task 10
+    [Fact]
+    public void AddMafInfrastructureServices_WithInvalidConfig_ShouldUseDefault()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MafServices:Implementations:ICacheStore"] = "InvalidCacheStore"
+            })
+            .Build();
+
+        // Act & Assert
+        var action = () => services.AddMafInfrastructureServices(configuration);
+
+        // 应该不抛出异常，而是使用默认实现
+        action.Should().NotThrow();
+
+        // 验证默认实现被注册
+        var descriptor = services.FirstOrDefault(
+            sd => sd.ServiceType == typeof(ICacheStore));
+        descriptor.Should().NotBeNull();
+        descriptor?.ImplementationType.Should().Be(typeof(MemoryCacheStore));
+        descriptor?.Lifetime.Should().Be(ServiceLifetime.Singleton);
+    }
 }
