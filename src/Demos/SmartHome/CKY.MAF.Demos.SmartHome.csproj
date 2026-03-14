@@ -3,7 +3,16 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Core\CKY.MAF.Core.csproj" />
     <ProjectReference Include="..\..\Services\CKY.MAF.Services.csproj" />
-    <ProjectReference Include="..\..\Infrastructure\CKY.MAF.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Repository\CKY.MAF.Repository.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
+    <PackageReference Include="OpenTelemetry" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.9.0-beta.2" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
   </ItemGroup>
 
   <PropertyGroup>

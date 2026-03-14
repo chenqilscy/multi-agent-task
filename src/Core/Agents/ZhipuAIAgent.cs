@@ -54,13 +54,12 @@ namespace CKY.MultiAgentFramework.Core.Agents
         public override async Task<string> ExecuteAsync(
             string modelId,
             string prompt,
-            LlmScenario scenario = LlmScenario.Chat,
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
             return await _resiliencePipeline.ExecuteAsync(
                 AgentId,
-                async (innerCt) => await ExecuteInternalAsync(modelId, prompt, scenario, systemPrompt, innerCt),
+                async (innerCt) => await ExecuteInternalAsync(modelId, prompt, systemPrompt, innerCt),
                 timeout: TimeSpan.FromSeconds(30),
                 ct);
         }
@@ -71,7 +70,6 @@ namespace CKY.MultiAgentFramework.Core.Agents
         private async Task<string> ExecuteInternalAsync(
             string modelId,
             string prompt,
-            LlmScenario scenario,
             string? systemPrompt,
             CancellationToken ct)
         {
@@ -79,10 +77,10 @@ namespace CKY.MultiAgentFramework.Core.Agents
 
             try
             {
-                Logger.LogInformation("[ZhipuAI] Calling model: {ModelId}, Scenario: {Scenario}", modelId, scenario);
+                Logger.LogInformation("[ZhipuAI] Calling model: {ModelId}", modelId);
 
                 // 构建请求体
-                var requestBody = BuildRequestBody(modelId, prompt, scenario, systemPrompt);
+                var requestBody = BuildRequestBody(modelId, prompt, systemPrompt);
                 var jsonContent = JsonSerializer.Serialize(requestBody);
                 var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
@@ -116,10 +114,13 @@ namespace CKY.MultiAgentFramework.Core.Agents
         /// <summary>
         /// 构建请求体
         /// </summary>
+        /// <remarks>
+        /// 注意：场景（Scenario）在 Agent 创建时已确定，这里直接使用配置中的参数。
+        /// 如果需要不同场景的特殊处理，应该在创建专门的 Agent 时处理。
+        /// </remarks>
         private object BuildRequestBody(
             string modelId,
             string prompt,
-            LlmScenario scenario,
             string? systemPrompt)
         {
             var messages = new List<object>();
@@ -134,56 +135,20 @@ namespace CKY.MultiAgentFramework.Core.Agents
                 });
             }
 
-            // 根据场景构建不同格式的消息
-            switch (scenario)
+            // 添加用户消息
+            messages.Add(new
             {
-                case LlmScenario.Chat:
-                    messages.Add(new
-                    {
-                        role = "user",
-                        content = prompt
-                    });
-                    break;
-
-                case LlmScenario.Intent:
-                    messages.Add(new
-                    {
-                        role = "user",
-                        content = $"请识别以下用户意图：{prompt}\n\n请以JSON格式返回，包含 intent（意图类型）和 confidence（置信度）字段。"
-                    });
-                    break;
-
-                case LlmScenario.Embed:
-                    // 智谱AI的 Embedding API 不同，这里暂时不支持
-                    throw new NotSupportedException("ZhipuAI Embedding API not yet implemented. Use LlmScenario.Chat instead.");
-
-                case LlmScenario.Image:
-                    messages.Add(new
-                    {
-                        role = "user",
-                        content = prompt
-                    });
-                    break;
-
-                case LlmScenario.Video:
-                    messages.Add(new
-                    {
-                        role = "user",
-                        content = prompt
-                    });
-                    break;
-
-                default:
-                    throw new ArgumentException($"Unsupported scenario: {scenario}");
-            }
+                role = "user",
+                content = prompt
+            });
 
             return new
             {
                 model = modelId,
                 messages = messages,
-                temperature = 0.7,
+                temperature = Config.Temperature,
                 top_p = 0.9,
-                max_tokens = 2000
+                max_tokens = Config.MaxTokens
             };
         }
 

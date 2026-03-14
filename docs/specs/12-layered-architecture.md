@@ -1,8 +1,13 @@
 # CKY.MAF 分层依赖架构设计
 
-> **文档版本**: v1.0
+> **文档版本**: v2.2
 > **创建日期**: 2026-03-13
+> **最后更新**: 2026-03-14
 > **设计原则**: 依赖倒置原则（DIP）+ 接口隔离原则（ISP）
+> **重要更新**:
+> - ✅ 实现Repository层（EfCore、Redis、MemoryVector）
+> - ✅ 统一Agent架构（MafAgentBase纯业务基类，不继承AIAgent）
+> - ✅ LlmAgent继承AIAgent，通过ILlmAgentRegistry组合调用
 
 ---
 
@@ -12,9 +17,10 @@
 2. [分层架构图](#分层架构图)
 3. [依赖规则](#依赖规则)
 4. [接口抽象设计](#接口抽象设计)
-5. [具体实现层](#具体实现层)
-6. [使用示例](#使用示例)
-7. [测试策略](#测试策略)
+5. [数据访问层](#数据访问层)
+6. [业务服务层](#业务服务层)
+7. [使用示例](#使用示例)
+8. [测试策略](#测试策略)
 
 ---
 
@@ -25,8 +31,8 @@
 > **高层模块不应依赖低层模块，两者都应依赖抽象。抽象不应依赖细节，细节应依赖抽象。**
 
 **应用到 CKY.MAF**：
-- **Core 层**（高层模块）定义抽象接口
-- **Infrastructure 层**（低层模块）实现抽象接口
+- **Core 层**（高层模块）定义抽象接口和领域实体
+- **Repository 层**（数据访问）实现抽象接口
 - **Services 层**（业务逻辑）依赖抽象接口，不依赖具体实现
 
 **好处**：
@@ -34,6 +40,7 @@
 - ✅ 所有存储实现可替换
 - ✅ 单元测试无需外部服务
 - ✅ 支持多种实现方案
+- ✅ 职责分离更清晰（业务逻辑 vs 数据访问）
 
 ---
 
@@ -41,62 +48,72 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 5: Demo应用层                                         │
+│  Layer 4: Demo应用层                                         │
 │  CKY.MAF.Demos.SmartHome (Blazor Server)                    │
 │                                                             │
 │  职责：提供用户界面和演示场景                                │
-│  依赖：Services, Infrastructure (具体实现)                   │
+│  依赖：Services, Core                                        │
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 4: 业务服务层                                         │
+│  Layer 3: 业务服务层                                         │
 │  CKY.MAF.Services                                           │
 │                                                             │
 │  职责：任务调度、意图识别、任务编排、结果聚合                │
 │  主要组件：                                                  │
-│  - MafTaskScheduler (任务调度器)                            │
+│  - MafTaskScheduler (任务调度器) ✅ 已实现                   │
 │  - MafIntentRecognizer (意图识别器)                         │
 │  - MafTaskOrchestrator (任务编排器)                          │
 │  - MafResultAggregator (结果聚合器)                          │
 │                                                             │
-│  依赖：Core (抽象接口)                                       │
+│  依赖：Core, Repository (抽象接口)                           │
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 3: 基础设施层（具体实现）                             │
-│  CKY.MAF.Infrastructure                                     │
+│  Layer 2: 数据访问层 (Repository)                           │
+│  CKY.MAF.Repository                                         │
 │                                                             │
-│  职责：实现 Core 定义的抽象接口                              │
+│  职责：实现 Core 定义的存储抽象接口                         │
 │  子模块：                                                    │
-│  ├─ Caching/        (缓存实现)                              │
+│  ├─ Caching/        (缓存实现) ✅ 已完成                     │
 │  │  ├─ RedisCacheStore : ICacheStore                        │
 │  │  └─ MemoryCacheStore : ICacheStore                       │
-│  ├─ Relational/     (关系数据库实现)                        │
-│  │  ├─ PostgreSqlDatabase : IRelationalDatabase            │
-│  │  └─ MySqlDatabase : IRelationalDatabase                  │
-│  └─ Vectorization/  (向量存储实现)                          │
-│     ├─ QdrantVectorStore : IVectorStore                     │
-│     └─ MemoryVectorStore : IVectorStore                     │
+│  ├─ Relational/     (关系数据库实现)                          │
+│  │  ├─ EfCoreRelationalDatabase : IRelationalDatabase       │
+│  │  └─ InMemoryDatabase : IRelationalDatabase               │
+│  └─ Vectorization/  (向量存储实现) ✅ 部分完成              │
+│     ├─ QdrantVectorStore : IVectorStore (API调整中)          │
+│     └─ MemoryVectorStore : IVectorStore ✅                   │
 │                                                             │
 │  外部依赖：                                                  │
-│  - StackExchange.Redis 2.8.16                               │
-│  - Npgsql 8.0.3                                             │
-│  - Qdrant.Client 1.9.0                                      │
+│  - StackExchange.Redis 2.11.8                               │
+│  - Microsoft.Data.Sqlite 9.0.0                              │
+│  - Dapper 2.1.72                                            │
 │                                                             │
 │  依赖：Core (实现抽象接口)                                   │
 └─────────────────────────────────────────────────────────────┘
                            ↓ 实现
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 2: 存储抽象层（领域服务接口）                         │
-│  CKY.MAF.Core.Abstractions                                  │
+│  Layer 1: 核心抽象层 (Core)                                  │
+│  CKY.MAF.Core                                               │
 │                                                             │
-│  职责：定义领域服务接口，依赖存储抽象接口                    │
+│  职责：定义抽象接口和领域实体                                │
 │  主要接口：                                                  │
+│  存储抽象：                                                  │
+│  - ICacheStore (缓存接口)                                   │
+│  - IVectorStore (向量存储接口)                              │
+│  - IRelationalDatabase (关系数据库接口)                      │
+│                                                             │
+│  领域服务：                                                  │
 │  - IMafSessionStorage (会话存储)                            │
 │  - IMafMemoryManager (记忆管理)                             │
 │  - ITaskRepository (任务仓储)                               │
 │                                                             │
-│  依赖：Core.Models, Core.Abstractions.Interfaces            │
+│  领域实体：                                                  │
+│  - MainTask, SubTask (任务模型)                             │
+│  - MafAgentBase (Agent基类 - 纯业务，不继承AIAgent)         │
+│                                                             │
+│  依赖：零外部依赖（仅 MS AF）                                │
 └─────────────────────────────────────────────────────────────┘
                            ↓ 组合
 ┌─────────────────────────────────────────────────────────────┐
@@ -112,13 +129,17 @@
 │  │  - MainTask, SubTask, MessageContext                     │
 │  │  - MafAgentBase, MafTaskBase                             │
 │  │                                                          │
-│  └─ Abstractions/ (Agent 基类)                              │
-│     - MafAgentBase : AIAgent                                │
-│     - MafMainAgent : MafAgentBase                           │
-│     - MafSubAgent : MafAgentBase                            │
+│  └─ Agents/ (Agent 基类)                                    │
+│     - MafAgentBase (纯业务基类，不继承AIAgent)               │
+│       ├─ 通过 ILlmAgentRegistry 组合调用 LlmAgent           │
+│       └─ Demo Agents: LightingAgent, ClimateAgent, MusicAgent│
+│                                                             │
+│  LLM层（Services实现）：                                      │
+│  - LlmAgent : AIAgent (继承MS Agent Framework)              │
+│  - ILlmAgentRegistry (LLM Agent注册表)                      │
 │                                                             │
 │  外部依赖：                                                  │
-│  - Microsoft.AgentFramework (唯一硬性依赖)                  │
+│  - Microsoft.Agents.AI (唯一硬性依赖) v1.0.0-preview.251001.1│
 │  - Microsoft.Extensions.* (仅抽象包)                        │
 │                                                             │
 │  依赖：无（核心抽象层）                                      │
@@ -196,6 +217,175 @@ services.AddSingleton<IVectorStore, QdrantVectorStore>();
 // services.AddSingleton<ICacheStore, MemoryCacheStore>();
 // services.AddSingleton<IRelationalDatabase, MySqlDatabase>();
 // services.AddSingleton<IVectorStore, MemoryVectorStore>();
+```
+
+---
+
+## Agent 架构设计
+
+### 设计原则：分离关注点
+
+**核心思想**：
+- **业务层**（Demo Agents）不继承AIAgent，是纯POCO类
+- **LLM层**（LlmAgent）继承AIAgent，负责LLM调用
+- 通过**组合**而非**继承**实现业务层对LLM的调用
+
+### Agent 层次结构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  业务层（Demo应用）                                          │
+│                                                             │
+│  ┌─────────────────┐  ┌─────────────────┐                  │
+│  │  LightingAgent  │  │  ClimateAgent   │                  │
+│  │  : MafAgentBase │  │  : MafAgentBase │                  │
+│  └─────────────────┘  └─────────────────┘                  │
+│                                                             │
+│  特点：                                                      │
+│  - 纯业务逻辑                                                │
+│  - 不继承 AIAgent                                           │
+│  - 通过 ILlmAgentRegistry 调用 LLM                          │
+└─────────────────────────────────────────────────────────────┘
+                    ↓ 组合
+┌─────────────────────────────────────────────────────────────┐
+│  核心抽象层（Core）                                          │
+│                                                             │
+│  ┌─────────────────────────────────────────┐               │
+│  │  MafAgentBase (抽象基类)                │               │
+│  │  - AgentId, Name, Description           │               │
+│  │  - Capabilities                         │               │
+│  │  - ExecuteBusinessLogicAsync() 抽象方法 │               │
+│  │  - CallLlmAsync() 辅助方法              │               │
+│  │  - CallLlmBatchAsync() 辅助方法         │               │
+│  └─────────────────────────────────────────┘               │
+│                                                             │
+│  依赖：ILlmAgentRegistry (抽象接口)                          │
+└─────────────────────────────────────────────────────────────┘
+                    ↓ 通过 Registry 获取
+┌─────────────────────────────────────────────────────────────┐
+│  Services层（LLM实现）                                       │
+│                                                             │
+│  ┌─────────────────────────────────────────┐               │
+│  │  ILlmAgentRegistry (注册表)             │               │
+│  │  - GetBestAgentAsync(scenario)         │               │
+│  └─────────────────────────────────────────┘               │
+│                                                             │
+│  ┌─────────────────┐  ┌─────────────────┐                  │
+│  │  智谱AILlmAgent  │  │ 通义千问Agent    │                  │
+│  │  : AIAgent      │  │ : AIAgent       │                  │
+│  └─────────────────┘  └─────────────────┘                  │
+│                                                             │
+│  特点：                                                      │
+│  - 继承 Microsoft.Agents.AI.AIAgent                        │
+│  - 实现所有 AIAgent 抽象方法                                 │
+│  - 封装 LLM Provider SDK调用                                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 架构优势
+
+| 特性 | 说明 | 好处 |
+|------|------|------|
+| **业务层纯净** | Demo Agents不继承AIAgent | ✅ 无需实现MS AF复杂抽象方法<br>✅ 业务逻辑清晰<br>✅ 易于测试和Mock |
+| **组合优于继承** | 通过ILlmAgentRegistry调用LLM | ✅ 灵活切换LLM Provider<br>✅ 支持多LLM并发调用<br>✅ 易于扩展新场景 |
+| **LLM层独立** | LlmAgent独立于业务层 | ✅ LLM实现可替换<br>✅ 支持熔断、降级、监控<br>✅ 统一LLM调用管理 |
+
+### 代码示例
+
+#### 业务层Agent（LightingAgent）
+
+```csharp
+public class LightingAgent : MafAgentBase
+{
+    private readonly ILightingService _lightingService;
+
+    public override string AgentId => "lighting-agent-001";
+    public override string Name => "LightingAgent";
+    public override string Description => "智能照明控制Agent";
+    public override IReadOnlyList<string> Capabilities => new[]
+        { "lighting", "light-control", "brightness-control" };
+
+    public LightingAgent(
+        ILightingService lightingService,
+        ILlmAgentRegistry llmRegistry,
+        ILogger<LightingAgent> logger)
+        : base(llmRegistry, logger)
+    {
+        _lightingService = lightingService;
+    }
+
+    public override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
+        MafTaskRequest request,
+        CancellationToken ct = default)
+    {
+        // 业务逻辑：直接调用服务
+        if (request.UserInput.Contains("打开"))
+        {
+            await _lightingService.TurnOnAsync("客厅", ct);
+            return new MafTaskResponse
+            {
+                TaskId = request.TaskId,
+                Success = true,
+                Result = "客厅的灯已打开"
+            };
+        }
+
+        // 需要LLM时：通过辅助方法调用
+        var enhancedResponse = await CallLlmAsync(
+            $"用户说：{request.UserInput}。请生成友好的回复。",
+            LlmScenario.Chat,
+            ct);
+
+        return new MafTaskResponse
+        {
+            TaskId = request.TaskId,
+            Success = true,
+            Result = enhancedResponse
+        };
+    }
+}
+```
+
+#### LLM层Agent（LlmAgent）
+
+```csharp
+public class ZhipuAIlmAgent : AIAgent, ILlmAgent
+{
+    private readonly ZhipuAIClient _client;
+    private readonly ILogger<ZhipuAIlmAgent> _logger;
+
+    public override string AgentId => "llm-zhipu-glm4";
+    public override string Name => "ZhipuAILlmAgent";
+    public override string Description => "智谱AI GLM-4模型";
+
+    protected override async Task<AgentResponse> RunCoreAsync(
+        IEnumerable<ChatMessage> messages,
+        AgentSession? session = null,
+        AgentRunOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        // 调用智谱AI API
+        var userMessage = messages.FirstOrDefault(m => m.Role == ChatRole.User);
+        var response = await _client.ChatAsync(userMessage.Text, cancellationToken);
+
+        return new AgentResponse(new[]
+        {
+            new ChatMessage(ChatRole.Assistant, response)
+        });
+    }
+
+    public async Task<string> ExecuteAsync(
+        string modelId,
+        string prompt,
+        LlmScenario scenario,
+        Dictionary<string, object>? parameters = null,
+        CancellationToken ct = default)
+    {
+        // LLM调用实现
+        var response = await _client.ChatAsync(prompt, ct);
+        return response;
+    }
+}
 ```
 
 ---

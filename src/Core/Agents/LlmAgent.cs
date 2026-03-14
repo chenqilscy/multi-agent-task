@@ -140,7 +140,6 @@ namespace CKY.MultiAgentFramework.Core.Agents
             var responseText = await ExecuteAsync(
                 Config.ModelId,
                 prompt,
-                LlmScenario.Chat,
                 systemPrompt,
                 cancellationToken);
 
@@ -179,14 +178,16 @@ namespace CKY.MultiAgentFramework.Core.Agents
         /// </summary>
         /// <param name="modelId">模型 ID（如 glm-4, qwen-max）</param>
         /// <param name="prompt">提示词</param>
-        /// <param name="scenario">LLM 使用场景</param>
         /// <param name="systemPrompt">系统提示词（可选）</param>
         /// <param name="ct">取消令牌</param>
         /// <returns>LLM 响应文本</returns>
+        /// <remarks>
+        /// 注意：场景（Scenario）在 Agent 创建时已经通过 LlmProviderConfig 确定，
+        /// 运行时不需要再传递场景参数。
+        /// </remarks>
         public abstract Task<string> ExecuteAsync(
             string modelId,
             string prompt,
-            LlmScenario scenario = LlmScenario.Chat,
             string? systemPrompt = null,
             CancellationToken ct = default);
 
@@ -196,7 +197,6 @@ namespace CKY.MultiAgentFramework.Core.Agents
         public virtual async Task<string[]> ExecuteBatchAsync(
             string modelId,
             string[] prompts,
-            LlmScenario scenario = LlmScenario.Chat,
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
@@ -205,7 +205,7 @@ namespace CKY.MultiAgentFramework.Core.Agents
 
             // 并行执行多个请求
             var tasks = prompts.Select(prompt =>
-                ExecuteAsync(modelId, prompt, scenario, systemPrompt, ct));
+                ExecuteAsync(modelId, prompt, systemPrompt, ct));
 
             return await Task.WhenAll(tasks);
         }

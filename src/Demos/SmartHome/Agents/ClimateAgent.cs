@@ -21,18 +21,15 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
 
         public ClimateAgent(
             IClimateService climateService,
-            IMafSessionStorage sessionStorage,
-            IPriorityCalculator priorityCalculator,
-            IMetricsCollector metricsCollector,
+            ILlmAgentRegistry llmRegistry,
             ILogger<ClimateAgent> logger)
-            : base(sessionStorage, priorityCalculator, metricsCollector, logger)
+            : base(llmRegistry, logger)
         {
             _climateService = climateService ?? throw new ArgumentNullException(nameof(climateService));
         }
 
-        protected override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
+        public override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
             MafTaskRequest request,
-            IAgentSession session,
             CancellationToken ct = default)
         {
             var userInput = request.UserInput;

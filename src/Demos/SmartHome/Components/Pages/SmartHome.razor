@@ -1,0 +1,180 @@
+@page "/smarthome"
+@using CKY.MultiAgentFramework.Demos.SmartHome.Models
+@using CKY.MultiAgentFramework.Demos.SmartHome.Services
+@inject SmartHomeControlService ControlService
+@inject NavigationManager Navigation
+
+<PageTitle>智能家居控制中心</PageTitle>
+
+<div class="smarthome-dashboard">
+    <div class="header">
+        <h1>🏠 智能家居控制中心</h1>
+        <p class="subtitle">使用 MAF 多代理框架构建</p>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-label">系统状态:</span>
+            <span class="status-value @statusClass">@systemStatus</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">活跃代理:</span>
+            <span class="status-value">@activeAgents 个</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">今日交互:</span>
+            <span class="status-value">@interactionCount 次</span>
+        </div>
+    </div>
+
+    <div class="controls-grid">
+        <!-- 照明控制卡片 -->
+        <div class="control-card lighting-card">
+            <div class="card-header">
+                <h2>💡 照明控制</h2>
+                <span class="card-badge">@lightingCount 个设备</span>
+            </div>
+            <div class="card-body">
+                <LightingControlPanel Room="客厅" />
+                <LightingControlPanel Room="卧室" />
+                <LightingControlPanel Room="厨房" />
+            </div>
+        </div>
+
+        <!-- 气候控制卡片 -->
+        <div class="control-card climate-card">
+            <div class="card-header">
+                <h2>🌡️ 气候控制</h2>
+                <span class="card-badge">@climateCount 个设备</span>
+            </div>
+            <div class="card-body">
+                <ClimateControlPanel Room="客厅" />
+                <ClimateControlPanel Room="卧室" />
+            </div>
+        </div>
+
+        <!-- 音乐控制卡片 -->
+        <div class="control-card music-card">
+            <div class="card-header">
+                <h2>🎵 音乐控制</h2>
+                <span class="card-badge">1 个设备</span>
+            </div>
+            <div class="card-body">
+                <MusicControlPanel />
+            </div>
+        </div>
+    </div>
+
+    <!-- 语音命令输入 -->
+    <div class="voice-command-section">
+        <h3>🎤 语音命令</h3>
+        <div class="command-input">
+            <input @bind="voiceCommand" placeholder="输入命令，例如：打开客厅的灯" />
+            <button @onclick="SendVoiceCommand" disabled="@(string.IsNullOrWhiteSpace(voiceCommand) || isProcessing)">
+                @(isProcessing ? "处理中..." : "发送命令")
+            </button>
+        </div>
+        @if (!string.IsNullOrEmpty(lastResponse))
+        {
+            <div class="last-response">
+                <strong>系统响应:</strong> @lastResponse
+            </div>
+        }
+    </div>
+
+    <!-- 命令历史 -->
+    @if (commandHistory.Any())
+    {
+        <div class="command-history">
+            <h3>📋 命令历史</h3>
+            <ul>
+                @foreach (var cmd in commandHistory.Take(10))
+                {
+                    <li>
+                        <span class="cmd-text">@cmd.Command</span>
+                        <span class="cmd-time">@cmd.Time.ToString("HH:mm:ss")</span>
+                        <span class="cmd-status @cmd.Success.ToString().ToLower()">@(cmd.Success ? "✓" : "✗")</span>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+</div>
+
+@code {
+    private string systemStatus = "运行中";
+    private string statusClass = "status-active";
+    private int activeAgents = 3;
+    private int interactionCount = 0;
+    private int lightingCount = 3;
+    private int climateCount = 2;
+    private string voiceCommand = string.Empty;
+    private string lastResponse = string.Empty;
+    private bool isProcessing = false;
+    private List<CommandRecord> commandHistory = new();
+
+    private class CommandRecord
+    {
+        public string Command { get; set; } = string.Empty;
+        public DateTime Time { get; set; }
+        public bool Success { get; set; }
+    }
+
+    protected override void OnInitialized()
+    {
+        // 初始化交互计数
+        interactionCount = commandHistory.Count(c => c.Time.Date == DateTime.Today);
+    }
+
+    private async Task SendVoiceCommand()
+    {
+        if (string.IsNullOrWhiteSpace(voiceCommand))
+            return;
+
+        isProcessing = true;
+        var command = voiceCommand;
+        voiceCommand = string.Empty;
+
+        try
+        {
+            // 发送命令到SmartHomeControlService
+            var response = await ControlService.ProcessCommandAsync(command);
+
+            lastResponse = response.Result;
+            interactionCount++;
+
+            commandHistory.Insert(0, new CommandRecord
+            {
+                Command = command,
+                Time = DateTime.Now,
+                Success = response.Success
+            });
+
+            if (commandHistory.Count > 20)
+            {
+                commandHistory.RemoveAt(commandHistory.Count - 1);
+            }
+
+            systemStatus = response.Success ? "运行中" : "警告";
+            statusClass = response.Success ? "status-active" : "status-warning";
+        }
+        catch (Exception ex)
+        {
+            lastResponse = $"错误: {ex.Message}";
+            systemStatus = "错误";
+            statusClass = "status-error";
+
+            commandHistory.Insert(0, new CommandRecord
+            {
+                Command = command,
+                Time = DateTime.Now,
+                Success = false
+            });
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+}

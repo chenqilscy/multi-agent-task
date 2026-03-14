@@ -1,4 +1,5 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Models.LLM;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.CircuitBreaker;
@@ -15,7 +16,7 @@ namespace CKY.MultiAgentFramework.Services.NLP
     {
         private readonly IIntentRecognizer _intentRecognizer;
         private readonly IIntentProviderMapping _mapping;
-        private readonly ILlmService _llmService;
+        private readonly ILlmAgentRegistry _llmRegistry;
         private readonly IServiceProvider _serviceProvider;
         private readonly IAsyncPolicy _circuitBreakerPolicy;
         private readonly ILogger<IntentDrivenEntityExtractor> _logger;
@@ -23,13 +24,13 @@ namespace CKY.MultiAgentFramework.Services.NLP
         public IntentDrivenEntityExtractor(
             IIntentRecognizer intentRecognizer,
             IIntentProviderMapping mapping,
-            ILlmService llmService,
+            ILlmAgentRegistry llmRegistry,
             IServiceProvider serviceProvider,
             ILogger<IntentDrivenEntityExtractor> logger)
         {
             _intentRecognizer = intentRecognizer ?? throw new ArgumentNullException(nameof(intentRecognizer));
             _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
-            _llmService = llmService ?? throw new ArgumentNullException(nameof(llmService));
+            _llmRegistry = llmRegistry ?? throw new ArgumentNullException(nameof(llmRegistry));
             _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -231,7 +232,13 @@ namespace CKY.MultiAgentFramework.Services.NLP
 
             try
             {
-                var response = await _llmService.CompleteAsync(systemPrompt, userInput, ct);
+                // 获取支持 Intent 场景的 LLM Agent
+                var llmAgent = await _llmRegistry.GetBestAgentAsync(LlmScenario.Intent, ct);
+                var response = await llmAgent.ExecuteAsync(
+                    llmAgent.GetCurrentModelId(),
+                    userInput,
+                    systemPrompt,
+                    ct);
                 _logger.LogDebug("LLM response: {Response}", response);
 
                 return ParseLlmResponse(response, supportedTypes);

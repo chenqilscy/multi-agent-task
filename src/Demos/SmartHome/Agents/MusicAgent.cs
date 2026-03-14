@@ -17,17 +17,14 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
         public override IReadOnlyList<string> Capabilities => ["music", "audio", "media-control"];
 
         public MusicAgent(
-            IMafSessionStorage sessionStorage,
-            IPriorityCalculator priorityCalculator,
-            IMetricsCollector metricsCollector,
+            ILlmAgentRegistry llmRegistry,
             ILogger<MusicAgent> logger)
-            : base(sessionStorage, priorityCalculator, metricsCollector, logger)
+            : base(llmRegistry, logger)
         {
         }
 
-        protected override Task<MafTaskResponse> ExecuteBusinessLogicAsync(
+        public override Task<MafTaskResponse> ExecuteBusinessLogicAsync(
             MafTaskRequest request,
-            IAgentSession session,
             CancellationToken ct = default)
         {
             var userInput = request.UserInput;

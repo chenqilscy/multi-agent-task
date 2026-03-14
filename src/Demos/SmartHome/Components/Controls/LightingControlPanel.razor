@@ -1,0 +1,75 @@
+@using CKY.MultiAgentFramework.Demos.SmartHome.Services
+@inject ILightingService LightingService
+
+<div class="lighting-panel">
+    <div class="room-header">
+        <h4>@Room</h4>
+        <div class="switch-container">
+            <label class="switch">
+                <input type="checkbox" @bind="isLightOn" @bind:after="ToggleLight" />
+                <span class="slider round"></span>
+            </label>
+        </div>
+    </div>
+
+    @if (isLightOn)
+    {
+        <div class="brightness-control">
+            <label>亮度</label>
+            <input type="range" min="0" max="100" @bind="brightness" @bind:after="ChangeBrightness" />
+            <span class="brightness-value">@brightness%</span>
+        </div>
+
+        <div class="preset-buttons">
+            <button class="preset-btn" @onclick="() => SetBrightness(100)">全亮</button>
+            <button class="preset-btn" @onclick="() => SetBrightness(70)">明亮</button>
+            <button class="preset-btn" @onclick="() => SetBrightness(30)">柔和</button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Room { get; set; } = "客厅";
+
+    private bool isLightOn = false;
+    private int brightness = 100;
+
+    private async Task ToggleLight()
+    {
+        try
+        {
+            if (isLightOn)
+            {
+                await LightingService.TurnOnAsync(Room);
+            }
+            else
+            {
+                await LightingService.TurnOffAsync(Room);
+            }
+        }
+        catch
+        {
+            // 在实际应用中应该显示错误消息
+            isLightOn = !isLightOn; // 回滚状态
+        }
+    }
+
+    private async Task ChangeBrightness()
+    {
+        try
+        {
+            await LightingService.SetBrightnessAsync(Room, brightness);
+        }
+        catch
+        {
+            // 处理错误
+        }
+    }
+
+    private void SetBrightness(int value)
+    {
+        brightness = value;
+        _ = ChangeBrightness();
+    }
+}

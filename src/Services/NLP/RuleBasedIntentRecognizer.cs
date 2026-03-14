@@ -11,18 +11,13 @@ namespace CKY.MultiAgentFramework.Services.NLP
     public class RuleBasedIntentRecognizer : IIntentRecognizer
     {
         private readonly ILogger<RuleBasedIntentRecognizer> _logger;
+        private readonly IIntentKeywordProvider _keywordProvider;
 
-        private static readonly Dictionary<string, string[]> IntentKeywords = new()
+        public RuleBasedIntentRecognizer(
+            IIntentKeywordProvider keywordProvider,
+            ILogger<RuleBasedIntentRecognizer> logger)
         {
-            ["ControlLight"] = ["灯", "照明", "亮", "暗", "开灯", "关灯"],
-            ["AdjustClimate"] = ["温度", "空调", "冷", "热", "暖", "制冷", "制热"],
-            ["PlayMusic"] = ["音乐", "播放", "歌曲", "歌", "音频"],
-            ["SecurityControl"] = ["门", "锁", "安全", "门锁", "摄像头"],
-            ["GeneralQuery"] = ["查询", "状态", "怎么", "什么", "帮我"]
-        };
-
-        public RuleBasedIntentRecognizer(ILogger<RuleBasedIntentRecognizer> logger)
-        {
+            _keywordProvider = keywordProvider ?? throw new ArgumentNullException(nameof(keywordProvider));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -39,12 +34,18 @@ namespace CKY.MultiAgentFramework.Services.NLP
             };
 
             var scores = new Dictionary<string, double>();
-            foreach (var (intent, keywords) in IntentKeywords)
+            var supportedIntents = _keywordProvider.GetSupportedIntents();
+
+            foreach (var intent in supportedIntents)
             {
-                var matchCount = keywords.Count(k => userInput.Contains(k, StringComparison.OrdinalIgnoreCase));
-                if (matchCount > 0)
+                var keywords = _keywordProvider.GetKeywords(intent);
+                if (keywords != null)
                 {
-                    scores[intent] = (double)matchCount / keywords.Length;
+                    var matchCount = keywords.Count(k => !string.IsNullOrEmpty(k) && userInput.Contains(k, StringComparison.OrdinalIgnoreCase));
+                    if (matchCount > 0)
+                    {
+                        scores[intent] = (double)matchCount / keywords.Length;
+                    }
                 }
             }
 

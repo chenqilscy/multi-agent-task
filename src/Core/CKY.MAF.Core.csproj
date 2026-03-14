@@ -7,6 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Microsoft Agent Framework (RC4 - 最新稳定版本) -->
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-rc4" />
+
+    <!-- Microsoft.Extensions.AI - ChatMessage, AIContent 等核心类型 (最新版本) -->
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.4.0" />
+
+    <!-- .NET 基础依赖 -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
   </ItemGroup>

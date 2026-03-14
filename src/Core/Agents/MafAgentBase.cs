@@ -1,4 +1,5 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Models.Task;
 using CKY.MultiAgentFramework.Core.Models.LLM;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -6,112 +7,184 @@ using Microsoft.Extensions.Logging;
 namespace CKY.MultiAgentFramework.Core.Agents
 {
     /// <summary>
-    /// MAF Agent 基类（使用组合模式而非继承 AIAgent）
+    /// MAF Agent 业务基类（纯业务层，不继承 AIAgent）
     /// </summary>
     /// <remarks>
-    /// 设计调整：
-    /// 由于 Microsoft.Agents.AI 的 AIAgent 基类 API 与预期不同，
-    /// 采用组合模式而非继承模式来构建 LLM Agent。
-    ///
     /// 架构设计：
-    /// 1. 不继承 AIAgent，而是使用 AIContextProvider 管道
-    /// 2. MafAgentBase 提供统一的 LLM 调用接口
-    /// 3. 具体厂商实现（智谱AI、通义千问等）继承此类
+    /// 1. 不继承 AIAgent，是纯业务逻辑抽象类
+    /// 2. 通过组合方式使用 ILlmAgentRegistry 调用LLM
+    /// 3. 提供业务逻辑执行的抽象方法
+    /// 4. Demo agents 继承此基类实现具体业务逻辑
+    ///
+    /// 层次关系：
+    /// - Demo Agents → MafAgentBase (业务层，纯POCO)
+    /// - MafAgentBase → ILlmAgentRegistry (通过组合调用LLM)
+    /// - LlmAgent : AIAgent (LLM层，继承MS Agent Framework)
     /// </remarks>
     public abstract class MafAgentBase
     {
-        /// <summary>LLM 配置</summary>
-        public readonly LlmProviderConfig Config;
-
         /// <summary>日志记录器</summary>
         protected readonly ILogger Logger;
+
+        /// <summary>LLM Agent 注册表（用于获取合适的LLM实例）</summary>
+        protected readonly ILlmAgentRegistry LlmRegistry;
 
         /// <summary>
         /// 构造函数
         /// </summary>
         protected MafAgentBase(
-            LlmProviderConfig config,
+            ILlmAgentRegistry llmRegistry,
             ILogger logger)
         {
-            Config = config ?? throw new ArgumentNullException(nameof(config));
+            LlmRegistry = llmRegistry ?? throw new ArgumentNullException(nameof(llmRegistry));
             Logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        /// <summary>
-        /// Agent 唯一标识
-        /// </summary>
-        public virtual string Id => $"{Config.ProviderName}-{Config.ModelId}".ToLowerInvariant();
+        #region Agent 标识属性
+
+        /// <summary>Agent 唯一标识（由子类实现）</summary>
+        public abstract string AgentId { get; }
+
+        /// <summary>Agent 显示名称（由子类实现）</summary>
+        public abstract string Name { get; }
+
+        /// <summary>Agent 描述（由子类实现）</summary>
+        public abstract string Description { get; }
+
+        /// <summary>Agent 能力列表（由子类实现）</summary>
+        public abstract IReadOnlyList<string> Capabilities { get; }
+
+        #endregion
+
+        #region 业务逻辑抽象方法（由子类实现）
 
         /// <summary>
-        /// Agent 显示名称
+        /// 执行业务逻辑（核心抽象方法）
         /// </summary>
-        public virtual string Name => $"{Config.ProviderDisplayName} ({Config.ModelId})";
+        public abstract Task<MafTaskResponse> ExecuteBusinessLogicAsync(
+            MafTaskRequest request,
+            CancellationToken ct = default);
+
+        #endregion
+
+        #region LLM 调用辅助方法
 
         /// <summary>
-        /// Agent 描述
+        /// 调用 LLM 处理文本（简单版本，无历史消息）
         /// </summary>
-        public virtual string Description => $"LLM Agent for {Config.ProviderName} - {Config.ModelId}";
-
-        #region LLM 调用核心方法
-
-        /// <summary>
-        /// 执行 LLM 调用（核心抽象方法）
-        /// </summary>
-        public abstract Task<string> ExecuteAsync(
-            string modelId,
+        /// <param name="prompt">提示词</param>
+        /// <param name="scenario">目标场景（用于选择合适的 LLM Agent）</param>
+        /// <param name="systemPrompt">系统提示词（可选）</param>
+        /// <param name="ct">取消令牌</param>
+        /// <returns>LLM 响应文本</returns>
+        protected async Task<string> CallLlmAsync(
             string prompt,
             LlmScenario scenario = LlmScenario.Chat,
             string? systemPrompt = null,
-            CancellationToken ct = default);
+            CancellationToken ct = default)
+        {
+            var llmAgent = await LlmRegistry.GetBestAgentAsync(scenario, ct);
+            return await llmAgent.ExecuteAsync(
+                llmAgent.GetCurrentModelId(),
+                prompt,
+                systemPrompt,
+                ct);
+        }
 
         /// <summary>
-        /// 批量执行 LLM 调用
+        /// 调用 LLM 处理多轮对话（带历史消息）
         /// </summary>
-        public virtual async Task<string[]> ExecuteBatchAsync(
-            string modelId,
+        /// <param name="messages">对话消息列表（包含历史消息）</param>
+        /// <param name="scenario">目标场景（用于选择合适的 LLM Agent）</param>
+        /// <param name="ct">取消令牌</param>
+        /// <returns>LLM 响应文本</returns>
+        /// <remarks>
+        /// 使用场景：
+        /// - 多轮对话：需要传递上下文历史
+        /// - 复杂任务：需要多轮交互才能完成
+        /// - 对话式应用：聊天机器人、智能客服等
+        ///
+        /// 示例：
+        /// <code>
+        /// var messages = new List&lt;ChatMessage&gt;
+        /// {
+        ///     new ChatMessage(ChatRole.System, "你是一个有用的AI助手"),
+        ///     new ChatMessage(ChatRole.User, "你好"),
+        ///     new ChatMessage(ChatRole.Assistant, "你好！有什么我可以帮助你的吗？"),
+        ///     new ChatMessage(ChatRole.User, "介绍一下你自己")
+        /// };
+        /// var response = await CallLlmChatAsync(messages, LlmScenario.Chat);
+        /// </code>
+        /// </remarks>
+        protected async Task<string> CallLlmChatAsync(
+            IEnumerable<ChatMessage> messages,
+            LlmScenario scenario = LlmScenario.Chat,
+            CancellationToken ct = default)
+        {
+            var llmAgent = await LlmRegistry.GetBestAgentAsync(scenario, ct);
+
+            // 将 ChatMessage 列表转换为单个 prompt（如果 Agent 不支持多轮对话）
+            // 注意：这里简化处理，实际应该让支持多轮对话的 Agent 直接处理 messages
+            var prompt = BuildPromptFromMessages(messages);
+
+            return await llmAgent.ExecuteAsync(
+                llmAgent.GetCurrentModelId(),
+                prompt,
+                null,
+                ct);
+        }
+
+        /// <summary>
+        /// 批量调用 LLM
+        /// </summary>
+        /// <param name="prompts">提示词数组</param>
+        /// <param name="scenario">目标场景（用于选择合适的 LLM Agent）</param>
+        /// <param name="systemPrompt">系统提示词（可选）</param>
+        /// <param name="ct">取消令牌</param>
+        /// <returns>LLM 响应文本数组</returns>
+        protected async Task<string[]> CallLlmBatchAsync(
             string[] prompts,
             LlmScenario scenario = LlmScenario.Chat,
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            if (prompts == null || prompts.Length == 0)
-                return Array.Empty<string>();
-
-            var tasks = prompts.Select(prompt =>
-                ExecuteAsync(modelId, prompt, scenario, systemPrompt, ct));
-
-            return await Task.WhenAll(tasks);
+            var llmAgent = await LlmRegistry.GetBestAgentAsync(scenario, ct);
+            return await llmAgent.ExecuteBatchAsync(
+                llmAgent.GetCurrentModelId(),
+                prompts,
+                systemPrompt,
+                ct);
         }
 
         /// <summary>
-        /// 检查模型是否支持指定场景
+        /// 从 ChatMessage 列表构建单个 prompt（兼容不支持多轮对话的 Agent）
         /// </summary>
-        public virtual bool SupportsScenario(LlmScenario scenario)
+        private static string BuildPromptFromMessages(IEnumerable<ChatMessage> messages)
         {
-            return Config.SupportedScenarios.Contains(scenario);
-        }
+            var sb = new System.Text.StringBuilder();
 
-        #endregion
+            foreach (var message in messages)
+            {
+                // 使用 if-else 而不是 switch，因为 ChatRole 可能不是枚举类型
+                if (message.Role.ToString() == "System")
+                {
+                    sb.AppendLine($"[System]: {message.Text}");
+                }
+                else if (message.Role.ToString() == "User")
+                {
+                    sb.AppendLine($"[User]: {message.Text}");
+                }
+                else if (message.Role.ToString() == "Assistant")
+                {
+                    sb.AppendLine($"[Assistant]: {message.Text}");
+                }
+                else
+                {
+                    sb.AppendLine($"[{message.Role}]: {message.Text}");
+                }
+            }
 
-        #region 辅助方法
-
-        /// <summary>
-        /// 获取当前配置的模型 ID
-        /// </summary>
-        public string GetCurrentModelId()
-        {
-            return Config.ModelId;
-        }
-
-        /// <summary>
-        /// 获取 API 密钥
-        /// </summary>
-        protected string GetApiKey()
-        {
-            if (string.IsNullOrWhiteSpace(Config.ApiKey))
-                throw new InvalidOperationException($"API Key is not configured for {Config.ProviderName}");
-
-            return Config.ApiKey;
+            return sb.ToString();
         }
 
         #endregion

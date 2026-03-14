@@ -21,18 +21,15 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
 
         public LightingAgent(
             ILightingService lightingService,
-            IMafSessionStorage sessionStorage,
-            IPriorityCalculator priorityCalculator,
-            IMetricsCollector metricsCollector,
+            ILlmAgentRegistry llmRegistry,
             ILogger<LightingAgent> logger)
-            : base(sessionStorage, priorityCalculator, metricsCollector, logger)
+            : base(llmRegistry, logger)
         {
             _lightingService = lightingService ?? throw new ArgumentNullException(nameof(lightingService));
         }
 
-        protected override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
+        public override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
             MafTaskRequest request,
-            IAgentSession session,
             CancellationToken ct = default)
         {
             var userInput = request.UserInput;
@@ -42,10 +39,6 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
             if (userInput.Contains("打开") || userInput.Contains("开灯"))
             {
                 await _lightingService.TurnOnAsync(room, ct);
-
-                // 保存操作到会话上下文
-                session.Context["last_lighting_action"] = "turn_on";
-                session.Context["last_room"] = room;
 
                 return new MafTaskResponse
                 {
@@ -57,9 +50,6 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
             else if (userInput.Contains("关闭") || userInput.Contains("关灯"))
             {
                 await _lightingService.TurnOffAsync(room, ct);
-
-                session.Context["last_lighting_action"] = "turn_off";
-                session.Context["last_room"] = room;
 
                 return new MafTaskResponse
                 {
