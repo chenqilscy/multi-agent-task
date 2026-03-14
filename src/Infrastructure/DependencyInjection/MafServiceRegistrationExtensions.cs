@@ -1,6 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
+using CKY.MultiAgentFramework.Core.Abstractions.Interfaces;
+using CKY.MultiAgentFramework.Infrastructure.Caching.Memory;
+using CKY.MultiAgentFramework.Infrastructure.Caching.Redis;
+
 namespace CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 
 /// <summary>
@@ -8,6 +12,9 @@ namespace CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 /// </summary>
 public static class MafServiceRegistrationExtensions
 {
+    private const string CacheConfigKey = "MafServices:Implementations:ICacheStore";
+    private const string MemoryCacheImplementation = "MemoryCacheStore";
+    private const string RedisCacheImplementation = "RedisCacheStore";
     /// <summary>
     /// 自动注册所有 Infrastructure 层服务
     /// </summary>
@@ -18,7 +25,25 @@ public static class MafServiceRegistrationExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // TODO: 在后续任务中实现各个服务的注册逻辑
+        // ========================================
+        // 缓存服务注册
+        // ========================================
+        var cacheImpl = configuration[CacheConfigKey];
+
+        if (string.IsNullOrEmpty(cacheImpl) || cacheImpl == MemoryCacheImplementation)
+        {
+            // 配置未指定或指定内存实现 → 使用内存实现
+            services.AddSingleton<ICacheStore, MemoryCacheStore>();
+        }
+        else if (cacheImpl == RedisCacheImplementation)
+        {
+            services.AddSingleton<ICacheStore, RedisCacheStore>();
+        }
+        else
+        {
+            // 配置值无效，静默使用默认实现
+            services.AddSingleton<ICacheStore, MemoryCacheStore>();
+        }
 
         return services;
     }
