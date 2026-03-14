@@ -188,7 +188,7 @@ classDiagram
         +ExecuteAsync(request) Task~AIResponse~
     }
 
-    class LlmAgent {
+    class MafAiAgent {
         <<LLM Agent基类>>
         +LlmProviderConfig Config
         +ExecuteAsync(modelId, prompt, scenario) Task~string~
@@ -206,9 +206,9 @@ classDiagram
     }
 
     AIAgent <|-- MafAgentBase : 继承
-    AIAgent <|-- LlmAgent : 继承
-    LlmAgent <|-- ZhipuAIAgent : 继承
-    LlmAgent <|-- QwenAIAgent : 继承
+    AIAgent <|-- MafAiAgent : 继承
+    MafAiAgent <|-- ZhipuAIAgent : 继承
+    MafAiAgent <|-- QwenAIAgent : 继承
 ```
 
 ### 2.3.1 LLM Agent 架构
@@ -220,7 +220,7 @@ classDiagram
 ```mermaid
 graph TB
     subgraph "LLM Agent 架构"
-        LlmBase[LlmAgent<br/>抽象基类]
+        LlmBase[MafAiAgent<br/>抽象基类]
 
         subgraph "具体实现"
             Zhipu[ZhipuAIAgent<br/>智谱AI]
@@ -237,7 +237,7 @@ graph TB
 
         subgraph "配置与注册"
             Config[LlmProviderConfig<br/>配置模型]
-            Registry[ILlmAgentRegistry<br/>注册表]
+            Registry[IMafAiAgentRegistry<br/>注册表]
         end
     end
 
@@ -267,7 +267,7 @@ graph TB
 | **弹性保护** | 熔断器、重试、超时 | `LlmResiliencePipeline` |
 | **配置验证** | 启动时验证配置有效性 | `LlmProviderConfig.Validate()` |
 | **API Key 脱敏** | 日志中自动隐藏敏感信息 | `GetApiKeyForLogging()` |
-| **故障转移** | 自动切换到备用提供商 | `ILlmAgentRegistry.GetBestAgentAsync()` |
+| **故障转移** | 自动切换到备用提供商 | `IMafAiAgentRegistry.GetBestAgentAsync()` |
 | **独立熔断器** | 每个 AgentId 独立的熔断器实例 | `ConcurrentDictionary<string, LlmCircuitBreaker>` |
 
 **使用示例**：

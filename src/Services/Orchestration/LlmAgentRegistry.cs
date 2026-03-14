@@ -9,26 +9,26 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
     /// LLM Agent 注册表实现
     /// 负责管理多个 LLM Agent 实例，根据场景和优先级动态选择
     /// </summary>
-    public class LlmAgentRegistry : ILlmAgentRegistry
+    public class MafAiAgentRegistry : IMafAiAgentRegistry
     {
-        private readonly Dictionary<string, LlmAgent> _agentsByKey = new();
-        private readonly Dictionary<LlmScenario, List<LlmAgent>> _agentsByScenario = new();
-        private readonly ILogger<LlmAgentRegistry> _logger;
+        private readonly Dictionary<string, MafAiAgent> _agentsByKey = new();
+        private readonly Dictionary<LlmScenario, List<MafAiAgent>> _agentsByScenario = new();
+        private readonly ILogger<MafAiAgentRegistry> _logger;
         private readonly object _lock = new();
 
-        public LlmAgentRegistry(ILogger<LlmAgentRegistry> logger)
+        public MafAiAgentRegistry(ILogger<MafAiAgentRegistry> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             // 初始化场景字典
             foreach (LlmScenario scenario in Enum.GetValues<LlmScenario>())
             {
-                _agentsByScenario[scenario] = new List<LlmAgent>();
+                _agentsByScenario[scenario] = new List<MafAiAgent>();
             }
         }
 
         /// <inheritdoc />
-        public void RegisterAgent(LlmAgent agent)
+        public void RegisterAgent(MafAiAgent agent)
         {
             if (agent == null)
                 throw new ArgumentNullException(nameof(agent));
@@ -58,7 +58,7 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
         }
 
         /// <inheritdoc />
-        public void RegisterAgents(IEnumerable<LlmAgent> agents)
+        public void RegisterAgents(IEnumerable<MafAiAgent> agents)
         {
             if (agents == null)
                 throw new ArgumentNullException(nameof(agents));
@@ -70,7 +70,7 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
         }
 
         /// <inheritdoc />
-        public async Task<LlmAgent> GetBestAgentAsync(LlmScenario scenario, CancellationToken ct = default)
+        public async Task<MafAiAgent> GetBestAgentAsync(LlmScenario scenario, CancellationToken ct = default)
         {
             var agents = GetAgentsByScenario(scenario);
 
@@ -95,7 +95,7 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
         }
 
         /// <inheritdoc />
-        public Task<LlmAgent?> GetAgentByProviderAsync(string providerName, CancellationToken ct = default)
+        public Task<MafAiAgent?> GetAgentByProviderAsync(string providerName, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(providerName))
                 throw new ArgumentException("Provider name cannot be null or empty", nameof(providerName));
@@ -110,7 +110,7 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
         }
 
         /// <inheritdoc />
-        public IReadOnlyList<LlmAgent> GetAllAgents()
+        public IReadOnlyList<MafAiAgent> GetAllAgents()
         {
             lock (_lock)
             {
@@ -119,11 +119,11 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
         }
 
         /// <inheritdoc />
-        public IReadOnlyList<LlmAgent> GetAgentsByScenario(LlmScenario scenario)
+        public IReadOnlyList<MafAiAgent> GetAgentsByScenario(LlmScenario scenario)
         {
             lock (_lock)
             {
-                return _agentsByScenario.GetValueOrDefault(scenario, new List<LlmAgent>()).ToList().AsReadOnly();
+                return _agentsByScenario.GetValueOrDefault(scenario, new List<MafAiAgent>()).ToList().AsReadOnly();
             }
         }
 

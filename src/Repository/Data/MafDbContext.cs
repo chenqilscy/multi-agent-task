@@ -1,4 +1,5 @@
 using CKY.MultiAgentFramework.Core.Models.Persisted;
+using CKY.MultiAgentFramework.Core.Models.Session;
 using CKY.MultiAgentFramework.Core.Models.Task;
 using CKY.MultiAgentFramework.Repository.Data.EntityTypeConfigurations;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +28,9 @@ namespace CKY.MultiAgentFramework.Repository.Data
         // LLM 提供商配置
         public DbSet<LlmProviderConfigEntity> LlmProviderConfigs => Set<LlmProviderConfigEntity>();
 
+        // 会话存储（统一模型）
+        public DbSet<MafSessionState> Sessions => Set<MafSessionState>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -42,6 +46,9 @@ namespace CKY.MultiAgentFramework.Repository.Data
 
             // 应用 LLM 配置
             modelBuilder.ApplyConfiguration(new LlmProviderConfigConfiguration());
+
+            // 应用会话配置（统一模型）
+            modelBuilder.ApplyConfiguration(new SessionConfiguration());
         }
     }
 }

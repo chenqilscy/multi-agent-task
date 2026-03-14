@@ -15,7 +15,7 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             // Arrange
             var mockIntentRecognizer = new Mock<IIntentRecognizer>();
             var mockMapping = new Mock<IIntentProviderMapping>();
-            var mockLlmRegistry = new Mock<ILlmAgentRegistry>();
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
             var mockServiceProvider = new Mock<IServiceProvider>();
             var mockLogger = new Mock<ILogger<IntentDrivenEntityExtractor>>();
 
@@ -49,7 +49,7 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             // Arrange
             var mockIntentRecognizer = new Mock<IIntentRecognizer>();
             var mockMapping = new Mock<IIntentProviderMapping>();
-            var mockLlmRegistry = new Mock<ILlmAgentRegistry>();
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
             var mockServiceProvider = new Mock<IServiceProvider>();
             var mockProvider = new Mock<IEntityPatternProvider>();
             var mockLogger = new Mock<ILogger<IntentDrivenEntityExtractor>>();
@@ -101,10 +101,10 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             // Arrange
             var mockIntentRecognizer = new Mock<IIntentRecognizer>();
             var mockMapping = new Mock<IIntentProviderMapping>();
-            var mockLlmRegistry = new Mock<ILlmAgentRegistry>();
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
             var mockServiceProvider = new Mock<IServiceProvider>();
             var mockProvider = new Mock<IEntityPatternProvider>();
-            var mockLlmAgent = new Mock<ILlmAgent>();
+            var mockLlmAgent = new Mock<IMafAiAgent>();
             var mockLogger = new Mock<ILogger<IntentDrivenEntityExtractor>>();
 
             mockIntentRecognizer
@@ -180,10 +180,10 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             // Arrange
             var mockIntentRecognizer = new Mock<IIntentRecognizer>();
             var mockMapping = new Mock<IIntentProviderMapping>();
-            var mockLlmRegistry = new Mock<ILlmAgentRegistry>();
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
             var mockServiceProvider = new Mock<IServiceProvider>();
             var mockProvider = new Mock<IEntityPatternProvider>();
-            var mockLlmAgent = new Mock<ILlmAgent>();
+            var mockLlmAgent = new Mock<IMafAiAgent>();
             var mockLogger = new Mock<ILogger<IntentDrivenEntityExtractor>>();
 
             mockIntentRecognizer
@@ -251,10 +251,10 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             // Arrange
             var mockIntentRecognizer = new Mock<IIntentRecognizer>();
             var mockMapping = new Mock<IIntentProviderMapping>();
-            var mockLlmRegistry = new Mock<ILlmAgentRegistry>();
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
             var mockServiceProvider = new Mock<IServiceProvider>();
             var mockProvider = new Mock<IEntityPatternProvider>();
-            var mockLlmAgent = new Mock<ILlmAgent>();
+            var mockLlmAgent = new Mock<IMafAiAgent>();
             var mockLogger = new Mock<ILogger<IntentDrivenEntityExtractor>>();
 
             mockIntentRecognizer

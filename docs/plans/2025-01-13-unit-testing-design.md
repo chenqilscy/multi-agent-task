@@ -28,7 +28,7 @@
   - Scheduling: MafTaskScheduler, MafPriorityCalculator
   - Orchestration: MafTaskDecomposer, MafTaskOrchestrator
   - Resilience: CircuitBreaker, RetryExecutor
-  - Factory: LlmAgentFactory
+  - Factory: MafAiAgentFactory
   - Storage: MafAgentRegistry
 
 **不包含的组件：**
@@ -167,7 +167,7 @@ src/tests/UnitTests/
 │   │   ├── CircuitBreakerTests.cs
 │   │   └── RetryExecutorTests.cs
 │   ├── Factory/
-│   │   └── LlmAgentFactoryTests.cs
+│   │   └── MafAiAgentFactoryTests.cs
 │   └── Storage/
 │       └── MafAgentRegistryTests.cs
 │

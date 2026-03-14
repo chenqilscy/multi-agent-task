@@ -3,21 +3,21 @@
 ## 架构概览
 
 ```
-LlmAgent : AIAgent (抽象基类)
+MafAiAgent : AIAgent (抽象基类)
 ├── ExecuteAsync() - 核心抽象方法
 ├── ExecuteBatchAsync() - 批量调用
 ├── SupportsScenario() - 场景支持检查
 └── 使用 LlmResiliencePipeline (重试+超时)
 
 具体实现:
-├── ZhipuAIAgent : LlmAgent (智谱AI)
-├── QwenAIAgent : LlmAgent (通义千问)
+├── ZhipuAIAgent : MafAiAgent (智谱AI)
+├── QwenAIAgent : MafAiAgent (通义千问)
 └── [未来] DeepSeekAIAgent, ErnieAIAgent 等
 ```
 
 ## 快速开始
 
-### 1. 创建 LlmAgent 实例
+### 1. 创建 MafAiAgent 实例
 
 ```csharp
 // 配置
@@ -89,7 +89,7 @@ Console.WriteLine(response);
 - [x] API Key 脱敏
 
 ### 推荐项（待完成）
-- [ ] ILlmAgentRegistry 实现
+- [ ] IMafAiAgentRegistry 实现
 - [ ] L2/L3 缓存集成
 - [ ] 单元测试覆盖
 - [ ] 熔断器模式完整实现

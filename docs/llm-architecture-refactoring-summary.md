@@ -9,7 +9,7 @@
 
 本次重构修正了 LLM 服务与业务 Agent 之间的架构关系，确保：
 - **业务 Agent**（MafAgentBase）专注于业务逻辑，不直接依赖 MS AF
-- **LLM Agent**（LlmAgent）继承 MS AF 的 AIAgent，封装不同 LLM 厂商的实现
+- **LLM Agent**（MafAiAgent）继承 MS AF 的 AIAgent，封装不同 LLM 厂商的实现
 - **配置驱动**：LLM 提供商配置存储在数据库，支持动态切换和场景选择
 
 ## 架构变更
@@ -19,7 +19,7 @@
 ```
 ❌ 错误架构：
 MafAgentBase : AIAgent              // 业务基类继承 MS AF
-    ├── ZhipuAILlmAgent : MafAgentBase  // LLM 实现继承业务基类
+    ├── ZhipuAIMafAiAgent : MafAgentBase  // LLM 实现继承业务基类
     └── LightingAgent : MafAgentBase    // 业务 Agent 继承业务基类
 
 问题：
@@ -36,15 +36,15 @@ MafAgentBase : AIAgent              // 业务基类继承 MS AF
 业务层 (Layer 5: Demos → Layer 4: Services)
 ┌────────────────────────────────────────┐
 │  MafAgentBase (纯业务基类)              │
-│  - 依赖 ILlmAgentRegistry               │
+│  - 依赖 IMafAiAgentRegistry               │
 │  - 提供 CallLlmAsync() 辅助方法         │
 │  - 不继承 AIAgent                       │
 └────────────┬───────────────────────────┘
              │ 使用
              ▼
 ┌────────────────────────────────────────┐
-│  ILlmAgentRegistry (LLM 注册表)         │
-│  - 管理多个 LlmAgent 实例               │
+│  IMafAiAgentRegistry (LLM 注册表)         │
+│  - 管理多个 MafAiAgent 实例               │
 │  - 根据场景和优先级动态选择              │
 │  - 从数据库加载配置                     │
 └────────────┬───────────────────────────┘
@@ -52,7 +52,7 @@ MafAgentBase : AIAgent              // 业务基类继承 MS AF
              ▼
 LLM 抽象层 (Layer 3: Infrastructure)
 ┌────────────────────────────────────────┐
-│  LlmAgent : AIAgent (抽象基类)          │
+│  MafAiAgent : AIAgent (抽象基类)          │
 │  - 继承 MS AF 的 AIAgent                │
 │  - 实现 ExecuteAsync(model, prompt)     │
 │  - 支持多种场景 (chat/embed/intent)     │
@@ -60,9 +60,9 @@ LLM 抽象层 (Layer 3: Infrastructure)
              │ 继承
              ▼
 ┌────────────────────────────────────────┐
-│  ZhipuAILlmAgent : LlmAgent            │
-│  TongyiLlmAgent : LlmAgent             │
-│  QwenLlmAgent : LlmAgent               │
+│  ZhipuAIMafAiAgent : MafAiAgent            │
+│  TongyiMafAiAgent : MafAiAgent             │
+│  QwenMafAiAgent : MafAiAgent               │
 └────────────────────────────────────────┘
 ```
 
@@ -70,7 +70,7 @@ LLM 抽象层 (Layer 3: Infrastructure)
 
 ### Core Layer (Layer 1)
 
-1. **[LlmAgent.cs](../src/Core/Agents/LlmAgent.cs)**
+1. **[MafAiAgent.cs](../src/Core/Agents/MafAiAgent.cs)**
    - 抽象基类，继承 `AIAgent`
    - 提供统一的 LLM 调用接口
    - 实现 MS AF 必需的抽象方法（RunAsync, RunStreamingAsync 等）
@@ -86,14 +86,14 @@ LLM 抽象层 (Layer 3: Infrastructure)
 
 ### Abstractions Layer (Layer 2)
 
-4. **[ILlmAgentRegistry.cs](../src/Core/Abstractions/ILlmAgentRegistry.cs)**
-   - 接口：管理多个 LlmAgent 实例
+4. **[IMafAiAgentRegistry.cs](../src/Core/Abstractions/IMafAiAgentRegistry.cs)**
+   - 接口：管理多个 MafAiAgent 实例
    - 方法：GetBestAgentAsync(scenario), GetAgentByProviderAsync, SetAgentEnabledAsync, ReloadFromDatabaseAsync
 
 ### Services Layer (Layer 4)
 
-5. **[LlmAgentRegistry.cs](../src/Services/Orchestration/LlmAgentRegistry.cs)**
-   - `ILlmAgentRegistry` 的实现
+5. **[MafAiAgentRegistry.cs](../src/Services/Orchestration/MafAiAgentRegistry.cs)**
+   - `IMafAiAgentRegistry` 的实现
    - 支持按场景和优先级选择最佳 LLM Agent
    - 支持动态启用/禁用 Agent
 
@@ -113,7 +113,7 @@ public abstract class MafAgentBase : AIAgent  // ❌ 继承 MS AF
 ```csharp
 public abstract class MafAgentBase  // ✅ 纯业务基类
 {
-    protected readonly ILlmAgentRegistry LlmRegistry;  // ✅ 依赖 LLM 注册表
+    protected readonly IMafAiAgentRegistry LlmRegistry;  // ✅ 依赖 LLM 注册表
 
     protected async Task<string> CallLlmAsync(
         string prompt,
@@ -132,11 +132,11 @@ public abstract class MafAgentBase  // ✅ 纯业务基类
 }
 ```
 
-### ZhipuAILlmAgent.cs
+### ZhipuAIMafAiAgent.cs
 
 **变更前**:
 ```csharp
-public class ZhipuAILlmAgent : MafAgentBase, ILlmService  // ❌ 继承业务基类
+public class ZhipuAIMafAiAgent : MafAgentBase, ILlmService  // ❌ 继承业务基类
 {
     private readonly ZhipuAIConfig _config;
 
@@ -158,14 +158,14 @@ public class ZhipuAILlmAgent : MafAgentBase, ILlmService  // ❌ 继承业务基
 
 **变更后**:
 ```csharp
-public class ZhipuAILlmAgent : LlmAgent  // ✅ 继承 LlmAgent
+public class ZhipuAIMafAiAgent : MafAiAgent  // ✅ 继承 MafAiAgent
 {
-    public ZhipuAILlmAgent(LlmProviderConfig config, ILogger<ZhipuAILlmAgent> logger)
+    public ZhipuAIMafAiAgent(LlmProviderConfig config, ILogger<ZhipuAIMafAiAgent> logger)
         : base(config, logger)  // ✅ 使用统一的配置模型
     {
     }
 
-    // 实现 LlmAgent 抽象方法
+    // 实现 MafAiAgent 抽象方法
     public override async Task<string> ExecuteAsync(
         string modelId,
         string prompt,
@@ -261,7 +261,7 @@ public class LightingAgent : MafAgentBase
         IMafSessionStorage sessionStorage,
         IPriorityCalculator priorityCalculator,
         IMetricsCollector metricsCollector,
-        ILlmAgentRegistry llmRegistry,
+        IMafAiAgentRegistry llmRegistry,
         ILogger<LightingAgent> logger)
         : base(sessionStorage, priorityCalculator, metricsCollector, llmRegistry, logger)
     {
@@ -311,25 +311,25 @@ var llmConfigs = await dbContext.LlmProviders
     .Include(p => p.Models)
     .ToListAsync();
 
-// 2. 创建 LlmAgent 实例
-var llmAgents = new List<LlmAgent>();
+// 2. 创建 MafAiAgent 实例
+var llmAgents = new List<MafAiAgent>();
 foreach (var config in llmConfigs)
 {
     var agent = config.ProviderName.ToLowerInvariant() switch
     {
-        "zhipuai" => new ZhipuAILlmAgent(config, logger),
-        "tongyi" => new TongyiLlmAgent(config, logger),
-        "qwen" => new QwenLlmAgent(config, logger),
+        "zhipuai" => new ZhipuAIMafAiAgent(config, logger),
+        "tongyi" => new TongyiMafAiAgent(config, logger),
+        "qwen" => new QwenMafAiAgent(config, logger),
         _ => throw new InvalidOperationException($"Unknown provider: {config.ProviderName}")
     };
     llmAgents.Add(agent);
 }
 
 // 3. 注册 LLM Agent Registry
-builder.Services.AddSingleton<ILlmAgentRegistry>(sp =>
-    new LlmAgentRegistry(llmAgents, sp.GetRequiredService<ILogger<LlmAgentRegistry>>()));
+builder.Services.AddSingleton<IMafAiAgentRegistry>(sp =>
+    new MafAiAgentRegistry(llmAgents, sp.GetRequiredService<ILogger<MafAiAgentRegistry>>()));
 
-// 4. 注册业务 Agent（自动注入 ILlmAgentRegistry）
+// 4. 注册业务 Agent（自动注入 IMafAiAgentRegistry）
 builder.Services.AddSingleton<LightingAgent>();
 builder.Services.AddSingleton<ClimateAgent>();
 
@@ -342,15 +342,15 @@ var app = builder.Build();
 
 | 层级 | 职责 | 继承关系 |
 |------|------|---------|
-| **LlmAgent** | LLM 服务抽象 | `: AIAgent` |
+| **MafAiAgent** | LLM 服务抽象 | `: AIAgent` |
 | **MafAgentBase** | 业务 Agent 基类 | 无（纯POCO） |
-| **ZhipuAILlmAgent** | 具体厂商实现 | `: LlmAgent` |
+| **ZhipuAIMafAiAgent** | 具体厂商实现 | `: MafAiAgent` |
 | **LightingAgent** | 具体业务 Agent | `: MafAgentBase` |
 
 ### 2. 依赖倒置
 
 ```
-业务 Agent → ILlmAgentRegistry (抽象) → LlmAgent (抽象) → ZhipuAILlmAgent (具体)
+业务 Agent → IMafAiAgentRegistry (抽象) → MafAiAgent (抽象) → ZhipuAIMafAiAgent (具体)
 ```
 
 ### 3. 配置驱动
@@ -386,7 +386,7 @@ var response = await _llmService.CompleteAsync(systemPrompt, userPrompt);
 // 方式1：使用 MafAgentBase 的辅助方法（推荐）
 var response = await CallLlmAsync(userPrompt, LlmScenario.Chat, systemPrompt);
 
-// 方式2：直接使用 LlmAgentRegistry
+// 方式2：直接使用 MafAiAgentRegistry
 var llmAgent = await _llmRegistry.GetBestAgentAsync(LlmScenario.Chat);
 var response = await llmAgent.ExecuteAsync(
     llmAgent.GetCurrentModelId(),
@@ -400,7 +400,7 @@ var response = await llmAgent.ExecuteAsync(
 ### 单元测试
 
 ```csharp
-public class LlmAgentRegistryTests
+public class MafAiAgentRegistryTests
 {
     [Fact]
     public async Task GetBestAgentAsync_ShouldReturnHighestPriorityAgent()
@@ -409,10 +409,10 @@ public class LlmAgentRegistryTests
         var config1 = new LlmProviderConfig { ProviderName = "zhipuai", Priority = 1, ... };
         var config2 = new LlmProviderConfig { ProviderName = "tongyi", Priority = 0, ... };
 
-        var agent1 = new MockZhipuAILlmAgent(config1);
-        var agent2 = new MockTongyiLlmAgent(config2);
+        var agent1 = new MockZhipuAIMafAiAgent(config1);
+        var agent2 = new MockTongyiMafAiAgent(config2);
 
-        var registry = new LlmAgentRegistry(new[] { agent1, agent2 });
+        var registry = new MafAiAgentRegistry(new[] { agent1, agent2 });
 
         // Act
         var bestAgent = await registry.GetBestAgentAsync(LlmScenario.Chat);
@@ -430,7 +430,7 @@ public class LlmAgentRegistryTests
 ## 性能考虑
 
 1. **LLM Agent 实例复用**: 所有 Agent 注册为单例
-2. **按场景缓存**: `LlmAgentRegistry` 按场景索引，快速查找
+2. **按场景缓存**: `MafAiAgentRegistry` 按场景索引，快速查找
 3. **优先级排序**: 优先级在注册时预排序，运行时 O(1) 选择
 
 ## 未来增强

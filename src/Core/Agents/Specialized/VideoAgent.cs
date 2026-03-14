@@ -17,7 +17,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
     /// - 故事叙述：将故事文本转化为视频
     /// - 产品展示：生成产品介绍视频
     /// </remarks>
-    public class VideoAgent : MafAgentBase
+    public class VideoAgent : MafBusinessAgentBase
     {
         public override string AgentId => "video-agent-001";
         public override string Name => "VideoAgent";
@@ -31,7 +31,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
         };
 
         public VideoAgent(
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<VideoAgent> logger)
             : base(llmRegistry, logger)
         {

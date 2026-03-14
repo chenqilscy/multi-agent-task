@@ -17,7 +17,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
     /// - 文档翻译：技术文档、用户手册的翻译
     /// - 实时翻译：对话或会议的实时翻译
     /// </remarks>
-    public class TranslationAgent : MafAgentBase
+    public class TranslationAgent : MafBusinessAgentBase
     {
         public override string AgentId => "translation-agent-001";
         public override string Name => "TranslationAgent";
@@ -31,7 +31,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
         };
 
         public TranslationAgent(
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<TranslationAgent> logger)
             : base(llmRegistry, logger)
         {

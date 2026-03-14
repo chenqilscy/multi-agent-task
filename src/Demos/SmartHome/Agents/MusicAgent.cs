@@ -9,7 +9,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
     /// 音乐播放Agent
     /// 负责处理音乐播放、暂停、切歌等控制命令
     /// </summary>
-    public class MusicAgent : MafAgentBase
+    public class MusicAgent : MafBusinessAgentBase
     {
         public override string AgentId => "music-agent-001";
         public override string Name => "MusicAgent";
@@ -17,7 +17,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
         public override IReadOnlyList<string> Capabilities => ["music", "audio", "media-control"];
 
         public MusicAgent(
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<MusicAgent> logger)
             : base(llmRegistry, logger)
         {

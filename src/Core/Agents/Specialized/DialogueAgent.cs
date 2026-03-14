@@ -19,7 +19,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
     /// - 对话状态跟踪：追踪对话进度和状态
     /// - 自然对话：提供流畅的对话体验
     /// </remarks>
-    public class DialogueAgent : MafAgentBase
+    public class DialogueAgent : MafBusinessAgentBase
     {
         public override string AgentId => "dialogue-agent-001";
         public override string Name => "DialogueAgent";
@@ -37,7 +37,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
         private readonly object _lock = new object();
 
         public DialogueAgent(
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<DialogueAgent> logger)
             : base(llmRegistry, logger)
         {

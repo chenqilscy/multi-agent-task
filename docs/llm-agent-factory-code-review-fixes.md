@@ -34,7 +34,7 @@ Task UpdateLastUsedAsync(
 ---
 
 #### 2. 空引用异常风险
-**文件**: `src/Core/Agents/FallbackLlmAgent.cs:102`
+**文件**: `src/Core/Agents/FallbackMafAiAgent.cs:102`
 
 **问题描述**:
 ```csharp
@@ -54,7 +54,7 @@ Prompt = string.IsNullOrEmpty(prompt) ? string.Empty :
 ---
 
 #### 3. HttpClient 使用反模式
-**文件**: `src/Repository/LLM/ZhipuAILlmAgent.cs:95-97`
+**文件**: `src/Repository/LLM/ZhipuAIMafAiAgent.cs:95-97`
 
 **问题描述**:
 ```csharp
@@ -69,9 +69,9 @@ using var httpClient = new HttpClient { ... } // 反模式！
 // 1. 通过 DI 注入 HttpClient
 private readonly HttpClient _httpClient;
 
-public ZhipuAILlmAgent(
+public ZhipuAIMafAiAgent(
     LlmProviderConfig config,
-    ILogger<ZhipuAILlmAgent> logger,
+    ILogger<ZhipuAIMafAiAgent> logger,
     HttpClient httpClient)  // 注入
     : base(config, logger)
 {
@@ -79,12 +79,12 @@ public ZhipuAILlmAgent(
 }
 
 // 2. 在 Startup.cs 中注册
-services.AddHttpClient<ZhipuAILlmAgent>(client => {
+services.AddHttpClient<ZhipuAIMafAiAgent>(client => {
     client.BaseAddress = new Uri(config.ApiBaseUrl);
 });
 ```
 
-**状态**: 已识别，需要在 ZhipuAILlmAgent 实现中添加
+**状态**: 已识别，需要在 ZhipuAIMafAiAgent 实现中添加
 
 ---
 
@@ -210,7 +210,7 @@ catch
 ### ✅ MEDIUM 优先级问题（1个）
 
 #### 8. 线程安全问题
-**文件**: `src/Core/Agents/FallbackLlmAgent.cs:30, 223-227`
+**文件**: `src/Core/Agents/FallbackMafAiAgent.cs:30, 223-227`
 
 **问题描述**:
 ```csharp
@@ -258,15 +258,15 @@ lock (_historyLock)
 ## 架构改进建议
 
 ### 1. 目录结构调整
-**当前问题**: `ZhipuAILlmAgent` 位于 `Repository.LLM` 命名空间
+**当前问题**: `ZhipuAIMafAiAgent` 位于 `Repository.LLM` 命名空间
 
 **建议重构**:
 ```
 Infrastructure/
   LLM/
-    ZhipuAILlmAgent.cs
-    TongyiLlmAgent.cs
-    WenxinLlmAgent.cs
+    ZhipuAIMafAiAgent.cs
+    TongyiMafAiAgent.cs
+    WenxinMafAiAgent.cs
 ```
 
 **理由**: 遵循 5 层架构的 Infrastructure 层定义
@@ -308,7 +308,7 @@ public class CachedLlmProviderConfigRepository : ILlmProviderConfigRepository
 ## 测试建议
 
 ### 单元测试
-- ✅ 已创建 `LlmAgentFactoryTests.cs`
+- ✅ 已创建 `MafAiAgentFactoryTests.cs`
 - 需要添加 Repository 的单元测试（使用 Mock DbContext）
 
 ### 集成测试

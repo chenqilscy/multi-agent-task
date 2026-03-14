@@ -39,7 +39,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// <summary>
         /// 根据提供商配置创建 LLM Agent（核心方法）
         /// </summary>
-        public async Task<LlmAgent> CreateAgentAsync(
+        public async Task<MafAiAgent> CreateAgentAsync(
             LlmProviderConfig config,
             LlmScenario scenario,
             CancellationToken ct = default)
@@ -72,7 +72,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
                 scenario);
 
             // 根据提供商名称创建对应的 Agent 实例
-            LlmAgent agent = config.ProviderName.ToLowerInvariant() switch
+            MafAiAgent agent = config.ProviderName.ToLowerInvariant() switch
             {
                 "zhipuai" => await CreateZhipuAIAgentAsync(config, ct),
                 "tongyi" => await CreateTongyiAgentAsync(config, ct),
@@ -96,7 +96,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// <summary>
         /// 根据提供商名称创建 LLM Agent（从数据库加载配置）
         /// </summary>
-        public async Task<LlmAgent> CreateAgentByProviderAsync(
+        public async Task<MafAiAgent> CreateAgentByProviderAsync(
             string providerName,
             LlmScenario scenario,
             CancellationToken ct = default)
@@ -124,7 +124,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// <summary>
         /// 根据场景创建最佳 LLM Agent（自动选择优先级最高的）
         /// </summary>
-        public async Task<LlmAgent> CreateBestAgentForScenarioAsync(
+        public async Task<MafAiAgent> CreateBestAgentForScenarioAsync(
             LlmScenario scenario,
             CancellationToken ct = default)
         {
@@ -161,7 +161,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// <summary>
         /// 批量创建支持指定场景的所有 LLM Agent
         /// </summary>
-        public async Task<List<LlmAgent>> CreateAllAgentsForScenarioAsync(
+        public async Task<List<MafAiAgent>> CreateAllAgentsForScenarioAsync(
             LlmScenario scenario,
             CancellationToken ct = default)
         {
@@ -183,11 +183,11 @@ namespace CKY.MultiAgentFramework.Services.Factory
                 _logger.LogWarning(
                     "[Factory] No enabled provider found for scenario: {Scenario}",
                     scenario);
-                return new List<LlmAgent>();
+                return new List<MafAiAgent>();
             }
 
             // 批量创建
-            var agents = new List<LlmAgent>();
+            var agents = new List<MafAiAgent>();
             foreach (var config in candidates)
             {
                 try
@@ -214,7 +214,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// <summary>
         /// 创建带有 Fallback 链的 LLM Agent
         /// </summary>
-        public async Task<LlmAgent> CreateAgentWithFallbackAsync(
+        public async Task<MafAiAgent> CreateAgentWithFallbackAsync(
             LlmScenario scenario,
             CancellationToken ct = default)
         {
@@ -284,7 +284,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// 注意：ZhipuAIAgent 需要 HttpClient，需要通过依赖注入提供。
         /// 这里抛出 NotImplementedException，提醒需要在工厂中添加 HttpClient 支持。
         /// </remarks>
-        private async Task<LlmAgent> CreateZhipuAIAgentAsync(
+        private async Task<MafAiAgent> CreateZhipuAIAgentAsync(
             LlmProviderConfig config,
             CancellationToken ct)
         {
@@ -300,7 +300,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// <summary>
         /// 创建通义千问 Agent
         /// </summary>
-        private async Task<LlmAgent> CreateTongyiAgentAsync(
+        private async Task<MafAiAgent> CreateTongyiAgentAsync(
             LlmProviderConfig config,
             CancellationToken ct)
         {
@@ -313,7 +313,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// <summary>
         /// 创建 Qwen Agent
         /// </summary>
-        private async Task<LlmAgent> CreateQwenAgentAsync(
+        private async Task<MafAiAgent> CreateQwenAgentAsync(
             LlmProviderConfig config,
             CancellationToken ct)
         {
@@ -324,7 +324,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// <summary>
         /// 创建文心一言 Agent
         /// </summary>
-        private async Task<LlmAgent> CreateWenxinAgentAsync(
+        private async Task<MafAiAgent> CreateWenxinAgentAsync(
             LlmProviderConfig config,
             CancellationToken ct)
         {
@@ -337,7 +337,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// <summary>
         /// 创建讯飞星火 Agent
         /// </summary>
-        private async Task<LlmAgent> CreateXunfeiAgentAsync(
+        private async Task<MafAiAgent> CreateXunfeiAgentAsync(
             LlmProviderConfig config,
             CancellationToken ct)
         {
@@ -350,7 +350,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// <summary>
         /// 创建百川 Agent
         /// </summary>
-        private async Task<LlmAgent> CreateBaichuanAgentAsync(
+        private async Task<MafAiAgent> CreateBaichuanAgentAsync(
             LlmProviderConfig config,
             CancellationToken ct)
         {
@@ -363,7 +363,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// <summary>
         /// 创建 MiniMax Agent
         /// </summary>
-        private async Task<LlmAgent> CreateMiniMaxAgentAsync(
+        private async Task<MafAiAgent> CreateMiniMaxAgentAsync(
             LlmProviderConfig config,
             CancellationToken ct)
         {
@@ -381,38 +381,48 @@ namespace CKY.MultiAgentFramework.Services.Factory
     // 注意：这些类需要在相应的命名空间中实现
     // 这里只是为了编译通过而提供的占位符
 
-    internal class TongyiLlmAgent : LlmAgent
+    public class TongyiLlmAgent : MafAiAgent
     {
         public TongyiLlmAgent(LlmProviderConfig config, ILogger logger) : base(config, logger) { }
         public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
             => throw new NotImplementedException("TongyiLlmAgent not yet implemented");
+        public override IAsyncEnumerable<string> ExecuteStreamingAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
+            => throw new NotImplementedException("TongyiLlmAgent not yet implemented");
     }
 
-    internal class WenxinLlmAgent : LlmAgent
+    public class WenxinLlmAgent : MafAiAgent
     {
         public WenxinLlmAgent(LlmProviderConfig config, ILogger logger) : base(config, logger) { }
         public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
             => throw new NotImplementedException("WenxinLlmAgent not yet implemented");
+        public override IAsyncEnumerable<string> ExecuteStreamingAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
+            => throw new NotImplementedException("WenxinLlmAgent not yet implemented");
     }
 
-    internal class XunfeiLlmAgent : LlmAgent
+    public class XunfeiLlmAgent : MafAiAgent
     {
         public XunfeiLlmAgent(LlmProviderConfig config, ILogger logger) : base(config, logger) { }
         public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
             => throw new NotImplementedException("XunfeiLlmAgent not yet implemented");
+        public override IAsyncEnumerable<string> ExecuteStreamingAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
+            => throw new NotImplementedException("XunfeiLlmAgent not yet implemented");
     }
 
-    internal class BaichuanLlmAgent : LlmAgent
+    public class BaichuanLlmAgent : MafAiAgent
     {
         public BaichuanLlmAgent(LlmProviderConfig config, ILogger logger) : base(config, logger) { }
         public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
             => throw new NotImplementedException("BaichuanLlmAgent not yet implemented");
+        public override IAsyncEnumerable<string> ExecuteStreamingAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
+            => throw new NotImplementedException("BaichuanLlmAgent not yet implemented");
     }
 
-    internal class MiniMaxLlmAgent : LlmAgent
+    public class MiniMaxLlmAgent : MafAiAgent
     {
         public MiniMaxLlmAgent(LlmProviderConfig config, ILogger logger) : base(config, logger) { }
         public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
+            => throw new NotImplementedException("MiniMaxLlmAgent not yet implemented");
+        public override IAsyncEnumerable<string> ExecuteStreamingAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
             => throw new NotImplementedException("MiniMaxLlmAgent not yet implemented");
     }
 

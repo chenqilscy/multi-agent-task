@@ -24,7 +24,7 @@ namespace CKY.MultiAgentFramework.Core.Agents
     /// services.AddSingleton<LlmResiliencePipeline>();
     /// </code>
     /// </remarks>
-    public class QwenAIAgent : LlmAgent
+    public class QwenAIAgent : MafAiAgent
     {
         private readonly HttpClient _httpClient;
         private readonly LlmResiliencePipeline _resiliencePipeline;
@@ -108,6 +108,21 @@ namespace CKY.MultiAgentFramework.Core.Agents
                 // 转换为自定义异常
                 throw ConvertToLlmException(ex, modelId);
             }
+        }
+
+        /// <summary>
+        /// 执行流式通义千问 LLM 调用（带弹性保护）
+        /// </summary>
+        public override async IAsyncEnumerable<string> ExecuteStreamingAsync(
+            string modelId,
+            string prompt,
+            string? systemPrompt = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            // TODO: Implement streaming support for QwenAI
+            // For now, fallback to non-streaming
+            var result = await ExecuteAsync(modelId, prompt, systemPrompt, ct);
+            yield return result;
         }
 
         /// <summary>

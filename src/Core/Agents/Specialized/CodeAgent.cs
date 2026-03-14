@@ -18,7 +18,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
     /// - 代码解释：解释代码的功能和逻辑
     /// - Bug 修复：定位和修复代码错误
     /// </remarks>
-    public class CodeAgent : MafAgentBase
+    public class CodeAgent : MafBusinessAgentBase
     {
         public override string AgentId => "code-agent-001";
         public override string Name => "CodeAgent";
@@ -33,7 +33,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
         };
 
         public CodeAgent(
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<CodeAgent> logger)
             : base(llmRegistry, logger)
         {

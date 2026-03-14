@@ -10,7 +10,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
     /// 照明控制Agent
     /// 负责处理智能家居中与灯光相关的所有控制命令
     /// </summary>
-    public class LightingAgent : MafAgentBase
+    public class LightingAgent : MafBusinessAgentBase
     {
         private readonly ILightingService _lightingService;
 
@@ -21,7 +21,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
 
         public LightingAgent(
             ILightingService lightingService,
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<LightingAgent> logger)
             : base(llmRegistry, logger)
         {

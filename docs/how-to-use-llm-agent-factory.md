@@ -1,12 +1,12 @@
 # LLM Agent Factory 使用指南
 
-本文档介绍如何使用 `LlmAgentFactory` 根据场景和优先级动态创建 LLM Agent 实例。
+本文档介绍如何使用 `MafAiAgentFactory` 根据场景和优先级动态创建 LLM Agent 实例。
 
 ## 架构概览
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     LlmAgentFactory                         │
+│                     MafAiAgentFactory                         │
 │                   (工厂模式核心)                            │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -40,22 +40,22 @@
 
 ### 2. 核心接口
 
-**ILlmAgentFactory** - 工厂接口
+**IMafAiAgentFactory** - 工厂接口
 ```csharp
 // 根据配置创建 Agent
-Task<LlmAgent> CreateAgentAsync(LlmProviderConfig config, LlmScenario scenario);
+Task<MafAiAgent> CreateAgentAsync(LlmProviderConfig config, LlmScenario scenario);
 
 // 根据提供商名称创建 Agent
-Task<LlmAgent> CreateAgentByProviderAsync(string providerName, LlmScenario scenario);
+Task<MafAiAgent> CreateAgentByProviderAsync(string providerName, LlmScenario scenario);
 
 // 创建最佳 Agent（自动选择优先级最高的）
-Task<LlmAgent> CreateBestAgentForScenarioAsync(LlmScenario scenario);
+Task<MafAiAgent> CreateBestAgentForScenarioAsync(LlmScenario scenario);
 
 // 批量创建所有支持该场景的 Agent
-Task<List<LlmAgent>> CreateAllAgentsForScenarioAsync(LlmScenario scenario);
+Task<List<MafAiAgent>> CreateAllAgentsForScenarioAsync(LlmScenario scenario);
 
 // 创建带 Fallback 能力的 Agent
-Task<LlmAgent> CreateAgentWithFallbackAsync(LlmScenario scenario);
+Task<MafAiAgent> CreateAgentWithFallbackAsync(LlmScenario scenario);
 
 // 检查提供商是否支持场景
 Task<bool> IsScenarioSupportedAsync(string providerName, LlmScenario scenario);
@@ -68,16 +68,16 @@ Task<bool> IsScenarioSupportedAsync(string providerName, LlmScenario scenario);
 ```csharp
 // 在 Startup 或 Program.cs 中注册服务
 services.AddScoped<ILlmProviderConfigRepository, LlmProviderConfigRepository>();
-services.AddScoped<ILlmAgentFactory, LlmAgentFactory>();
+services.AddScoped<IMafAiAgentFactory, MafAiAgentFactory>();
 services.AddDbContext<MafDbContext>(options =>
     options.UseNpgsql("YourConnectionString"));
 
 // 在业务代码中使用
 public class ChatService
 {
-    private readonly ILlmAgentFactory _agentFactory;
+    private readonly IMafAiAgentFactory _agentFactory;
 
-    public ChatService(ILlmAgentFactory agentFactory)
+    public ChatService(IMafAiAgentFactory agentFactory)
     {
         _agentFactory = agentFactory;
     }
@@ -102,9 +102,9 @@ public class ChatService
 ```csharp
 public class RobustChatService
 {
-    private readonly ILlmAgentFactory _agentFactory;
+    private readonly IMafAiAgentFactory _agentFactory;
 
-    public RobustChatService(ILlmAgentFactory agentFactory)
+    public RobustChatService(IMafAiAgentFactory agentFactory)
     {
         _agentFactory = agentFactory;
     }
@@ -208,7 +208,7 @@ public class ConfigManagementService
 
 ## Fallback 机制
 
-`FallbackLlmAgent` 实现了自动故障转移：
+`FallbackMafAiAgent` 实现了自动故障转移：
 
 1. **按优先级尝试**: 从主 Agent 开始，依次尝试备用 Agent
 2. **场景支持**: 只尝试支持当前场景的 Agent
@@ -217,7 +217,7 @@ public class ConfigManagementService
 
 ```csharp
 // 获取 Fallback 统计
-if (agent is FallbackLlmAgent fallbackAgent)
+if (agent is FallbackMafAiAgent fallbackAgent)
 {
     var stats = fallbackAgent.GetStatistics();
     Console.WriteLine($"Fallback Rate: {stats.FallbackRate:P2}");
@@ -247,11 +247,11 @@ if (agent is FallbackLlmAgent fallbackAgent)
 
 要添加新的 LLM 提供商：
 
-1. **实现 Agent 类**（继承 `LlmAgent`）
+1. **实现 Agent 类**（继承 `MafAiAgent`）
 ```csharp
-public class NewProviderLlmAgent : LlmAgent
+public class NewProviderMafAiAgent : MafAiAgent
 {
-    public NewProviderLlmAgent(LlmProviderConfig config, ILogger logger)
+    public NewProviderMafAiAgent(LlmProviderConfig config, ILogger logger)
         : base(config, logger)
     {
     }
@@ -270,17 +270,17 @@ public class NewProviderLlmAgent : LlmAgent
 
 2. **在工厂中注册**
 ```csharp
-// 在 LlmAgentFactory.CreateAgentAsync 中添加 case
+// 在 MafAiAgentFactory.CreateAgentAsync 中添加 case
 "newprovider" => await CreateNewProviderAgentAsync(config, ct),
 
 // 添加创建方法
-private async Task<LlmAgent> CreateNewProviderAgentAsync(
+private async Task<MafAiAgent> CreateNewProviderAgentAsync(
     LlmProviderConfig config,
     CancellationToken ct)
 {
     await Task.CompletedTask;
-    var logger = _loggerFactory.CreateLogger<NewProviderLlmAgent>();
-    return new NewProviderLlmAgent(config, logger);
+    var logger = _loggerFactory.CreateLogger<NewProviderMafAiAgent>();
+    return new NewProviderMafAiAgent(config, logger);
 }
 ```
 
@@ -304,7 +304,7 @@ builder.Services.AddDbContext<MafDbContext>(options =>
 
 // 注册仓储和工厂
 builder.Services.AddScoped<ILlmProviderConfigRepository, LlmProviderConfigRepository>();
-builder.Services.AddScoped<ILlmAgentFactory, LlmAgentFactory>();
+builder.Services.AddScoped<IMafAiAgentFactory, MafAiAgentFactory>();
 
 // 添加 LoggerFactory（可选，用于日志）
 builder.Services.AddLogging();

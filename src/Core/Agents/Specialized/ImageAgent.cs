@@ -17,7 +17,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
     /// - 创意设计：生成海报、Logo、插图等
     /// - 内容创作：为文章、博客生成配图
     /// </remarks>
-    public class ImageAgent : MafAgentBase
+    public class ImageAgent : MafBusinessAgentBase
     {
         public override string AgentId => "image-agent-001";
         public override string Name => "ImageAgent";
@@ -31,7 +31,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
         };
 
         public ImageAgent(
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<ImageAgent> logger)
             : base(llmRegistry, logger)
         {

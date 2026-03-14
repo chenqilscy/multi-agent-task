@@ -12,7 +12,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                     应用层 (Services)                        │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │              LlmAgentFactory                         │  │
+│  │              MafAiAgentFactory                         │  │
 │  │        (工厂模式 - 核心创建逻辑)                      │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
@@ -20,18 +20,18 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                  抽象层 (Abstractions)                       │
 │  ┌──────────────────────┐  ┌────────────────────────────┐  │
-│  │ ILlmAgentFactory     │  │ ILlmProviderConfigRepository│ │
+│  │ IMafAiAgentFactory     │  │ ILlmProviderConfigRepository│ │
 │  └──────────────────────┘  └────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   核心层 (Core)                              │
 │  ┌──────────────────┐  ┌─────────────────────────────────┐ │
-│  │  LlmAgent        │  │  LlmProviderConfig              │ │
+│  │  MafAiAgent        │  │  LlmProviderConfig              │ │
 │  │  (抽象基类)       │  │  (领域模型)                      │ │
 │  └──────────────────┘  └─────────────────────────────────┘ │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │           FallbackLlmAgent                            │  │
+│  │           FallbackMafAiAgent                            │  │
 │  │        (装饰器模式 - 自动故障转移)                     │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
@@ -43,7 +43,7 @@
 │  │           (EF Core 实现)                              │  │
 │  └──────────────────────────────────────────────────────┘  │
 │  ┌──────────────────┐  ┌─────────────────────────────────┐ │
-│  │ZhipuAILlmAgent   │  │ TongyiLlmAgent / WenxinLlmAgent  │ │
+│  │ZhipuAIMafAiAgent   │  │ TongyiMafAiAgent / WenxinMafAiAgent  │ │
 │  │  (具体实现)       │  │   (其他提供商实现)                │ │
 │  └──────────────────┘  └─────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
@@ -84,7 +84,7 @@
 
 #### 2.3 抽象基类 (Base Agent)
 
-**LlmAgent**
+**MafAiAgent**
 - **职责**: 所有 LLM Agent 的抽象基类
 - **继承**: `AIAgent` (Microsoft Agent Framework)
 - **核心方法**:
@@ -99,7 +99,7 @@
 
 #### 2.4 工厂模式 (Factory)
 
-**ILlmAgentFactory / LlmAgentFactory**
+**IMafAiAgentFactory / MafAiAgentFactory**
 - **职责**: 根据配置和场景创建 Agent 实例
 - **创建策略**:
   - 按提供商名称创建
@@ -109,7 +109,7 @@
 
 #### 2.5 装饰器模式 (Decorator)
 
-**FallbackLlmAgent**
+**FallbackMafAiAgent**
 - **职责**: 包装主 Agent，提供自动故障转移
 - **机制**:
   1. 尝试主 Agent
@@ -123,7 +123,7 @@
 用户请求 (Chat, Embed, Intent...)
         │
         ▼
-LlmAgentFactory.CreateBestAgentForScenarioAsync(scenario)
+MafAiAgentFactory.CreateBestAgentForScenarioAsync(scenario)
         │
         ▼
 ILlmProviderConfigRepository.GetAllEnabledAsync()
@@ -138,7 +138,7 @@ MafDbContext.LlmProviderConfigs
 排序: OrderBy(Priority)
         │
         ▼
-创建 LlmAgent 实例 (ZhipuAILlmAgent, TongyiLlmAgent...)
+创建 MafAiAgent 实例 (ZhipuAIMafAiAgent, TongyiMafAiAgent...)
         │
         ▼
 返回 Agent 给调用方
@@ -147,7 +147,7 @@ MafDbContext.LlmProviderConfigs
 ### 4. Fallback 流程
 
 ```
-FallbackLlmAgent.ExecuteAsync(prompt, scenario)
+FallbackMafAiAgent.ExecuteAsync(prompt, scenario)
         │
         ├─→ 尝试 Agent1 (Priority=1): 智谱AI
         │       │
@@ -174,9 +174,9 @@ FallbackLlmAgent.ExecuteAsync(prompt, scenario)
 
 | 模式 | 应用位置 | 优势 |
 |------|---------|------|
-| **工厂模式** | `LlmAgentFactory` | 集中创建逻辑，隐藏实例化细节 |
+| **工厂模式** | `MafAiAgentFactory` | 集中创建逻辑，隐藏实例化细节 |
 | **策略模式** | 不同提供商的创建方法 | 易于添加新的提供商 |
-| **装饰器模式** | `FallbackLlmAgent` | 动态添加 Fallback 能力，不修改原 Agent |
+| **装饰器模式** | `FallbackMafAiAgent` | 动态添加 Fallback 能力，不修改原 Agent |
 | **仓储模式** | `ILlmProviderConfigRepository` | 解耦数据访问，易于测试 |
 | **单一职责** | 每个类职责明确 | 高内聚低耦合 |
 
@@ -188,9 +188,9 @@ FallbackLlmAgent.ExecuteAsync(prompt, scenario)
 
 1. **实现 Agent 类**
 ```csharp
-public class NewProviderLlmAgent : LlmAgent
+public class NewProviderMafAiAgent : MafAiAgent
 {
-    public NewProviderLlmAgent(LlmProviderConfig config, ILogger logger)
+    public NewProviderMafAiAgent(LlmProviderConfig config, ILogger logger)
         : base(config, logger) { }
 
     public override async Task<string> ExecuteAsync(...)
@@ -202,10 +202,10 @@ public class NewProviderLlmAgent : LlmAgent
 
 2. **在工厂中注册**
 ```csharp
-// LlmAgentFactory.CreateAgentAsync
+// MafAiAgentFactory.CreateAgentAsync
 "newprovider" => await CreateNewProviderAgentAsync(config, ct),
 
-private async Task<LlmAgent> CreateNewProviderAgentAsync(...)
+private async Task<MafAiAgent> CreateNewProviderAgentAsync(...)
 {
     // 创建并返回实例
 }

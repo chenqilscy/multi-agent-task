@@ -93,19 +93,19 @@ namespace CKY.MultiAgentFramework.Core.Configuration
 ### 1.3 修改 ZhipuAIConfig 使用配置绑定
 
 ```csharp
-// src/Repository/LLM/ZhipuAILlmAgent.cs
+// src/Repository/LLM/ZhipuAIMafAiAgent.cs
 namespace CKY.MultiAgentFramework.Repository.LLM
 {
-    public class ZhipuAILlmAgent : MafAgentBase, ILlmService
+    public class ZhipuAIMafAiAgent : MafAgentBase, ILlmService
     {
         private readonly ZhipuAIConfig _config;
 
-        public ZhipuAILlmAgent(
+        public ZhipuAIMafAiAgent(
             ZhipuAIConfig config,
             IMafSessionStorage sessionStorage,
             IPriorityCalculator priorityCalculator,
             IMetricsCollector metricsCollector,
-            ILogger<ZhipuAILlmAgent> logger)
+            ILogger<ZhipuAIMafAiAgent> logger)
             : base(sessionStorage, priorityCalculator, metricsCollector, logger)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
@@ -172,8 +172,8 @@ public class Program
         };
 
         // 注册 ZhipuAI Agent（同时作为 ILlmService）
-        services.AddSingleton<ZhipuAILlmAgent>();
-        services.AddSingleton<ILlmService>(sp => sp.GetRequiredService<ZhipuAILlmAgent>());
+        services.AddSingleton<ZhipuAIMafAiAgent>();
+        services.AddSingleton<ILlmService>(sp => sp.GetRequiredService<ZhipuAIMafAiAgent>());
         services.AddSingleton(zhipuAIConfig);
     }
 }
@@ -215,25 +215,25 @@ namespace CKY.MultiAgentFramework.Core.Configuration
 }
 ```
 
-### 2.2 修改 ZhipuAILlmAgent 使用 IOptions
+### 2.2 修改 ZhipuAIMafAiAgent 使用 IOptions
 
 ```csharp
-// src/Repository/LLM/ZhipuAILlmAgent.cs
+// src/Repository/LLM/ZhipuAIMafAiAgent.cs
 using CKY.MultiAgentFramework.Core.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace CKY.MultiAgentFramework.Repository.LLM
 {
-    public class ZhipuAILlmAgent : MafAgentBase, ILlmService
+    public class ZhipuAIMafAiAgent : MafAgentBase, ILlmService
     {
         private readonly ZhipuAIOptions _options;
 
-        public ZhipuAILlmAgent(
+        public ZhipuAIMafAiAgent(
             IOptions<ZhipuAIOptions> options,
             IMafSessionStorage sessionStorage,
             IPriorityCalculator priorityCalculator,
             IMetricsCollector metricsCollector,
-            ILogger<ZhipuAILlmAgent> logger)
+            ILogger<ZhipuAIMafAiAgent> logger)
             : base(sessionStorage, priorityCalculator, metricsCollector, logger)
         {
             _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
@@ -267,8 +267,8 @@ public class Program
             builder.Configuration.GetSection(ZhipuAIOptions.SectionName));
 
         // 注册 ZhipuAI Agent
-        builder.Services.AddSingleton<ZhipuAILlmAgent>();
-        builder.Services.AddSingleton<ILlmService>(sp => sp.GetRequiredService<ZhipuAILlmAgent>());
+        builder.Services.AddSingleton<ZhipuAIMafAiAgent>();
+        builder.Services.AddSingleton<ILlmService>(sp => sp.GetRequiredService<ZhipuAIMafAiAgent>());
 
         var app = builder.Build();
         app.Run();
@@ -311,12 +311,12 @@ namespace CKY.MultiAgentFramework.Services.Configuration
                 services.Configure<ZhipuAIOptions>(
                     configuration.GetSection("LLM:Providers:ZhipuAI"));
 
-                services.AddSingleton<ZhipuAILlmAgent>();
+                services.AddSingleton<ZhipuAIMafAiAgent>();
 
                 // 如果是主提供商，注册为 ILlmService
                 if (primaryProvider.Equals("ZhipuAI", StringComparison.OrdinalIgnoreCase))
                 {
-                    services.AddSingleton<ILlmService>(sp => sp.GetRequiredService<ZhipuAILlmAgent>());
+                    services.AddSingleton<ILlmService>(sp => sp.GetRequiredService<ZhipuAIMafAiAgent>());
                 }
             }
 
@@ -327,12 +327,12 @@ namespace CKY.MultiAgentFramework.Services.Configuration
                 services.Configure<TongyiQianwenOptions>(
                     configuration.GetSection("LLM:Providers:TongyiQianwen"));
 
-                services.AddSingleton<TongyiQianwenLlmAgent>();
+                services.AddSingleton<TongyiQianwenMafAiAgent>();
 
                 // 如果是主提供商，注册为 ILlmService
                 if (primaryProvider.Equals("TongyiQianwen", StringComparison.OrdinalIgnoreCase))
                 {
-                    services.AddSingleton<ILlmService>(sp => sp.GetRequiredService<TongyiQianwenLlmAgent>());
+                    services.AddSingleton<ILlmService>(sp => sp.GetRequiredService<TongyiQianwenMafAiAgent>());
                 }
             }
 
@@ -388,17 +388,17 @@ public class Program
 ## 方法 4：支持配置热更新
 
 ```csharp
-// src/Repository/LLM/ZhipuAILlmAgent.cs
-public class ZhipuAILlmAgent : MafAgentBase, ILlmService
+// src/Repository/LLM/ZhipuAIMafAiAgent.cs
+public class ZhipuAIMafAiAgent : MafAgentBase, ILlmService
 {
     private readonly IOptionsMonitor<ZhipuAIOptions> _optionsMonitor;
 
-    public ZhipuAILlmAgent(
+    public ZhipuAIMafAiAgent(
         IOptionsMonitor<ZhipuAIOptions> optionsMonitor,  // 使用 Monitor 支持热更新
         IMafSessionStorage sessionStorage,
         IPriorityCalculator priorityCalculator,
         IMetricsCollector metricsCollector,
-        ILogger<ZhipuAILlmAgent> logger)
+        ILogger<ZhipuAIMafAiAgent> logger)
         : base(sessionStorage, priorityCalculator, metricsCollector, logger)
     {
         _optionsMonitor = optionsMonitor;

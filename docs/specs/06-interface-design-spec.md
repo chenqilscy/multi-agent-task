@@ -181,11 +181,11 @@ namespace CKY.MultiAgentFramework.Repository.LLM
     /// 智谱AI LLM Agent - 继承MafAgentBase并实现ILlmService
     /// 展示正确的MS AF集成方式
     /// </summary>
-    public class ZhipuAILlmAgent : MafAgentBase, ILlmService
+    public class ZhipuAIMafAiAgent : MafAgentBase, ILlmService
     {
         private readonly ZhipuAIConfig _config;
 
-        public ZhipuAILlmAgent(
+        public ZhipuAIMafAiAgent(
             ZhipuAIConfig config,
             IMafSessionStorage sessionStorage,
             IPriorityCalculator priorityCalculator,

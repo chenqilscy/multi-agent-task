@@ -7,7 +7,7 @@
 > **重要更新**:
 > - ✅ 实现Repository层（EfCore、Redis、MemoryVector）
 > - ✅ 统一Agent架构（MafAgentBase纯业务基类，不继承AIAgent）
-> - ✅ LlmAgent继承AIAgent，通过ILlmAgentRegistry组合调用
+> - ✅ MafAiAgent继承AIAgent，通过IMafAiAgentRegistry组合调用
 
 ---
 
@@ -131,12 +131,12 @@
 │  │                                                          │
 │  └─ Agents/ (Agent 基类)                                    │
 │     - MafAgentBase (纯业务基类，不继承AIAgent)               │
-│       ├─ 通过 ILlmAgentRegistry 组合调用 LlmAgent           │
+│       ├─ 通过 IMafAiAgentRegistry 组合调用 MafAiAgent           │
 │       └─ Demo Agents: LightingAgent, ClimateAgent, MusicAgent│
 │                                                             │
 │  LLM层（Services实现）：                                      │
-│  - LlmAgent : AIAgent (继承MS Agent Framework)              │
-│  - ILlmAgentRegistry (LLM Agent注册表)                      │
+│  - MafAiAgent : AIAgent (继承MS Agent Framework)              │
+│  - IMafAiAgentRegistry (LLM Agent注册表)                      │
 │                                                             │
 │  外部依赖：                                                  │
 │  - Microsoft.Agents.AI (唯一硬性依赖) v1.0.0-preview.251001.1│
@@ -227,7 +227,7 @@ services.AddSingleton<IVectorStore, QdrantVectorStore>();
 
 **核心思想**：
 - **业务层**（Demo Agents）不继承AIAgent，是纯POCO类
-- **LLM层**（LlmAgent）继承AIAgent，负责LLM调用
+- **LLM层**（MafAiAgent）继承AIAgent，负责LLM调用
 - 通过**组合**而非**继承**实现业务层对LLM的调用
 
 ### Agent 层次结构
@@ -244,7 +244,7 @@ services.AddSingleton<IVectorStore, QdrantVectorStore>();
 │  特点：                                                      │
 │  - 纯业务逻辑                                                │
 │  - 不继承 AIAgent                                           │
-│  - 通过 ILlmAgentRegistry 调用 LLM                          │
+│  - 通过 IMafAiAgentRegistry 调用 LLM                          │
 └─────────────────────────────────────────────────────────────┘
                     ↓ 组合
 ┌─────────────────────────────────────────────────────────────┐
@@ -259,19 +259,19 @@ services.AddSingleton<IVectorStore, QdrantVectorStore>();
 │  │  - CallLlmBatchAsync() 辅助方法         │               │
 │  └─────────────────────────────────────────┘               │
 │                                                             │
-│  依赖：ILlmAgentRegistry (抽象接口)                          │
+│  依赖：IMafAiAgentRegistry (抽象接口)                          │
 └─────────────────────────────────────────────────────────────┘
                     ↓ 通过 Registry 获取
 ┌─────────────────────────────────────────────────────────────┐
 │  Services层（LLM实现）                                       │
 │                                                             │
 │  ┌─────────────────────────────────────────┐               │
-│  │  ILlmAgentRegistry (注册表)             │               │
+│  │  IMafAiAgentRegistry (注册表)             │               │
 │  │  - GetBestAgentAsync(scenario)         │               │
 │  └─────────────────────────────────────────┘               │
 │                                                             │
 │  ┌─────────────────┐  ┌─────────────────┐                  │
-│  │  智谱AILlmAgent  │  │ 通义千问Agent    │                  │
+│  │  智谱AIMafAiAgent  │  │ 通义千问Agent    │                  │
 │  │  : AIAgent      │  │ : AIAgent       │                  │
 │  └─────────────────┘  └─────────────────┘                  │
 │                                                             │
@@ -287,8 +287,8 @@ services.AddSingleton<IVectorStore, QdrantVectorStore>();
 | 特性 | 说明 | 好处 |
 |------|------|------|
 | **业务层纯净** | Demo Agents不继承AIAgent | ✅ 无需实现MS AF复杂抽象方法<br>✅ 业务逻辑清晰<br>✅ 易于测试和Mock |
-| **组合优于继承** | 通过ILlmAgentRegistry调用LLM | ✅ 灵活切换LLM Provider<br>✅ 支持多LLM并发调用<br>✅ 易于扩展新场景 |
-| **LLM层独立** | LlmAgent独立于业务层 | ✅ LLM实现可替换<br>✅ 支持熔断、降级、监控<br>✅ 统一LLM调用管理 |
+| **组合优于继承** | 通过IMafAiAgentRegistry调用LLM | ✅ 灵活切换LLM Provider<br>✅ 支持多LLM并发调用<br>✅ 易于扩展新场景 |
+| **LLM层独立** | MafAiAgent独立于业务层 | ✅ LLM实现可替换<br>✅ 支持熔断、降级、监控<br>✅ 统一LLM调用管理 |
 
 ### 代码示例
 
@@ -307,7 +307,7 @@ public class LightingAgent : MafAgentBase
 
     public LightingAgent(
         ILightingService lightingService,
-        ILlmAgentRegistry llmRegistry,
+        IMafAiAgentRegistry llmRegistry,
         ILogger<LightingAgent> logger)
         : base(llmRegistry, logger)
     {
@@ -346,16 +346,16 @@ public class LightingAgent : MafAgentBase
 }
 ```
 
-#### LLM层Agent（LlmAgent）
+#### LLM层Agent（MafAiAgent）
 
 ```csharp
-public class ZhipuAIlmAgent : AIAgent, ILlmAgent
+public class ZhipuAIlmAgent : AIAgent, IMafAiAgent
 {
     private readonly ZhipuAIClient _client;
     private readonly ILogger<ZhipuAIlmAgent> _logger;
 
     public override string AgentId => "llm-zhipu-glm4";
-    public override string Name => "ZhipuAILlmAgent";
+    public override string Name => "ZhipuAIMafAiAgent";
     public override string Description => "智谱AI GLM-4模型";
 
     protected override async Task<AgentResponse> RunCoreAsync(

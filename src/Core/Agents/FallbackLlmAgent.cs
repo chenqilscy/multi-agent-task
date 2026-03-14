@@ -18,10 +18,10 @@ namespace CKY.MultiAgentFramework.Core.Agents
     /// - 需要在多个 LLM 提供商之间自动切换
     /// - 需要记录 Fallback 历史用于监控
     /// </remarks>
-    public class FallbackLlmAgent : LlmAgent
+    public class FallbackLlmAgent : MafAiAgent
     {
-        private readonly LlmAgent _primaryAgent;
-        private readonly List<LlmAgent> _fallbackAgents;
+        private readonly MafAiAgent _primaryAgent;
+        private readonly List<MafAiAgent> _fallbackAgents;
         private readonly ILogger _logger;
         private readonly object _historyLock = new();
 
@@ -38,8 +38,8 @@ namespace CKY.MultiAgentFramework.Core.Agents
         /// <param name="fallbackAgents">备用 Agent 列表（按优先级排序）</param>
         /// <param name="logger">日志记录器</param>
         public FallbackLlmAgent(
-            LlmAgent primaryAgent,
-            List<LlmAgent> fallbackAgents,
+            MafAiAgent primaryAgent,
+            List<MafAiAgent> fallbackAgents,
             ILogger logger)
             : base(CreateFallbackConfig(primaryAgent, fallbackAgents), logger)
         {
@@ -52,8 +52,8 @@ namespace CKY.MultiAgentFramework.Core.Agents
         /// 创建 Fallback Agent 的组合配置
         /// </summary>
         private static LlmProviderConfig CreateFallbackConfig(
-            LlmAgent primaryAgent,
-            List<LlmAgent> fallbackAgents)
+            MafAiAgent primaryAgent,
+            List<MafAiAgent> fallbackAgents)
         {
             var allScenarios = new List<LlmScenario>();
             allScenarios.AddRange(primaryAgent.Config.SupportedScenarios);
@@ -104,7 +104,7 @@ namespace CKY.MultiAgentFramework.Core.Agents
             };
 
             // 收集所有 Agent（主 Agent + 备用 Agent）
-            var allAgents = new List<LlmAgent> { _primaryAgent };
+            var allAgents = new List<MafAiAgent> { _primaryAgent };
             allAgents.AddRange(_fallbackAgents);
 
             // 依次尝试每个 Agent
@@ -174,6 +174,21 @@ namespace CKY.MultiAgentFramework.Core.Agents
             throw new InvalidOperationException(
                 "All agents failed",
                 lastException);
+        }
+
+        /// <summary>
+        /// 执行流式 LLM 调用（带自动 Fallback）
+        /// </summary>
+        public override async IAsyncEnumerable<string> ExecuteStreamingAsync(
+            string modelId,
+            string prompt,
+            string? systemPrompt = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            // TODO: Implement streaming support for Fallback
+            // For now, fallback to non-streaming
+            var result = await ExecuteAsync(modelId, prompt, systemPrompt, ct);
+            yield return result;
         }
 
         /// <summary>

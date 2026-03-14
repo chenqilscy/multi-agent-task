@@ -11,12 +11,12 @@ namespace CKY.MultiAgentFramework.Services.NLP
     /// </summary>
     public class LlmIntentRecognizer : IIntentRecognizer
     {
-        private readonly ILlmAgentRegistry _llmRegistry;
+        private readonly IMafAiAgentRegistry _llmRegistry;
         private readonly IIntentKeywordProvider _keywordProvider;
         private readonly ILogger<LlmIntentRecognizer> _logger;
 
         public LlmIntentRecognizer(
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             IIntentKeywordProvider keywordProvider,
             ILogger<LlmIntentRecognizer> logger)
         {

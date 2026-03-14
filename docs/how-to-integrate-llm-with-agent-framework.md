@@ -24,7 +24,7 @@
                      │ 继承 + 实现
                      ▼
 ┌─────────────────────────────────────────────────────┐
-│          ZhipuAILlmAgent : MafAgentBase             │
+│          ZhipuAIMafAiAgent : MafAgentBase             │
 │          同时实现 ILlmService 接口                    │
 │  - ExecuteBusinessLogicAsync: 调用 LLM API          │
 │  - 利用 MS AF 的会话管理能力                         │
@@ -54,7 +54,7 @@ public class ZhipuAIService : ILlmService
 
 ```csharp
 // 正确：基于 MS AF 的 AIAgent
-public class ZhipuAILlmAgent : MafAgentBase, ILlmService
+public class ZhipuAIMafAiAgent : MafAgentBase, ILlmService
 {
     // ✅ 继承 MafAgentBase，使用 MS AF 的所有能力
 
@@ -109,18 +109,18 @@ namespace CKY.MultiAgentFramework.Core.Abstractions
 ### 2. 实现 LLM Agent（Repository 层）
 
 ```csharp
-// src/Repository/LLM/ZhipuAILlmAgent.cs
-public class ZhipuAILlmAgent : MafAgentBase, ILlmService
+// src/Repository/LLM/ZhipuAIMafAiAgent.cs
+public class ZhipuAIMafAiAgent : MafAgentBase, ILlmService
 {
     private readonly ZhipuAIConfig _config;
     private readonly HttpClient _httpClient; // 仅用于底层 API 调用
 
-    public ZhipuAILlmAgent(
+    public ZhipuAIMafAiAgent(
         ZhipuAIConfig config,
         IMafSessionStorage sessionStorage,
         IPriorityCalculator priorityCalculator,
         IMetricsCollector metricsCollector,
-        ILogger<ZhipuAILlmAgent> logger)
+        ILogger<ZhipuAIMafAiAgent> logger)
         : base(sessionStorage, priorityCalculator, metricsCollector, logger)
     {
         _config = config;
@@ -239,8 +239,8 @@ public class SmartLightingAgent : MafAgentBase
 public static void ConfigureServices(IServiceCollection services)
 {
     // 注册 LLM Agent（既是 Agent 也是服务）
-    services.AddSingleton<ZhipuAILlmAgent>();
-    services.AddSingleton<ILlmService>(sp => sp.GetRequiredService<ZhipuAILlmAgent>());
+    services.AddSingleton<ZhipuAIMafAiAgent>();
+    services.AddSingleton<ILlmService>(sp => sp.GetRequiredService<ZhipuAIMafAiAgent>());
     services.AddSingleton(new ZhipuAIConfig
     {
         ApiKey = configuration["ZhipuAI:ApiKey"],
@@ -340,7 +340,7 @@ protected override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(...)
 ## 测试
 
 ```csharp
-public class ZhipuAILlmAgentTests
+public class ZhipuAIMafAiAgentTests
 {
     [Fact]
     public async Task CompleteAsync_ShouldUseMafAgentExecuteFlow()
@@ -351,12 +351,12 @@ public class ZhipuAILlmAgentTests
         var mockMetricsCollector = new Mock<IMetricsCollector>();
         var config = new ZhipuAIConfig { ApiKey = "test", Model = "glm-4" };
 
-        var agent = new ZhipuAILlmAgent(
+        var agent = new ZhipuAIMafAiAgent(
             config,
             mockSessionStorage.Object,
             mockPriorityCalculator.Object,
             mockMetricsCollector.Object,
-            NullLogger<ZhipuAILlmAgent>.Instance);
+            NullLogger<ZhipuAIMafAiAgent>.Instance);
 
         // Act
         var response = await agent.CompleteAsync("你好");

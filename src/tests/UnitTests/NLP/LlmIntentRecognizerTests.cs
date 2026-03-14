@@ -10,14 +10,14 @@ namespace CKY.MultiAgentFramework.Tests.NLP
     public class LlmIntentRecognizerTests
     {
         private readonly LlmIntentRecognizer _sut;
-        private readonly Mock<ILlmAgentRegistry> _mockLlmRegistry;
-        private readonly Mock<ILlmAgent> _mockLlmAgent;
+        private readonly Mock<IMafAiAgentRegistry> _mockLlmRegistry;
+        private readonly Mock<IMafAiAgent> _mockLlmAgent;
         private readonly TestIntentKeywordProvider _keywordProvider;
 
         public LlmIntentRecognizerTests()
         {
-            _mockLlmRegistry = new Mock<ILlmAgentRegistry>();
-            _mockLlmAgent = new Mock<ILlmAgent>();
+            _mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
+            _mockLlmAgent = new Mock<IMafAiAgent>();
             _keywordProvider = new TestIntentKeywordProvider();
 
             // Setup registry to return the mock agent

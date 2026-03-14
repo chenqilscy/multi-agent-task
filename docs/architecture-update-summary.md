@@ -16,7 +16,7 @@
 **更新内容**：
 - 修改了"核心依赖"部分，明确 LLM 服务通过继承 `AIAgent` 并实现 `ILlmService` 接口
 - 更新了"1.2 LLM集成接口"章节，说明正确的架构原则
-- 添加了"2.2 LLM服务Agent示例"章节，展示 `ZhipuAILlmAgent` 的实现
+- 添加了"2.2 LLM服务Agent示例"章节，展示 `ZhipuAIMafAiAgent` 的实现
 - 更新了"2.3 业务Agent示例"章节，展示如何在业务 Agent 中使用 `ILlmService`
 
 **关键变更**：
@@ -60,7 +60,7 @@
                      │ 实现
                      ▼
 ┌─────────────────────────────────────────────────────┐
-│     ZhipuAILlmAgent : MafAgentBase : AIAgent          │
+│     ZhipuAIMafAiAgent : MafAgentBase : AIAgent          │
 │       - ExecuteBusinessLogicAsync: 调用 LLM API      │
 │       - 利用 MS AF 的会话管理、状态追踪               │
 └────────────────────┬────────────────────────────────┘
@@ -83,9 +83,9 @@
 
 ### 实现示例
 
-**ZhipuAILlmAgent** (正确的 LLM 服务实现):
+**ZhipuAIMafAiAgent** (正确的 LLM 服务实现):
 ```csharp
-public class ZhipuAILlmAgent : MafAgentBase, ILlmService
+public class ZhipuAIMafAiAgent : MafAgentBase, ILlmService
 {
     // ✅ 继承 MafAgentBase (进而继承 AIAgent)
     // ✅ 实现 ILlmService 接口
@@ -154,8 +154,8 @@ public class LightingAgent : MafAgentBase
 ## 实现文件
 
 - **ILlmService 接口**: [src/Core/Abstractions/ILlmService.cs](../src/Core/Abstractions/ILlmService.cs)
-- **智谱AI 实现**: [src/Repository/LLM/ZhipuAILlmAgent.cs](../src/Repository/LLM/ZhipuAILlmAgent.cs)
-- **单元测试**: [src/tests/UnitTests/LLM/ZhipuAILlmAgentTests.cs](../src/tests/UnitTests/LLM/ZhipuAILlmAgentTests.cs)
+- **智谱AI 实现**: [src/Repository/LLM/ZhipuAIMafAiAgent.cs](../src/Repository/LLM/ZhipuAIMafAiAgent.cs)
+- **单元测试**: [src/tests/UnitTests/LLM/ZhipuAIMafAiAgentTests.cs](../src/tests/UnitTests/LLM/ZhipuAIMafAiAgentTests.cs)
 
 ## 总结
 

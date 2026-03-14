@@ -53,10 +53,10 @@ builder.Services.AddOpenTelemetry()
 // ========================================
 
 // 1. 注册 LLM Agent Registry
-builder.Services.AddSingleton<ILlmAgentRegistry, LlmAgentRegistry>();
+builder.Services.AddSingleton<IMafAiAgentRegistry, LlmAgentRegistry>();
 
 // 2. 注册 LLM Agent（可选 - 需要配置 API Key 时启用）
-// builder.Services.AddSingleton<LlmAgent>(sp =>
+// builder.Services.AddSingleton<MafAiAgent>(sp =>
 // {
 //     var config = new LlmProviderConfig
 //     {

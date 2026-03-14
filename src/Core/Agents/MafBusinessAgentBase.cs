@@ -7,33 +7,37 @@ using Microsoft.Extensions.Logging;
 namespace CKY.MultiAgentFramework.Core.Agents
 {
     /// <summary>
-    /// MAF Agent 业务基类（纯业务层，不继承 AIAgent）
+    /// MAF 业务 Agent 基类（纯业务层，不继承 AIAgent）
     /// </summary>
     /// <remarks>
     /// 架构设计：
     /// 1. 不继承 AIAgent，是纯业务逻辑抽象类
-    /// 2. 通过组合方式使用 ILlmAgentRegistry 调用LLM
+    /// 2. 通过组合方式使用 IMafAiAgentRegistry 调用LLM
     /// 3. 提供业务逻辑执行的抽象方法
     /// 4. Demo agents 继承此基类实现具体业务逻辑
     ///
     /// 层次关系：
-    /// - Demo Agents → MafAgentBase (业务层，纯POCO)
-    /// - MafAgentBase → ILlmAgentRegistry (通过组合调用LLM)
-    /// - LlmAgent : AIAgent (LLM层，继承MS Agent Framework)
+    /// - Demo Agents → MafBusinessAgentBase (业务层，纯POCO)
+    /// - MafBusinessAgentBase → IMafAiAgentRegistry (通过组合调用LLM)
+    /// - MafAiAgent : AIAgent (LLM层，继承MS Agent Framework)
+    ///
+    /// 命名说明：
+    /// - MafBusinessAgentBase: 业务层基类，强调业务逻辑
+    /// - MafAiAgent: LLM层基类，强调LLM调用
     /// </remarks>
-    public abstract class MafAgentBase
+    public abstract class MafBusinessAgentBase
     {
         /// <summary>日志记录器</summary>
         protected readonly ILogger Logger;
 
         /// <summary>LLM Agent 注册表（用于获取合适的LLM实例）</summary>
-        protected readonly ILlmAgentRegistry LlmRegistry;
+        protected readonly IMafAiAgentRegistry LlmRegistry;
 
         /// <summary>
         /// 构造函数
         /// </summary>
-        protected MafAgentBase(
-            ILlmAgentRegistry llmRegistry,
+        protected MafBusinessAgentBase(
+            IMafAiAgentRegistry llmRegistry,
             ILogger logger)
         {
             LlmRegistry = llmRegistry ?? throw new ArgumentNullException(nameof(llmRegistry));

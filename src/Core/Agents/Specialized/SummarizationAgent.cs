@@ -17,7 +17,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
     /// - 文档提炼：从技术文档中提取关键信息
     /// - 新闻聚合：快速了解多条新闻的核心内容
     /// </remarks>
-    public class SummarizationAgent : MafAgentBase
+    public class SummarizationAgent : MafBusinessAgentBase
     {
         public override string AgentId => "summarization-agent-001";
         public override string Name => "SummarizationAgent";
@@ -31,7 +31,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
         };
 
         public SummarizationAgent(
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<SummarizationAgent> logger)
             : base(llmRegistry, logger)
         {

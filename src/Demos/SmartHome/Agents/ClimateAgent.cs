@@ -10,7 +10,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
     /// 气候控制Agent
     /// 负责处理空调、温度调节等气候控制命令
     /// </summary>
-    public class ClimateAgent : MafAgentBase
+    public class ClimateAgent : MafBusinessAgentBase
     {
         private readonly IClimateService _climateService;
 
@@ -21,7 +21,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
 
         public ClimateAgent(
             IClimateService climateService,
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<ClimateAgent> logger)
             : base(llmRegistry, logger)
         {

@@ -10,7 +10,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
     /// 智能家居主控Agent
     /// 负责任务分解、Agent编排和结果聚合
     /// </summary>
-    public class SmartHomeMainAgent : CKY.MultiAgentFramework.Core.Agents.MafAgentBase
+    public class SmartHomeMainAgent : CKY.MultiAgentFramework.Core.Agents.MafBusinessAgentBase
     {
         private readonly IIntentRecognizer _intentRecognizer;
         private readonly ITaskDecomposer _taskDecomposer;
@@ -34,7 +34,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
             IAgentMatcher agentMatcher,
             ITaskOrchestrator taskOrchestrator,
             IResultAggregator resultAggregator,
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<SmartHomeMainAgent> logger)
             : base(llmRegistry, logger)
         {

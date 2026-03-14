@@ -17,7 +17,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
     /// - 多意图识别：识别一句话中的多个意图
     /// - 意图澄清：当意图不明确时提出澄清问题
     /// </remarks>
-    public class IntentRecognitionAgent : MafAgentBase
+    public class IntentRecognitionAgent : MafBusinessAgentBase
     {
         public override string AgentId => "intent-recognition-agent-001";
         public override string Name => "IntentRecognitionAgent";
@@ -33,7 +33,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
         private readonly IIntentKeywordProvider _keywordProvider;
 
         public IntentRecognitionAgent(
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             IIntentKeywordProvider keywordProvider,
             ILogger<IntentRecognitionAgent> logger)
             : base(llmRegistry, logger)

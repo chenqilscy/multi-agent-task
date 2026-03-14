@@ -16,7 +16,7 @@ namespace CKY.MultiAgentFramework.Services.NLP
     {
         private readonly IIntentRecognizer _intentRecognizer;
         private readonly IIntentProviderMapping _mapping;
-        private readonly ILlmAgentRegistry _llmRegistry;
+        private readonly IMafAiAgentRegistry _llmRegistry;
         private readonly IServiceProvider _serviceProvider;
         private readonly IAsyncPolicy _circuitBreakerPolicy;
         private readonly ILogger<IntentDrivenEntityExtractor> _logger;
@@ -24,7 +24,7 @@ namespace CKY.MultiAgentFramework.Services.NLP
         public IntentDrivenEntityExtractor(
             IIntentRecognizer intentRecognizer,
             IIntentProviderMapping mapping,
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             IServiceProvider serviceProvider,
             ILogger<IntentDrivenEntityExtractor> logger)
         {

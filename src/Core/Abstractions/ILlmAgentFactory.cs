@@ -16,7 +16,7 @@ namespace CKY.MultiAgentFramework.Core.Abstractions
         /// <param name="scenario">目标场景（用于验证 Agent 是否支持）</param>
         /// <param name="ct">取消令牌</param>
         /// <returns>创建的 LLM Agent 实例</returns>
-        Task<LlmAgent> CreateAgentAsync(
+        Task<MafAiAgent> CreateAgentAsync(
             LlmProviderConfig config,
             LlmScenario scenario,
             CancellationToken ct = default);
@@ -28,7 +28,7 @@ namespace CKY.MultiAgentFramework.Core.Abstractions
         /// <param name="scenario">目标场景</param>
         /// <param name="ct">取消令牌</param>
         /// <returns>创建的 LLM Agent 实例</returns>
-        Task<LlmAgent> CreateAgentByProviderAsync(
+        Task<MafAiAgent> CreateAgentByProviderAsync(
             string providerName,
             LlmScenario scenario,
             CancellationToken ct = default);
@@ -39,7 +39,7 @@ namespace CKY.MultiAgentFramework.Core.Abstractions
         /// <param name="scenario">目标场景</param>
         /// <param name="ct">取消令牌</param>
         /// <returns>创建的 LLM Agent 实例</returns>
-        Task<LlmAgent> CreateBestAgentForScenarioAsync(
+        Task<MafAiAgent> CreateBestAgentForScenarioAsync(
             LlmScenario scenario,
             CancellationToken ct = default);
 
@@ -49,7 +49,7 @@ namespace CKY.MultiAgentFramework.Core.Abstractions
         /// <param name="scenario">目标场景</param>
         /// <param name="ct">取消令牌</param>
         /// <returns>创建的 LLM Agent 实例列表（按优先级排序）</returns>
-        Task<List<LlmAgent>> CreateAllAgentsForScenarioAsync(
+        Task<List<MafAiAgent>> CreateAllAgentsForScenarioAsync(
             LlmScenario scenario,
             CancellationToken ct = default);
 
@@ -60,7 +60,7 @@ namespace CKY.MultiAgentFramework.Core.Abstractions
         /// <param name="scenario">目标场景</param>
         /// <param name="ct">取消令牌</param>
         /// <returns>带有 Fallback 能力的 LLM Agent</returns>
-        Task<LlmAgent> CreateAgentWithFallbackAsync(
+        Task<MafAiAgent> CreateAgentWithFallbackAsync(
             LlmScenario scenario,
             CancellationToken ct = default);
 

@@ -18,7 +18,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
     /// - 相似度计算：计算两段文本的语义相似度
     /// - 推荐系统：基于内容的相似度推荐
     /// </remarks>
-    public class EmbeddingAgent : MafAgentBase
+    public class EmbeddingAgent : MafBusinessAgentBase
     {
         public override string AgentId => "embedding-agent-001";
         public override string Name => "EmbeddingAgent";
@@ -32,7 +32,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
         };
 
         public EmbeddingAgent(
-            ILlmAgentRegistry llmRegistry,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<EmbeddingAgent> logger)
             : base(llmRegistry, logger)
         {
