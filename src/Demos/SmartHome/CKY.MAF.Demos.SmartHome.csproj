@@ -4,6 +4,7 @@
     <ProjectReference Include="..\..\Core\CKY.MAF.Core.csproj" />
     <ProjectReference Include="..\..\Services\CKY.MAF.Services.csproj" />
     <ProjectReference Include="..\..\Repository\CKY.MAF.Repository.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\DependencyInjection\CKY.MAF.Infrastructure.DependencyInjection.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,6 +5,7 @@ using CKY.MAF.Demos.SmartHome.Components;
 using CKY.MAF.Demos.SmartHome.Hubs;
 using CKY.MultiAgentFramework.Demos.SmartHome.Providers;
 using CKY.MultiAgentFramework.Demos.SmartHome.Services;
+using CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 using CKY.MultiAgentFramework.Repository.Data;
 using CKY.MultiAgentFramework.Repository.Repositories;
 using CKY.MultiAgentFramework.Services.Monitoring;
@@ -19,6 +20,9 @@ var builder = WebApplication.CreateBuilder(args);
 // 配置 EF Core SQLite
 builder.Services.AddDbContext<MafDbContext>(options =>
     options.UseSqlite("Data Source=smart_home.db"));
+
+// 自动注册 Infrastructure 服务
+builder.Services.AddMafInfrastructureServices(builder.Configuration);
 
 // 注册工作单元和仓储
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
