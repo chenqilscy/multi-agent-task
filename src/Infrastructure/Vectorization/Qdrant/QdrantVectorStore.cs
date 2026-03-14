@@ -1,0 +1,234 @@
+using CKY.MultiAgentFramework.Core.Abstractions;
+using Qdrant.Client;
+using Qdrant.Client.Grpc;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant
+{
+    /// <summary>
+    /// Qdrant 向量存储实现
+    /// </summary>
+    public sealed class QdrantVectorStore : IVectorStore
+    {
+        private readonly QdrantClient _client;
+        private readonly ILogger<QdrantVectorStore> _logger;
+        private readonly QdrantVectorStoreOptions _options;
+
+        public QdrantVectorStore(
+            QdrantClient client,
+            ILogger<QdrantVectorStore> logger,
+            IOptions<QdrantVectorStoreOptions> options)
+        {
+            _client = client ?? throw new ArgumentNullException(nameof(client));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _options = options?.Value ?? new QdrantVectorStoreOptions();
+
+            _logger.LogInformation("QdrantVectorStore initialized (Host: {Host}:{Port})",
+                _options.Host, _options.Port);
+        }
+
+        #region IVectorStore 实现
+
+        public async Task CreateCollectionAsync(
+            string collectionName,
+            int vectorSize,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                _logger.LogInformation("Creating collection: {CollectionName}, VectorSize: {VectorSize}",
+                    collectionName, vectorSize);
+
+                await _client.CreateCollectionAsync(
+                    collectionName,
+                    new VectorParams
+                    {
+                        Size = (ulong)vectorSize,
+                        Distance = ParseDistanceMetric(_options.DistanceMetric)
+                    },
+                    cancellationToken: ct);
+
+                _logger.LogInformation("Collection created successfully: {CollectionName}", collectionName);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Failed to create collection: {CollectionName}", collectionName);
+                throw;
+            }
+        }
+
+        public async Task InsertAsync(
+            string collectionName,
+            IEnumerable<VectorPoint> points,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                var pointList = points.ToList();
+                _logger.LogInformation("Inserting {Count} points into collection: {CollectionName}",
+                    pointList.Count, collectionName);
+
+                var qdrantPoints = new List<PointStruct>();
+                foreach (var point in pointList)
+                {
+                    var pointId = Guid.Parse(point.Id);
+                    var payloadDict = new Dictionary<string, Value>();
+                    foreach (var kvp in point.Metadata)
+                    {
+                        payloadDict[kvp.Key] = new Value { StringValue = kvp.Value?.ToString() ?? "" };
+                    }
+
+                    // 创建带payload的点
+                    qdrantPoints.Add(PointStruct.Payload(
+                        pointId,
+                        point.Vector,
+                        payloadDict
+                    ));
+                }
+
+                await _client.UpsertAsync(
+                    collectionName,
+                    qdrantPoints,
+                    wait: true,
+                    cancellationToken: ct);
+
+                _logger.LogInformation("Successfully inserted {Count} points", qdrantPoints.Count);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Failed to insert points into collection: {CollectionName}", collectionName);
+                throw;
+            }
+        }
+
+        public async Task<List<VectorSearchResult>> SearchAsync(
+            string collectionName,
+            float[] vector,
+            int topK = 10,
+            Dictionary<string, object>? filter = null,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                _logger.LogDebug("Searching in collection: {CollectionName}, TopK: {TopK}",
+                    collectionName, topK);
+
+                var results = await _client.SearchAsync(
+                    collectionName,
+                    vector,
+                    limit: (ulong)topK,
+                    payloadSelector: new WithPayloadSelector { Enable = true },
+                    cancellationToken: ct);
+
+                var searchResults = results.Select(r => new VectorSearchResult
+                {
+                    Id = r.Id.Uuid.ToString(),
+                    Score = r.Score,
+                    Metadata = ConvertPayloadToMetadata(r.Payload)
+                }).ToList();
+
+                if (_options.EnableVerboseLogging)
+                {
+                    _logger.LogDebug("Found {Count} results", searchResults.Count);
+                }
+
+                return searchResults;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Search failed in collection: {CollectionName}", collectionName);
+                throw;
+            }
+        }
+
+        public async Task DeleteAsync(
+            string collectionName,
+            IEnumerable<string> ids,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                var idList = ids.ToList();
+                _logger.LogInformation("Deleting {Count} points from collection: {CollectionName}",
+                    idList.Count, collectionName);
+
+                var pointIds = idList.Select(id => Guid.Parse(id)).ToList();
+
+                await _client.DeleteAsync(
+                    collectionName,
+                    pointIds,
+                    wait: true,
+                    cancellationToken: ct);
+
+                _logger.LogInformation("Successfully deleted {Count} points", pointIds.Count);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Failed to delete points from collection: {CollectionName}", collectionName);
+                throw;
+            }
+        }
+
+        public async Task DeleteCollectionAsync(
+            string collectionName,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                _logger.LogInformation("Deleting collection: {CollectionName}", collectionName);
+
+                await _client.DeleteCollectionAsync(collectionName, cancellationToken: ct);
+
+                _logger.LogInformation("Collection deleted successfully: {CollectionName}", collectionName);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Failed to delete collection: {CollectionName}", collectionName);
+                throw;
+            }
+        }
+
+        #endregion
+
+        #region 私有辅助方法
+
+        private static Distance ParseDistanceMetric(string metric)
+        {
+            return metric.ToUpperInvariant() switch
+            {
+                "COSINE" => Distance.Cosine,
+                "EUCLIDEAN" => Distance.Euclid,
+                "DOTPRODUCT" => Distance.Dot,
+                _ => Distance.Cosine
+            };
+        }
+
+        private static IReadOnlyDictionary<string, Value> ConvertMetadataToPayload(Dictionary<string, object> metadata)
+        {
+            if (metadata == null || metadata.Count == 0)
+                return new Dictionary<string, Value>();
+
+            var payload = new Dictionary<string, Value>();
+            foreach (var kvp in metadata)
+            {
+                payload[kvp.Key] = new Value { StringValue = kvp.Value?.ToString() ?? "" };
+            }
+            return payload;
+        }
+
+        private static Dictionary<string, object> ConvertPayloadToMetadata(IReadOnlyDictionary<string, Value> payload)
+        {
+            var metadata = new Dictionary<string, object>();
+
+            foreach (var kvp in payload)
+            {
+                metadata[kvp.Key] = kvp.Value.StringValue ?? string.Empty;
+            }
+
+            return metadata;
+        }
+
+        #endregion
+    }
+}

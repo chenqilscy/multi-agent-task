@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+语言：使用简体中文
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
@@ -18,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Technology Stack
 
 - **.NET 10** (target framework)
-- **Microsoft Agent Framework (Preview)** - Required base framework
+- **Microsoft Agent Framework (Preview)** - Required base framework for all AI/LLM operations
 - **ASP.NET Core** - Native (no ABP framework)
 - **Blazor Server** - Demo application UI
 - **Storage**:
@@ -27,7 +29,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - L3: PostgreSQL (relational database)
   - Vector: Qdrant (semantic search)
 - **Testing**: xUnit, FluentAssertions, Moq, Testcontainers
-- **LLM Providers**: 智谱AI (GLM-4/GLM-4-Plus) as primary, 通义千问/文心一言/讯飞星火 as fallback
+- **LLM Integration**: MS AF native interfaces only - NO SemanticKernel, NO direct provider SDKs
+  - Primary: 智谱AI (GLM-4/GLM-4-Plus)
+  - Fallback: 通义千问/文心一言/讯飞星火
+  - Implement custom `ILlmService` in Infrastructure layer for each provider
 - **Monitoring**: Prometheus, Grafana, distributed tracing
 
 ## Documentation Structure
@@ -233,7 +238,9 @@ public class MafTaskSchedulerTests
 - ✅ Write unit tests with Moq for all Services layer code
 - ✅ Use Testcontainers for Infrastructure integration tests
 - ✅ Follow the 5-layer architecture strictly
-- ✅ Keep Core layer with ZERO external dependencies (except MS AF)
+- ✅ Keep Core layer with ZERO external dependencies (except MS AF and Microsoft.Extensions.* abstractions)
+- ✅ Use Microsoft Agent Framework (MS AF) for all LLM integrations and AI agent functionality
+- ✅ Define custom LLM service abstractions (like ILlmService) for provider-specific implementations in Infrastructure layer
 
 ### DON'T:
 - ❌ Never reference concrete implementations (RedisCacheStore, PostgreSqlDatabase) in Services layer
@@ -241,6 +248,8 @@ public class MafTaskSchedulerTests
 - ❌ Never use synchronous I/O (no .Result, .Wait(), or blocking calls)
 - ❌ Never hardcode storage implementation choices
 - ❌ Never skip unit tests for Services layer
+- ❌ Never use SemanticKernel API or other LLM orchestration frameworks - use MS AF only
+- ❌ Never directly depend on LLM provider SDKs (OpenAI, Azure OpenAI, etc.) in Core or Services layers - use abstractions
 
 ## Common Tasks
 

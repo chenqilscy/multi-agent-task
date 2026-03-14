@@ -44,7 +44,7 @@ builder.Services.AddSingleton<IEntityExtractor, IntentDrivenEntityExtractor>();
 
 ```csharp
 // 1. 注册 LLM Service
-builder.Services.AddSingleton<LlmAgent>();
+builder.Services.AddSingleton<MafAiAgent>();
 builder.Services.AddSingleton<ILlmService, LlmServiceAdapter>();
 
 // 2. 其他配置同上...

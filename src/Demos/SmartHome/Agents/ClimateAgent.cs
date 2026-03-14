@@ -10,7 +10,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
     /// 气候控制Agent
     /// 负责处理空调、温度调节等气候控制命令
     /// </summary>
-    public class ClimateAgent : MafAgentBase
+    public class ClimateAgent : MafBusinessAgentBase
     {
         private readonly IClimateService _climateService;
 
@@ -21,18 +21,15 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Agents
 
         public ClimateAgent(
             IClimateService climateService,
-            IMafSessionStorage sessionStorage,
-            IPriorityCalculator priorityCalculator,
-            IMetricsCollector metricsCollector,
+            IMafAiAgentRegistry llmRegistry,
             ILogger<ClimateAgent> logger)
-            : base(sessionStorage, priorityCalculator, metricsCollector, logger)
+            : base(llmRegistry, logger)
         {
             _climateService = climateService ?? throw new ArgumentNullException(nameof(climateService));
         }
 
-        protected override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
+        public override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
             MafTaskRequest request,
-            IAgentSession session,
             CancellationToken ct = default)
         {
             var userInput = request.UserInput;

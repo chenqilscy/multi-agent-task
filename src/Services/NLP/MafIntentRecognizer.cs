@@ -4,7 +4,8 @@ using Microsoft.Extensions.Logging;
 namespace CKY.MultiAgentFramework.Services.NLP
 {
     /// <summary>
-    /// 意图识别器（组合规则识别和向量识别）
+    /// 意图识别器（组合LLM识别和规则识别）
+    /// 默认使用混合模式：LLM为主，规则识别为降级方案
     /// </summary>
     public class MafIntentRecognizer : IIntentRecognizer
     {
@@ -12,7 +13,7 @@ namespace CKY.MultiAgentFramework.Services.NLP
         private readonly ILogger<MafIntentRecognizer> _logger;
 
         public MafIntentRecognizer(
-            RuleBasedIntentRecognizer primaryRecognizer,
+            HybridIntentRecognizer primaryRecognizer,
             ILogger<MafIntentRecognizer> logger)
         {
             _primaryRecognizer = primaryRecognizer ?? throw new ArgumentNullException(nameof(primaryRecognizer));

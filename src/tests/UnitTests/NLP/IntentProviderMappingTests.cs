@@ -17,6 +17,11 @@ namespace CKY.MultiAgentFramework.Tests.NLP
         {
             return new[] { "device" };
         }
+
+        public string GetFewShotExamples()
+        {
+            return "Example few-shot content for light control";
+        }
     }
 
     public class ACControlEntityPatternProvider : IEntityPatternProvider
@@ -31,6 +36,11 @@ namespace CKY.MultiAgentFramework.Tests.NLP
         public IEnumerable<string> GetSupportedEntityTypes()
         {
             return new[] { "device" };
+        }
+
+        public string GetFewShotExamples()
+        {
+            return "Example few-shot content for AC control";
         }
     }
 

@@ -14,6 +14,7 @@ namespace CKY.MultiAgentFramework.Services.Storage
         private readonly ILogger<MafAgentRegistry> _logger;
 
         private const string RegistryKeyPrefix = "maf:agent:";
+        private const string AllAgentIdsKey = "maf:agent:_all_ids";
 
         public MafAgentRegistry(
             ICacheStore cacheStore,
@@ -32,18 +33,27 @@ namespace CKY.MultiAgentFramework.Services.Storage
             registration.RegisteredAt = DateTime.UtcNow;
             registration.LastHeartbeat = DateTime.UtcNow;
 
+            // 存储Agent注册信息
             await _cacheStore.SetAsync(
                 $"{RegistryKeyPrefix}{registration.AgentId}",
                 registration,
                 TimeSpan.FromDays(1),
                 ct);
+
+            // 将AgentId添加到全局集合中
+            await AddAgentIdToAllIdsAsync(registration.AgentId, ct);
         }
 
         /// <inheritdoc />
         public async Task UnregisterAsync(string agentId, CancellationToken ct = default)
         {
             _logger.LogInformation("Unregistering agent {AgentId}", agentId);
+
+            // 删除Agent注册信息
             await _cacheStore.DeleteAsync($"{RegistryKeyPrefix}{agentId}", ct);
+
+            // 从全局集合中移除AgentId
+            await RemoveAgentIdFromAllIdsAsync(agentId, ct);
         }
 
         /// <inheritdoc />
@@ -70,10 +80,24 @@ namespace CKY.MultiAgentFramework.Services.Storage
         /// <inheritdoc />
         public async Task<List<AgentRegistration>> GetAllAsync(CancellationToken ct = default)
         {
-            // TODO: 完整实现需要维护一个专门存储所有AgentId的键（如 maf:agent:_all_ids）
-            // 当前简化实现返回空列表，需要在生产使用前实现完整版本
             _logger.LogDebug("Getting all registered agents");
-            return new List<AgentRegistration>();
+
+            // 获取所有AgentId
+            var allIds = await GetAllAgentIdsAsync(ct);
+
+            // 批量获取Agent注册信息
+            var agents = new List<AgentRegistration>();
+            foreach (var agentId in allIds)
+            {
+                var registration = await FindByIdAsync(agentId, ct);
+                if (registration != null)
+                {
+                    agents.Add(registration);
+                }
+            }
+
+            _logger.LogDebug("Found {Count} registered agents", agents.Count);
+            return agents;
         }
 
         /// <inheritdoc />
@@ -92,6 +116,54 @@ namespace CKY.MultiAgentFramework.Services.Storage
                     registration,
                     TimeSpan.FromDays(1),
                     ct);
+            }
+        }
+
+        /// <summary>
+        /// 获取所有AgentId列表
+        /// </summary>
+        private async Task<List<string>> GetAllAgentIdsAsync(CancellationToken ct)
+        {
+            var result = await _cacheStore.GetAsync<List<string>>(AllAgentIdsKey, ct);
+            return result ?? new List<string>();
+        }
+
+        /// <summary>
+        /// 添加AgentId到全局集合
+        /// </summary>
+        private async Task AddAgentIdToAllIdsAsync(string agentId, CancellationToken ct)
+        {
+            var allIds = await GetAllAgentIdsAsync(ct);
+
+            if (!allIds.Contains(agentId, StringComparer.OrdinalIgnoreCase))
+            {
+                allIds.Add(agentId);
+                await _cacheStore.SetAsync(
+                    AllAgentIdsKey,
+                    allIds,
+                    TimeSpan.FromDays(7), // AgentId列表保留7天
+                    ct);
+                _logger.LogDebug("Added AgentId {AgentId} to all-ids collection", agentId);
+            }
+        }
+
+        /// <summary>
+        /// 从全局集合中移除AgentId
+        /// </summary>
+        private async Task RemoveAgentIdFromAllIdsAsync(string agentId, CancellationToken ct)
+        {
+            var allIds = await GetAllAgentIdsAsync(ct);
+
+            var removed = allIds.RemoveAll(id => string.Equals(id, agentId, StringComparison.OrdinalIgnoreCase));
+
+            if (removed > 0)
+            {
+                await _cacheStore.SetAsync(
+                    AllAgentIdsKey,
+                    allIds,
+                    TimeSpan.FromDays(7),
+                    ct);
+                _logger.LogDebug("Removed AgentId {AgentId} from all-ids collection", agentId);
             }
         }
     }

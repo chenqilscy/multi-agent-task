@@ -6,6 +6,9 @@ namespace CKY.MultiAgentFramework.Core.Models.LLM
     /// </summary>
     public class LlmProviderConfig
     {
+        /// <summary>数据库主键 ID（用于更新现有配置）</summary>
+        public int? Id { get; set; }
+
         /// <summary>提供商唯一标识（如 zhipuai, tongyi, qwen）</summary>
         public string ProviderName { get; set; } = string.Empty;
 

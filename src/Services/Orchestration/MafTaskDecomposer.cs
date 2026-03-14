@@ -12,19 +12,13 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
     public class MafTaskDecomposer : ITaskDecomposer
     {
         private readonly ILogger<MafTaskDecomposer> _logger;
+        private readonly IIntentCapabilityProvider _capabilityProvider;
 
-        /// <summary>意图到能力的映射</summary>
-        private static readonly Dictionary<string, string> IntentCapabilityMap = new()
+        public MafTaskDecomposer(
+            IIntentCapabilityProvider capabilityProvider,
+            ILogger<MafTaskDecomposer> logger)
         {
-            ["ControlLight"] = "lighting",
-            ["AdjustClimate"] = "climate",
-            ["PlayMusic"] = "music",
-            ["SecurityControl"] = "security",
-            ["GeneralQuery"] = "general"
-        };
-
-        public MafTaskDecomposer(ILogger<MafTaskDecomposer> logger)
-        {
+            _capabilityProvider = capabilityProvider ?? throw new ArgumentNullException(nameof(capabilityProvider));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -43,7 +37,9 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
             };
 
             // 根据主意图创建主任务
-            if (IntentCapabilityMap.TryGetValue(intent.PrimaryIntent, out var capability))
+            var capability = _capabilityProvider.GetCapability(intent.PrimaryIntent);
+
+            if (capability != null)
             {
                 var primaryTask = new DecomposedTask
                 {

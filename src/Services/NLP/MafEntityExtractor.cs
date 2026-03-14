@@ -10,16 +10,13 @@ namespace CKY.MultiAgentFramework.Services.NLP
     public class MafEntityExtractor : IEntityExtractor
     {
         private readonly ILogger<MafEntityExtractor> _logger;
+        private readonly IEntityPatternProvider _patternProvider;
 
-        private static readonly Dictionary<string, string[]> EntityPatterns = new()
+        public MafEntityExtractor(
+            IEntityPatternProvider patternProvider,
+            ILogger<MafEntityExtractor> logger)
         {
-            ["Room"] = ["客厅", "卧室", "厨房", "浴室", "书房", "餐厅", "阳台"],
-            ["Device"] = ["灯", "空调", "窗帘", "音箱", "电视", "门锁", "摄像头"],
-            ["Action"] = ["打开", "关闭", "调节", "设置", "增加", "减少", "播放", "暂停"]
-        };
-
-        public MafEntityExtractor(ILogger<MafEntityExtractor> logger)
-        {
+            _patternProvider = patternProvider ?? throw new ArgumentNullException(nameof(patternProvider));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -31,27 +28,35 @@ namespace CKY.MultiAgentFramework.Services.NLP
             _logger.LogDebug("Extracting entities from: {Input}", userInput);
 
             var result = new EntityExtractionResult();
+            var supportedTypes = _patternProvider.GetSupportedEntityTypes();
 
-            foreach (var (entityType, patterns) in EntityPatterns)
+            foreach (var entityType in supportedTypes)
             {
-                foreach (var pattern in patterns)
+                var patterns = _patternProvider.GetPatterns(entityType);
+                if (patterns != null)
                 {
-                    var index = userInput.IndexOf(pattern, StringComparison.OrdinalIgnoreCase);
-                    if (index >= 0)
+                    foreach (var pattern in patterns)
                     {
-                        var entity = new Entity
+                        if (!string.IsNullOrEmpty(pattern))
                         {
-                            EntityType = entityType,
-                            EntityValue = pattern,
-                            StartPosition = index,
-                            EndPosition = index + pattern.Length,
-                            Confidence = 0.9
-                        };
-                        result.ExtractedEntities.Add(entity);
+                            var index = userInput.IndexOf(pattern, StringComparison.OrdinalIgnoreCase);
+                            if (index >= 0)
+                            {
+                                var entity = new Entity
+                                {
+                                    EntityType = entityType,
+                                    EntityValue = pattern,
+                                    StartPosition = index,
+                                    EndPosition = index + pattern.Length,
+                                    Confidence = 0.9
+                                };
+                                result.ExtractedEntities.Add(entity);
 
-                        if (!result.Entities.ContainsKey(entityType))
-                        {
-                            result.Entities[entityType] = pattern;
+                                if (!result.Entities.ContainsKey(entityType))
+                                {
+                                    result.Entities[entityType] = pattern;
+                                }
+                            }
                         }
                     }
                 }

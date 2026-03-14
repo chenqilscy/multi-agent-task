@@ -14,7 +14,7 @@
 **核心依赖**：
 - ✅ 所有Agent必须继承自MS AF的`AIAgent`基类
 - ✅ 使用MS AF的Agent-to-Agent（A2A）通信机制
-- ✅ 使用MS AF的`IChatClient`进行LLM调用
+- ✅ **LLM服务通过继承`AIAgent`并实现`ILlmService`接口**（参见LLM集成章节）
 - ✅ CKY.MAF提供MS AF缺失的企业级特性（调度、存储、监控）
 
 ---
@@ -69,16 +69,20 @@ classDiagram
 
 ---
 
-### 1.2 不再定义的接口
+### 1.2 LLM集成接口
 
-以下接口由Microsoft Agent Framework提供，**CKY.MAF不再重复定义**：
+CKY.MAF定义`ILlmService`接口作为LLM服务的抽象，**实现类必须继承自MS AF的`AIAgent`**。
 
-| CKY.MAF旧接口 | MS AF对应接口 | 说明 |
-|--------------|---------------|------|
-| ❌ `IMafAgent` | ✅ `AIAgent` | Agent基类 |
-| ❌ `ILLMService` | ✅ `IChatClient` | LLM调用接口 |
-| ❌ `IAgentCommunicator` | ✅ A2A内置 | Agent间通信 |
-| ❌ `IToolRegistry` | ✅ `AITool` | 工具注册机制 |
+| 接口 | 说明 | 实现要求 |
+|------|------|---------|
+| ✅ `ILlmService` | LLM服务抽象接口 | 必须继承`MafAgentBase`（进而继承`AIAgent`） |
+| ✅ `AIAgent` | MS Agent Framework基类 | LLM Agent必须继承此类 |
+| ❌ `IChatClient` | MS AF可能存在的接口 | 不使用，使用我们自己的`ILlmService` |
+
+**关键架构原则**：
+- ✅ **所有LLM服务必须是Agent**：继承`AIAgent`，充分利用MS AF的会话管理、状态追踪能力
+- ✅ **定义ILlmService接口**：为其他Agent提供简化的LLM访问方式
+- ✅ **不绕过MS AF**：不直接使用HttpClient调用LLM API，而是通过Agent的执行流程
 
 ---
 
@@ -168,41 +172,148 @@ namespace MultiAgentFramework.Core.Agents
 
 ---
 
-### 2.2 具体Agent示例
+### 2.2 LLM服务Agent示例
+
+```csharp
+namespace CKY.MultiAgentFramework.Repository.LLM
+{
+    /// <summary>
+    /// 智谱AI LLM Agent - 继承MafAgentBase并实现ILlmService
+    /// 展示正确的MS AF集成方式
+    /// </summary>
+    public class ZhipuAIMafAiAgent : MafAgentBase, ILlmService
+    {
+        private readonly ZhipuAIConfig _config;
+
+        public ZhipuAIMafAiAgent(
+            ZhipuAIConfig config,
+            IMafSessionStorage sessionStorage,
+            IPriorityCalculator priorityCalculator,
+            IMetricsCollector metricsCollector,
+            ILogger logger)
+            : base(sessionStorage, priorityCalculator, metricsCollector, logger)
+        {
+            _config = config;
+        }
+
+        // ILlmService 接口实现
+        public async Task<string> CompleteAsync(
+            string prompt,
+            CancellationToken ct = default)
+        {
+            // 通过MS AF的执行流程处理
+            var request = new MafTaskRequest
+            {
+                TaskId = Guid.NewGuid().ToString(),
+                ConversationId = $"llm-{Guid.NewGuid()}",
+                UserInput = prompt
+            };
+
+            var response = await ExecuteAsync(request, ct);
+            return response.Result ?? throw new InvalidOperationException(response.Error);
+        }
+
+        // MafAgentBase 属性
+        public override string AgentId => "zhipuai-llm-agent";
+        public override string Name => "智谱AI LLM Agent";
+        public override string Description => "基于MS AF的智谱AI GLM-4模型";
+        public override IReadOnlyList<string> Capabilities => new[]
+        {
+            "文本生成", "意图识别", "任务分解"
+        };
+
+        // 核心业务逻辑：实际的LLM API调用
+        protected override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
+            MafTaskRequest request,
+            IAgentSession session,
+            CancellationToken ct)
+        {
+            // ✅ 利用MS AF的会话管理
+            var prompt = ParsePrompt(request.UserInput);
+
+            // 调用智谱AI API
+            var response = await CallZhipuAIApiAsync(prompt, ct);
+
+            // ✅ 记录到会话历史（MS AF能力）
+            session.History.Add(new Message
+            {
+                Role = "assistant",
+                Content = response
+            });
+
+            // ✅ 自动统计（MS AF能力）
+            Statistics.TotalExecutions++;
+
+            return new MafTaskResponse
+            {
+                TaskId = request.TaskId,
+                Success = true,
+                Result = response
+            };
+        }
+    }
+}
+```
+
+### 2.3 业务Agent示例（使用LLM服务）
 
 ```csharp
 namespace SmartHomeDemo.Agents
 {
     /// <summary>
-    /// 照明Agent - Demo应用示例
+    /// 照明Agent - 使用LLM服务进行意图理解
     /// </summary>
     public class LightingAgent : MafAgentBase
     {
+        private readonly ILlmService _llmService;
+
+        public LightingAgent(
+            ILlmService llmService,
+            IMafSessionStorage sessionStorage,
+            IPriorityCalculator priorityCalculator,
+            IMetricsCollector metricsCollector,
+            ILogger logger)
+            : base(sessionStorage, priorityCalculator, metricsCollector, logger)
+        {
+            _llmService = llmService;
+        }
+
         public override string Name => "LightingAgent";
         public override string Description => "智能照明控制Agent";
 
-        protected override async Task<AIResponse> ExecuteBusinessLogicAsync(
-            AIRequest request,
-            AgentSession session,
+        protected override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
+            MafTaskRequest request,
+            IAgentSession session,
             CancellationToken cancellationToken)
         {
-            // 1. 使用MS AF的LLM能力
-            var prompt = BuildPrompt(request, session);
-            var llmResponse = await this.LLM.CompleteAsync(
-                prompt,
-                cancellationToken: cancellationToken);
+            // 1. 使用LLM服务理解用户意图
+            var systemPrompt = "你是智能家居照明助手...";
+            var userPrompt = request.UserInput;
+            var llmResponse = await _llmService.CompleteAsync(
+                systemPrompt,
+                userPrompt,
+                cancellationToken);
 
-            // 2. 使用CKY.MAF的存储
+            // 2. 解析指令并执行
+            var command = ParseLightingCommand(llmResponse);
+            await ExecuteLightingControl(command);
+
+            // 3. 使用CKY.MAF的存储
             await SessionStorage.SaveContextAsync(
                 request.ConversationId,
                 "last_operation",
-                llmResponse.Content);
+                command.ToString());
 
-            // 3. 使用MS AF的A2A通信（如需与其他Agent协作）
-            if (NeedCollaboration(request))
+            return new MafTaskResponse
             {
-                await this.SendAgentMessageAsync(
-                    "ClimateAgent",
+                TaskId = request.TaskId,
+                Success = true,
+                Result = $"已执行：{command.Action}"
+            };
+        }
+    }
+}
+```
                     "调低温度以配合照明",
                     cancellationToken);
             }

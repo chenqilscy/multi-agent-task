@@ -8,18 +8,18 @@ namespace CKY.MultiAgentFramework.Services.Registry
     /// <summary>
     /// LLM Agent 注册表实现
     /// </summary>
-    public class LlmAgentRegistry : ILlmAgentRegistry
+    public class MafAiAgentRegistry : IMafAiAgentRegistry
     {
-        private readonly ILogger<LlmAgentRegistry> _logger;
-        private readonly List<LlmAgent> _agents = new();
+        private readonly ILogger<MafAiAgentRegistry> _logger;
+        private readonly List<MafAiAgent> _agents = new();
         private readonly object _lock = new();
 
-        public LlmAgentRegistry(ILogger<LlmAgentRegistry> logger)
+        public MafAiAgentRegistry(ILogger<MafAiAgentRegistry> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public void RegisterAgent(LlmAgent agent)
+        public void RegisterAgent(MafAiAgent agent)
         {
             if (agent == null) throw new ArgumentNullException(nameof(agent));
 
@@ -37,7 +37,7 @@ namespace CKY.MultiAgentFramework.Services.Registry
             }
         }
 
-        public void RegisterAgents(IEnumerable<LlmAgent> agents)
+        public void RegisterAgents(IEnumerable<MafAiAgent> agents)
         {
             if (agents == null) throw new ArgumentNullException(nameof(agents));
 
@@ -47,7 +47,7 @@ namespace CKY.MultiAgentFramework.Services.Registry
             }
         }
 
-        public async Task<LlmAgent> GetBestAgentAsync(
+        public async Task<MafAiAgent> GetBestAgentAsync(
             LlmScenario scenario,
             CancellationToken ct = default)
         {
@@ -76,7 +76,7 @@ namespace CKY.MultiAgentFramework.Services.Registry
             }
         }
 
-        public Task<LlmAgent?> GetAgentByProviderAsync(
+        public Task<MafAiAgent?> GetAgentByProviderAsync(
             string providerName,
             CancellationToken ct = default)
         {
@@ -89,7 +89,7 @@ namespace CKY.MultiAgentFramework.Services.Registry
             }
         }
 
-        public IReadOnlyList<LlmAgent> GetAllAgents()
+        public IReadOnlyList<MafAiAgent> GetAllAgents()
         {
             lock (_lock)
             {
@@ -97,7 +97,7 @@ namespace CKY.MultiAgentFramework.Services.Registry
             }
         }
 
-        public IReadOnlyList<LlmAgent> GetAgentsByScenario(LlmScenario scenario)
+        public IReadOnlyList<MafAiAgent> GetAgentsByScenario(LlmScenario scenario)
         {
             lock (_lock)
             {

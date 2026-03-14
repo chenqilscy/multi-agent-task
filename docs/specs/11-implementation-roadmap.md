@@ -134,7 +134,7 @@ dotnet sln add demos/SmartHome/CKY.MAF.Demos.SmartHome.csproj
 <!-- Core项目 - 只包含抽象接口和模型 -->
 <ItemGroup>
   <!-- MS Agent Framework（唯一硬性依赖）-->
-  <PackageReference Include="Microsoft.AgentFramework" Version="1.0.0-preview" />
+  <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-preview.251001.1" />
 
   <!-- .NET 基础依赖 -->
   <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />

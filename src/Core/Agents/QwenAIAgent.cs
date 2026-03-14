@@ -24,7 +24,7 @@ namespace CKY.MultiAgentFramework.Core.Agents
     /// services.AddSingleton<LlmResiliencePipeline>();
     /// </code>
     /// </remarks>
-    public class QwenAIAgent : LlmAgent
+    public class QwenAIAgent : MafAiAgent
     {
         private readonly HttpClient _httpClient;
         private readonly LlmResiliencePipeline _resiliencePipeline;
@@ -49,10 +49,12 @@ namespace CKY.MultiAgentFramework.Core.Agents
         public override async Task<string> ExecuteAsync(
             string modelId,
             string prompt,
-            LlmScenario scenario = LlmScenario.Chat,
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
+            // 从配置获取主场景，默认使用 Chat
+            var scenario = Config.SupportedScenarios.Any() ? Config.SupportedScenarios.First() : LlmScenario.Chat;
+
             return await _resiliencePipeline.ExecuteAsync(
                 AgentId,
                 async (innerCt) => await ExecuteInternalAsync(modelId, prompt, scenario, systemPrompt, innerCt),
@@ -106,6 +108,21 @@ namespace CKY.MultiAgentFramework.Core.Agents
                 // 转换为自定义异常
                 throw ConvertToLlmException(ex, modelId);
             }
+        }
+
+        /// <summary>
+        /// 执行流式通义千问 LLM 调用（带弹性保护）
+        /// </summary>
+        public override async IAsyncEnumerable<string> ExecuteStreamingAsync(
+            string modelId,
+            string prompt,
+            string? systemPrompt = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            // TODO: Implement streaming support for QwenAI
+            // For now, fallback to non-streaming
+            var result = await ExecuteAsync(modelId, prompt, systemPrompt, ct);
+            yield return result;
         }
 
         /// <summary>

@@ -474,7 +474,7 @@ classDiagram
         +ExecuteAsync(messages) Task~AgentResponse~
     }
 
-    class LlmAgent {
+    class MafAiAgent {
         <<LLM Agent基类>>
         +LlmProviderConfig Config
         +ExecuteAsync(modelId, prompt, scenario) Task~string~
@@ -492,12 +492,12 @@ classDiagram
         +ExecuteAsync(...) Task~string~
     }
 
-    AIAgent <|-- LlmAgent
-    LlmAgent <|-- ZhipuAIAgent
-    LlmAgent <|-- QwenAIAgent
+    AIAgent <|-- MafAiAgent
+    MafAiAgent <|-- ZhipuAIAgent
+    MafAiAgent <|-- QwenAIAgent
 ```
 
-### 5.2 创建 LlmAgent 实例
+### 5.2 创建 MafAiAgent 实例
 
 ```csharp
 // ===== 1. 配置 LLM 提供商 =====
@@ -592,11 +592,11 @@ foreach (var (prompt, response) in prompts.Zip(responses))
 }
 ```
 
-### 5.4 使用 LlmAgentRegistry（故障转移）
+### 5.4 使用 MafAiAgentRegistry（故障转移）
 
 ```csharp
 // ===== 1. 注册多个 LLM Agent =====
-var registry = new LlmAgentRegistry(logger);
+var registry = new MafAiAgentRegistry(logger);
 
 // 注册智谱AI
 var zhipuConfig = new LlmProviderConfig
@@ -771,7 +771,7 @@ var config = new LlmProviderConfig
 };
 
 // 2. ❌ 不要创建自己的 HttpClient
-public class MyAgent : LlmAgent
+public class MyAgent : MafAiAgent
 {
     private readonly HttpClient _httpClient = new();  // 错误！会导致 socket 耗尽
 }

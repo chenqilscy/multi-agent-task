@@ -1,4 +1,5 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Models.LLM;
 using CKY.MultiAgentFramework.Services.NLP;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -14,7 +15,7 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             // Arrange
             var mockIntentRecognizer = new Mock<IIntentRecognizer>();
             var mockMapping = new Mock<IIntentProviderMapping>();
-            var mockLlmService = new Mock<ILlmService>();
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
             var mockServiceProvider = new Mock<IServiceProvider>();
             var mockLogger = new Mock<ILogger<IntentDrivenEntityExtractor>>();
 
@@ -29,7 +30,7 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             var extractor = new IntentDrivenEntityExtractor(
                 mockIntentRecognizer.Object,
                 mockMapping.Object,
-                mockLlmService.Object,
+                mockLlmRegistry.Object,
                 mockServiceProvider.Object,
                 mockLogger.Object);
 
@@ -48,7 +49,7 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             // Arrange
             var mockIntentRecognizer = new Mock<IIntentRecognizer>();
             var mockMapping = new Mock<IIntentProviderMapping>();
-            var mockLlmService = new Mock<ILlmService>();
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
             var mockServiceProvider = new Mock<IServiceProvider>();
             var mockProvider = new Mock<IEntityPatternProvider>();
             var mockLogger = new Mock<ILogger<IntentDrivenEntityExtractor>>();
@@ -82,7 +83,7 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             var extractor = new IntentDrivenEntityExtractor(
                 mockIntentRecognizer.Object,
                 mockMapping.Object,
-                mockLlmService.Object,
+                mockLlmRegistry.Object,
                 mockServiceProvider.Object,
                 mockLogger.Object);
 
@@ -100,9 +101,10 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             // Arrange
             var mockIntentRecognizer = new Mock<IIntentRecognizer>();
             var mockMapping = new Mock<IIntentProviderMapping>();
-            var mockLlmService = new Mock<ILlmService>();
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
             var mockServiceProvider = new Mock<IServiceProvider>();
             var mockProvider = new Mock<IEntityPatternProvider>();
+            var mockLlmAgent = new Mock<IMafAiAgent>();
             var mockLogger = new Mock<ILogger<IntentDrivenEntityExtractor>>();
 
             mockIntentRecognizer
@@ -128,15 +130,28 @@ namespace CKY.MultiAgentFramework.Tests.NLP
                 .Setup(x => x.GetPatterns("Device"))
                 .Returns(new[] { "灯" });
 
-            // 模拟 LLM 返回
-            mockLlmService
-                .Setup(x => x.CompleteAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            // 模拟 LLM Registry 返回 Agent
+            mockLlmRegistry
+                .Setup(x => x.GetBestAgentAsync(LlmScenario.Intent, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(mockLlmAgent.Object);
+
+            // 模拟 LLM Agent 返回
+            mockLlmAgent
+                .Setup(x => x.ExecuteAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<CancellationToken>()))
                 .ReturnsAsync(@"{""Room"": ""客厅"", ""Device"": ""灯"", ""Action"": ""调亮"", ""Brightness"": ""80%""}");
+
+            mockLlmAgent
+                .Setup(x => x.GetCurrentModelId())
+                .Returns("test-model");
 
             var extractor = new IntentDrivenEntityExtractor(
                 mockIntentRecognizer.Object,
                 mockMapping.Object,
-                mockLlmService.Object,
+                mockLlmRegistry.Object,
                 mockServiceProvider.Object,
                 mockLogger.Object);
 
@@ -147,8 +162,15 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             // Assert
             Assert.NotNull(result);
             Assert.True(result.Entities.ContainsKey("Room") || result.Entities.ContainsKey("Device"));
-            mockLlmService.Verify(
-                x => x.CompleteAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            mockLlmRegistry.Verify(
+                x => x.GetBestAgentAsync(LlmScenario.Intent, It.IsAny<CancellationToken>()),
+                Times.Once);
+            mockLlmAgent.Verify(
+                x => x.ExecuteAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<CancellationToken>()),
                 Times.Once);
         }
 
@@ -158,9 +180,10 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             // Arrange
             var mockIntentRecognizer = new Mock<IIntentRecognizer>();
             var mockMapping = new Mock<IIntentProviderMapping>();
-            var mockLlmService = new Mock<ILlmService>();
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
             var mockServiceProvider = new Mock<IServiceProvider>();
             var mockProvider = new Mock<IEntityPatternProvider>();
+            var mockLlmAgent = new Mock<IMafAiAgent>();
             var mockLogger = new Mock<ILogger<IntentDrivenEntityExtractor>>();
 
             mockIntentRecognizer
@@ -189,15 +212,28 @@ namespace CKY.MultiAgentFramework.Tests.NLP
                 .Setup(x => x.GetPatterns("Action"))
                 .Returns(new[] { "打开" });
 
+            // 模拟 LLM Registry 返回 Agent
+            mockLlmRegistry
+                .Setup(x => x.GetBestAgentAsync(LlmScenario.Intent, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(mockLlmAgent.Object);
+
             // 模拟 LLM 失败
-            mockLlmService
-                .Setup(x => x.CompleteAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            mockLlmAgent
+                .Setup(x => x.ExecuteAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new HttpRequestException("LLM service unavailable"));
+
+            mockLlmAgent
+                .Setup(x => x.GetCurrentModelId())
+                .Returns("test-model");
 
             var extractor = new IntentDrivenEntityExtractor(
                 mockIntentRecognizer.Object,
                 mockMapping.Object,
-                mockLlmService.Object,
+                mockLlmRegistry.Object,
                 mockServiceProvider.Object,
                 mockLogger.Object);
 
@@ -215,9 +251,10 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             // Arrange
             var mockIntentRecognizer = new Mock<IIntentRecognizer>();
             var mockMapping = new Mock<IIntentProviderMapping>();
-            var mockLlmService = new Mock<ILlmService>();
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
             var mockServiceProvider = new Mock<IServiceProvider>();
             var mockProvider = new Mock<IEntityPatternProvider>();
+            var mockLlmAgent = new Mock<IMafAiAgent>();
             var mockLogger = new Mock<ILogger<IntentDrivenEntityExtractor>>();
 
             mockIntentRecognizer
@@ -240,10 +277,19 @@ namespace CKY.MultiAgentFramework.Tests.NLP
                 .Setup(x => x.GetPatterns("Action"))
                 .Returns(new[] { "打开" });
 
+            // 模拟 LLM Registry 返回 Agent
+            mockLlmRegistry
+                .Setup(x => x.GetBestAgentAsync(LlmScenario.Intent, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(mockLlmAgent.Object);
+
+            mockLlmAgent
+                .Setup(x => x.GetCurrentModelId())
+                .Returns("test-model");
+
             var extractor = new IntentDrivenEntityExtractor(
                 mockIntentRecognizer.Object,
                 mockMapping.Object,
-                mockLlmService.Object,
+                mockLlmRegistry.Object,
                 mockServiceProvider.Object,
                 mockLogger.Object);
 
@@ -251,8 +297,8 @@ namespace CKY.MultiAgentFramework.Tests.NLP
             var result = await extractor.ExtractAsync("把那边的灯打开");
 
             // Assert - 短输入但有模糊词，应该触发 LLM
-            mockLlmService.Verify(
-                x => x.CompleteAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            mockLlmRegistry.Verify(
+                x => x.GetBestAgentAsync(LlmScenario.Intent, It.IsAny<CancellationToken>()),
                 Times.Once);
         }
 
