@@ -6,6 +6,7 @@ using CKY.MultiAgentFramework.Infrastructure.Caching.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Redis;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant;
+using CKY.MultiAgentFramework.Repository.Relational;
 
 namespace CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 
@@ -21,6 +22,8 @@ public static class MafServiceRegistrationExtensions
     private const string VectorConfigKey = "MafServices:Implementations:IVectorStore";
     private const string MemoryVectorImplementation = "MemoryVectorStore";
     private const string QdrantVectorImplementation = "QdrantVectorStore";
+
+    private const string DatabaseConfigKey = "MafServices:Implementations:IRelationalDatabase";
 
     /// <summary>
     /// 自动注册所有 Infrastructure 层服务
@@ -71,6 +74,13 @@ public static class MafServiceRegistrationExtensions
             // 配置值无效，静默使用默认实现
             services.AddSingleton<IVectorStore, MemoryVectorStore>();
         }
+
+        // ========================================
+        // 关系数据库服务注册
+        // ========================================
+        // 注意：此服务默认使用 EfCoreRelationalDatabase (SQLite via EF Core)
+        // 如需其他实现，可在此扩展配置驱动选择
+        services.AddScoped<IRelationalDatabase, EfCoreRelationalDatabase>();
 
         return services;
     }
