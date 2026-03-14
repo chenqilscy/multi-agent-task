@@ -140,14 +140,27 @@
             // 发送命令到SmartHomeControlService
             var response = await ControlService.ProcessCommandAsync(command);
 
-            lastResponse = response.Result;
+            // 处理澄清流程
+            if (response.NeedsClarification && !string.IsNullOrEmpty(response.ClarificationQuestion))
+            {
+                lastResponse = $"❓ {response.ClarificationQuestion}";
+                if (response.ClarificationOptions.Count > 0)
+                {
+                    lastResponse += $"\n可选：{string.Join("、", response.ClarificationOptions)}";
+                }
+            }
+            else
+            {
+                lastResponse = response.Result;
+            }
+
             interactionCount++;
 
             commandHistory.Insert(0, new CommandRecord
             {
                 Command = command,
                 Time = DateTime.Now,
-                Success = response.Success
+                Success = response.Success || response.NeedsClarification,
             });
 
             if (commandHistory.Count > 20)
@@ -155,8 +168,8 @@
                 commandHistory.RemoveAt(commandHistory.Count - 1);
             }
 
-            systemStatus = response.Success ? "运行中" : "警告";
-            statusClass = response.Success ? "status-active" : "status-warning";
+            systemStatus = (response.Success || response.NeedsClarification) ? "运行中" : "警告";
+            statusClass = (response.Success || response.NeedsClarification) ? "status-active" : "status-warning";
         }
         catch (Exception ex)
         {

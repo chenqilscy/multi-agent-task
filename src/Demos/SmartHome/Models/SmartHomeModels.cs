@@ -8,6 +8,15 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Models
         public bool Success { get; set; }
         public string Result { get; set; } = string.Empty;
         public string? Error { get; set; }
+
+        /// <summary>是否需要用户澄清（缺少必要实体时为 true）</summary>
+        public bool NeedsClarification { get; set; }
+
+        /// <summary>澄清问题</summary>
+        public string? ClarificationQuestion { get; set; }
+
+        /// <summary>澄清建议选项</summary>
+        public List<string> ClarificationOptions { get; set; } = new();
     }
 
     /// <summary>
