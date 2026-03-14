@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using CKY.MultiAgentFramework.Core.Abstractions.Interfaces;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Redis;
+using CKY.MultiAgentFramework.Infrastructure.Vectorization.Memory;
+using CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant;
 
 namespace CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 
@@ -15,6 +17,11 @@ public static class MafServiceRegistrationExtensions
     private const string CacheConfigKey = "MafServices:Implementations:ICacheStore";
     private const string MemoryCacheImplementation = "MemoryCacheStore";
     private const string RedisCacheImplementation = "RedisCacheStore";
+
+    private const string VectorConfigKey = "MafServices:Implementations:IVectorStore";
+    private const string MemoryVectorImplementation = "MemoryVectorStore";
+    private const string QdrantVectorImplementation = "QdrantVectorStore";
+
     /// <summary>
     /// 自动注册所有 Infrastructure 层服务
     /// </summary>
@@ -43,6 +50,26 @@ public static class MafServiceRegistrationExtensions
         {
             // 配置值无效，静默使用默认实现
             services.AddSingleton<ICacheStore, MemoryCacheStore>();
+        }
+
+        // ========================================
+        // 向量存储服务注册
+        // ========================================
+        var vectorImpl = configuration[VectorConfigKey];
+
+        if (string.IsNullOrEmpty(vectorImpl) || vectorImpl == MemoryVectorImplementation)
+        {
+            // 默认: 内存实现
+            services.AddSingleton<IVectorStore, MemoryVectorStore>();
+        }
+        else if (vectorImpl == QdrantVectorImplementation)
+        {
+            services.AddSingleton<IVectorStore, QdrantVectorStore>();
+        }
+        else
+        {
+            // 配置值无效，静默使用默认实现
+            services.AddSingleton<IVectorStore, MemoryVectorStore>();
         }
 
         return services;
