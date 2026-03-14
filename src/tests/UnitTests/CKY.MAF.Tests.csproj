@@ -26,7 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Core\CKY.MAF.Core.csproj" />
     <ProjectReference Include="..\..\Services\CKY.MAF.Services.csproj" />
-    <ProjectReference Include="..\..\Repository\CKY.MAF.Repository.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\Repository\CKY.MAF.Repository.csproj" />
   </ItemGroup>
 
   <!-- 添加排除模式来防止重复程序集属性 -->

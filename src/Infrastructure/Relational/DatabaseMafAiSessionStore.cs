@@ -1,7 +1,7 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Models.Session;
-using CKY.MultiAgentFramework.Repository.Data;
-using CKY.MultiAgentFramework.Repository.Repositories;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

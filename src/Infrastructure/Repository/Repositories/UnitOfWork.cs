@@ -1,8 +1,8 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
-using CKY.MultiAgentFramework.Repository.Data;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
 using Microsoft.EntityFrameworkCore.Storage;
 
-namespace CKY.MultiAgentFramework.Repository.Repositories
+namespace CKY.MultiAgentFramework.Infrastructure.Repository.Repositories
 {
     /// <summary>
     /// 工作单元实现

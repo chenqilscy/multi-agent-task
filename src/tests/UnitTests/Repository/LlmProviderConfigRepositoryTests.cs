@@ -1,6 +1,6 @@
 // src/tests/UnitTests/Repository/LlmProviderConfigRepositoryTests.cs
 using CKY.MultiAgentFramework.Core.Models.LLM;
-using CKY.MultiAgentFramework.Repository.Repositories;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
 using CKY.MultiAgentFramework.Tests.Helpers;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;

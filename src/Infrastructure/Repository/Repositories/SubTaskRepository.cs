@@ -1,9 +1,9 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Models.Task;
-using CKY.MultiAgentFramework.Repository.Data;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace CKY.MultiAgentFramework.Repository.Repositories
+namespace CKY.MultiAgentFramework.Infrastructure.Repository.Repositories
 {
     /// <summary>
     /// 子任务仓储实现

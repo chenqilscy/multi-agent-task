@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\Core\CKY.MAF.Core.csproj" />
+    <ProjectReference Include="..\..\Core\CKY.MAF.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

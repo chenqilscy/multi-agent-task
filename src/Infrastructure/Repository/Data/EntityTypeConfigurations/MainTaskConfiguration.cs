@@ -2,7 +2,7 @@ using CKY.MultiAgentFramework.Core.Models.Task;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace CKY.MultiAgentFramework.Repository.Data.EntityTypeConfigurations
+namespace CKY.MultiAgentFramework.Infrastructure.Repository.Data.EntityTypeConfigurations
 {
     /// <summary>
     /// MainTask 实体配置

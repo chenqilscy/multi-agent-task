@@ -6,7 +6,7 @@ using CKY.MultiAgentFramework.Infrastructure.Caching.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Redis;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant;
-using CKY.MultiAgentFramework.Repository.Relational;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Relational;
 
 namespace CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 

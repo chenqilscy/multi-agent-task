@@ -25,7 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Core\CKY.MAF.Core.csproj" />
     <ProjectReference Include="..\..\Services\CKY.MAF.Services.csproj" />
-    <ProjectReference Include="..\..\Repository\CKY.MAF.Repository.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\Repository\CKY.MAF.Repository.csproj" />
     <ProjectReference Include="..\..\Infrastructure\Caching\CKY.MAF.Infrastructure.Caching.csproj" />
   </ItemGroup>
 

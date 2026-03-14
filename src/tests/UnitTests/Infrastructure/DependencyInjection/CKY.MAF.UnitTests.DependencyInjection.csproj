@@ -27,7 +27,7 @@
     <ProjectReference Include="..\..\..\..\Infrastructure\Caching\CKY.MAF.Infrastructure.Caching.csproj" />
     <ProjectReference Include="..\..\..\..\Infrastructure\Vectorization\CKY.MAF.Infrastructure.Vectorization.csproj" />
     <ProjectReference Include="..\..\..\..\Infrastructure\DependencyInjection\CKY.MAF.Infrastructure.DependencyInjection.csproj" />
-    <ProjectReference Include="..\..\..\..\Repository\CKY.MAF.Repository.csproj" />
+    <ProjectReference Include="..\..\..\..\Infrastructure\Repository\CKY.MAF.Repository.csproj" />
     <ProjectReference Include="..\..\..\..\Core\CKY.MAF.Core.csproj" />
   </ItemGroup>
 

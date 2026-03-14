@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 
-namespace CKY.MultiAgentFramework.Repository.Relational
+namespace CKY.MultiAgentFramework.Infrastructure.Repository.Relational
 {
     /// <summary>
     /// EF Core 关系数据库实现

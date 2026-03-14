@@ -2,7 +2,7 @@ using CKY.MultiAgentFramework.Core.Models.Persisted;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace CKY.MultiAgentFramework.Repository.Data.EntityTypeConfigurations
+namespace CKY.MultiAgentFramework.Infrastructure.Repository.Data.EntityTypeConfigurations
 {
     /// <summary>
     /// LLM 提供商配置实体配置

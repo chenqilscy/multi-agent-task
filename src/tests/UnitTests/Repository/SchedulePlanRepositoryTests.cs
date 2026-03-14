@@ -1,7 +1,7 @@
 // src/tests/UnitTests/Repository/SchedulePlanRepositoryTests.cs
 using CKY.MultiAgentFramework.Core.Enums;
 using CKY.MultiAgentFramework.Core.Models.Persisted;
-using CKY.MultiAgentFramework.Repository.Repositories;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
 using CKY.MultiAgentFramework.Tests.Helpers;
 using FluentAssertions;
 

@@ -1,5 +1,5 @@
 // src/tests/UnitTests/Helpers/RepositoryTestBase.cs
-using CKY.MultiAgentFramework.Repository.Data;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace CKY.MultiAgentFramework.Tests.Helpers;

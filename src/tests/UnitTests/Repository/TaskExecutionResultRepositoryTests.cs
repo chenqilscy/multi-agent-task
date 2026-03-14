@@ -1,6 +1,6 @@
 // src/tests/UnitTests/Repository/TaskExecutionResultRepositoryTests.cs
 using CKY.MultiAgentFramework.Core.Models.Persisted;
-using CKY.MultiAgentFramework.Repository.Repositories;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
 using CKY.MultiAgentFramework.Tests.Helpers;
 using FluentAssertions;
 

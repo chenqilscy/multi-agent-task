@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Text.Json;
 
-namespace CKY.MultiAgentFramework.Repository.Data.EntityTypeConfigurations
+namespace CKY.MultiAgentFramework.Infrastructure.Repository.Data.EntityTypeConfigurations
 {
     /// <summary>
     /// 会话实体配置（统一模型）

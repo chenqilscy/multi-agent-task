@@ -1,7 +1,7 @@
 // src/tests/UnitTests/Repository/SubTaskRepositoryTests.cs
 using CKY.MultiAgentFramework.Core.Enums;
 using CKY.MultiAgentFramework.Core.Models.Task;
-using CKY.MultiAgentFramework.Repository.Repositories;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
 using CKY.MultiAgentFramework.Tests.Helpers;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;

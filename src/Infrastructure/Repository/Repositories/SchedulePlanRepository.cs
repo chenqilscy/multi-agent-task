@@ -1,10 +1,10 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Enums;
 using CKY.MultiAgentFramework.Core.Models.Persisted;
-using CKY.MultiAgentFramework.Repository.Data;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace CKY.MultiAgentFramework.Repository.Repositories
+namespace CKY.MultiAgentFramework.Infrastructure.Repository.Repositories
 {
     /// <summary>
     /// 调度计划仓储实现

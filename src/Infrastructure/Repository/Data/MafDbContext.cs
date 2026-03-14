@@ -1,10 +1,10 @@
 using CKY.MultiAgentFramework.Core.Models.Persisted;
 using CKY.MultiAgentFramework.Core.Models.Session;
 using CKY.MultiAgentFramework.Core.Models.Task;
-using CKY.MultiAgentFramework.Repository.Data.EntityTypeConfigurations;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Data.EntityTypeConfigurations;
 using Microsoft.EntityFrameworkCore;
 
-namespace CKY.MultiAgentFramework.Repository.Data
+namespace CKY.MultiAgentFramework.Infrastructure.Repository.Data
 {
     /// <summary>
     /// MAF 数据库上下文

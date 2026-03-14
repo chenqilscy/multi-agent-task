@@ -3,7 +3,7 @@ using CKY.MultiAgentFramework.Core.Models.Persisted;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace CKY.MultiAgentFramework.Repository.Data.EntityTypeConfigurations
+namespace CKY.MultiAgentFramework.Infrastructure.Repository.Data.EntityTypeConfigurations
 {
     /// <summary>
     /// 调度计划实体配置
