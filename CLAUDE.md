@@ -253,6 +253,39 @@ public class MafTaskSchedulerTests
 
 ## Common Tasks
 
+### 注册 Infrastructure 服务
+
+使用自动注册扩展方法：
+
+```csharp
+// Program.cs
+services.AddMafInfrastructureServices(builder.Configuration);
+```
+
+**默认实现**（开发环境）：
+- ICacheStore → MemoryCacheStore
+- IVectorStore → MemoryVectorStore
+- IRelationalDatabase → EfCoreRelationalDatabase (SQLite via EF Core)
+- IMafAiSessionStore → DatabaseMafAiSessionStore
+
+**配置覆盖**（生产环境）：
+
+在 `appsettings.Production.json` 中配置：
+```json
+{
+  "MafServices": {
+    "Implementations": {
+      "ICacheStore": "RedisCacheStore",
+      "IVectorStore": "QdrantVectorStore"
+    }
+  }
+}
+```
+
+**支持的生命周期**：
+- Singleton: ICacheStore, IVectorStore, RedisMafAiSessionStore
+- Scoped: IRelationalDatabase, DatabaseMafAiSessionStore (依赖 DbContext)
+
 ### Adding a New Storage Implementation
 
 1. Create new project in `Infrastructure/` layer (e.g., `Infrastructure.Caching.NCache`)
