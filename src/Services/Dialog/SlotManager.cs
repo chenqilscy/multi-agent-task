@@ -30,6 +30,15 @@ namespace CKY.MultiAgentFramework.Services.Dialog
             EntityExtractionResult entities,
             CancellationToken ct = default)
         {
+            if (string.IsNullOrWhiteSpace(userInput))
+                throw new ArgumentException("User input cannot be empty", nameof(userInput));
+
+            if (intent == null)
+                throw new ArgumentNullException(nameof(intent));
+
+            if (entities == null)
+                throw new ArgumentNullException(nameof(entities));
+
             _logger.LogDebug("Detecting missing slots for intent: {Intent}", intent.PrimaryIntent);
 
             var slotDef = _slotDefinitionProvider.GetDefinition(intent.PrimaryIntent);
@@ -81,6 +90,7 @@ namespace CKY.MultiAgentFramework.Services.Dialog
         {
             // TODO: Task 1.5 实现
             // TODO: Implement in Task 1.5
+            // TODO: Task 1.5 - Pass ct to LLM calls when implementing FillSlotsAsync
             return Task.FromResult(providedSlots);
         }
 
