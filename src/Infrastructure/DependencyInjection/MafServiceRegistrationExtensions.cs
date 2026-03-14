@@ -6,6 +6,7 @@ using CKY.MultiAgentFramework.Infrastructure.Caching.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Redis;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant;
+using CKY.MultiAgentFramework.Infrastructure.Relational;
 using CKY.MultiAgentFramework.Repository.Relational;
 
 namespace CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
@@ -24,6 +25,10 @@ public static class MafServiceRegistrationExtensions
     private const string QdrantVectorImplementation = "QdrantVectorStore";
 
     private const string DatabaseConfigKey = "MafServices:Implementations:IRelationalDatabase";
+
+    private const string SessionConfigKey = "MafServices:Implementations:IMafAiSessionStore";
+    private const string DatabaseSessionImplementation = "DatabaseMafAiSessionStore";
+    private const string RedisSessionImplementation = "RedisMafAiSessionStore";
 
     /// <summary>
     /// 自动注册所有 Infrastructure 层服务
@@ -81,6 +86,26 @@ public static class MafServiceRegistrationExtensions
         // 注意：此服务默认使用 EfCoreRelationalDatabase (SQLite via EF Core)
         // 如需其他实现，可在此扩展配置驱动选择
         services.AddScoped<IRelationalDatabase, EfCoreRelationalDatabase>();
+
+        // ========================================
+        // Session 存储服务注册
+        // ========================================
+        var sessionImpl = configuration[SessionConfigKey];
+
+        if (string.IsNullOrEmpty(sessionImpl) || sessionImpl == DatabaseSessionImplementation)
+        {
+            // 默认: 数据库实现（因为需要 DbContext）
+            services.AddScoped<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, DatabaseMafAiSessionStore>();
+        }
+        else if (sessionImpl == RedisSessionImplementation)
+        {
+            services.AddSingleton<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, RedisMafAiSessionStore>();
+        }
+        else
+        {
+            // 配置值无效，静默使用默认实现
+            services.AddScoped<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, DatabaseMafAiSessionStore>();
+        }
 
         return services;
     }
