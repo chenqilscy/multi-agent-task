@@ -1,12 +1,11 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-using CKY.MultiAgentFramework.Core.Abstractions.Interfaces;
+using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Redis;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant;
-using CKY.MultiAgentFramework.Infrastructure.Relational;
 using CKY.MultiAgentFramework.Repository.Relational;
 
 namespace CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
@@ -89,23 +88,21 @@ public static class MafServiceRegistrationExtensions
 
         // ========================================
         // Session 存储服务注册
+        // TODO: Task 11 - Implement session store registration
         // ========================================
-        var sessionImpl = configuration[SessionConfigKey];
-
-        if (string.IsNullOrEmpty(sessionImpl) || sessionImpl == DatabaseSessionImplementation)
-        {
-            // 默认: 数据库实现（因为需要 DbContext）
-            services.AddScoped<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, DatabaseMafAiSessionStore>();
-        }
-        else if (sessionImpl == RedisSessionImplementation)
-        {
-            services.AddSingleton<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, RedisMafAiSessionStore>();
-        }
-        else
-        {
-            // 配置值无效，静默使用默认实现
-            services.AddScoped<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, DatabaseMafAiSessionStore>();
-        }
+        // var sessionImpl = configuration[SessionConfigKey];
+        // if (string.IsNullOrEmpty(sessionImpl) || sessionImpl == DatabaseSessionImplementation)
+        // {
+        //     services.AddScoped<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, DatabaseMafAiSessionStore>();
+        // }
+        // else if (sessionImpl == RedisSessionImplementation)
+        // {
+        //     services.AddSingleton<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, RedisMafAiSessionStore>();
+        // }
+        // else
+        // {
+        //     services.AddScoped<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, DatabaseMafAiSessionStore>();
+        // }
 
         return services;
     }
