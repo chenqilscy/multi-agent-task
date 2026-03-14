@@ -80,11 +80,13 @@ namespace CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant
                     }
 
                     // 创建带payload的点
-                    qdrantPoints.Add(PointStruct.Payload(
-                        pointId,
-                        point.Vector,
-                        payloadDict
-                    ));
+                    var pointStruct = new PointStruct
+                    {
+                        Id = pointId,
+                        Vectors = point.Vector,
+                        Payload = { payloadDict }
+                    };
+                    qdrantPoints.Add(pointStruct);
                 }
 
                 await _client.UpsertAsync(
