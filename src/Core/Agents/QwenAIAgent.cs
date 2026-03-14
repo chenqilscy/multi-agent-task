@@ -49,10 +49,12 @@ namespace CKY.MultiAgentFramework.Core.Agents
         public override async Task<string> ExecuteAsync(
             string modelId,
             string prompt,
-            LlmScenario scenario = LlmScenario.Chat,
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
+            // 从配置获取主场景，默认使用 Chat
+            var scenario = Config.SupportedScenarios.Any() ? Config.SupportedScenarios.First() : LlmScenario.Chat;
+
             return await _resiliencePipeline.ExecuteAsync(
                 AgentId,
                 async (innerCt) => await ExecuteInternalAsync(modelId, prompt, scenario, systemPrompt, innerCt),

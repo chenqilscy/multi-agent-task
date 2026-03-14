@@ -33,7 +33,6 @@ namespace CKY.MultiAgentFramework.Services.NLP
                 var result = await _llmAgent.ExecuteAsync(
                     _llmAgent.Config.ModelId,
                     prompt,
-                    Core.Models.LLM.LlmScenario.Chat,
                     null,
                     ct);
                 return result;
@@ -57,7 +56,6 @@ namespace CKY.MultiAgentFramework.Services.NLP
                 var result = await _llmAgent.ExecuteAsync(
                     _llmAgent.Config.ModelId,
                     userPrompt,
-                    Core.Models.LLM.LlmScenario.Chat,
                     systemPrompt,
                     ct);
                 return result;

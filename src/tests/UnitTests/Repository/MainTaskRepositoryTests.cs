@@ -9,11 +9,14 @@ namespace CKY.MultiAgentFramework.Tests.Repository;
 
 public class MainTaskRepositoryTests : RepositoryTestBase
 {
-    private readonly MainTaskRepository _repository;
-
-    public MainTaskRepositoryTests()
+    private MainTaskRepository _repository
     {
-        _repository = new MainTaskRepository(DbContext);
+        get
+        {
+            if (DbContext == null)
+                throw new InvalidOperationException("DbContext not initialized. Call InitializeAsync first.");
+            return new MainTaskRepository(DbContext);
+        }
     }
 
     [Fact]
