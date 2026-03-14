@@ -1,5 +1,6 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Agents;
+using CKY.MultiAgentFramework.Core.Agents.Providers;
 using CKY.MultiAgentFramework.Core.Models.LLM;
 using Microsoft.Extensions.Logging;
 
@@ -375,56 +376,4 @@ namespace CKY.MultiAgentFramework.Services.Factory
 
         #endregion
     }
-
-    #region 占位符 Agent 类（需要在实际实现中替换）
-
-    // 注意：这些类需要在相应的命名空间中实现
-    // 这里只是为了编译通过而提供的占位符
-
-    public class TongyiLlmAgent : MafAiAgent
-    {
-        public TongyiLlmAgent(LlmProviderConfig config, ILogger logger) : base(config, logger) { }
-        public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
-            => throw new NotImplementedException("TongyiLlmAgent not yet implemented");
-        public override IAsyncEnumerable<string> ExecuteStreamingAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
-            => throw new NotImplementedException("TongyiLlmAgent not yet implemented");
-    }
-
-    public class WenxinLlmAgent : MafAiAgent
-    {
-        public WenxinLlmAgent(LlmProviderConfig config, ILogger logger) : base(config, logger) { }
-        public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
-            => throw new NotImplementedException("WenxinLlmAgent not yet implemented");
-        public override IAsyncEnumerable<string> ExecuteStreamingAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
-            => throw new NotImplementedException("WenxinLlmAgent not yet implemented");
-    }
-
-    public class XunfeiLlmAgent : MafAiAgent
-    {
-        public XunfeiLlmAgent(LlmProviderConfig config, ILogger logger) : base(config, logger) { }
-        public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
-            => throw new NotImplementedException("XunfeiLlmAgent not yet implemented");
-        public override IAsyncEnumerable<string> ExecuteStreamingAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
-            => throw new NotImplementedException("XunfeiLlmAgent not yet implemented");
-    }
-
-    public class BaichuanLlmAgent : MafAiAgent
-    {
-        public BaichuanLlmAgent(LlmProviderConfig config, ILogger logger) : base(config, logger) { }
-        public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
-            => throw new NotImplementedException("BaichuanLlmAgent not yet implemented");
-        public override IAsyncEnumerable<string> ExecuteStreamingAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
-            => throw new NotImplementedException("BaichuanLlmAgent not yet implemented");
-    }
-
-    public class MiniMaxLlmAgent : MafAiAgent
-    {
-        public MiniMaxLlmAgent(LlmProviderConfig config, ILogger logger) : base(config, logger) { }
-        public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
-            => throw new NotImplementedException("MiniMaxLlmAgent not yet implemented");
-        public override IAsyncEnumerable<string> ExecuteStreamingAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
-            => throw new NotImplementedException("MiniMaxLlmAgent not yet implemented");
-    }
-
-    #endregion
 }
