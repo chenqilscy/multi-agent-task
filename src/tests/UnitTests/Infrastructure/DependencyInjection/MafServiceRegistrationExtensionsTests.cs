@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Memory;
+using CKY.MultiAgentFramework.Infrastructure.Caching.Redis;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Memory;
 using CKY.MultiAgentFramework.Repository.Relational;
 
@@ -46,6 +47,28 @@ public class MafServiceRegistrationExtensionsTests
         databaseDescriptor?.Lifetime.Should().Be(ServiceLifetime.Scoped);
     }
 
-    // TODO: Add configuration-based service registration tests in Task 9
+    [Fact]
+    public void AddMafInfrastructureServices_WithRedisConfig_ShouldRegisterRedisCacheStore()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MafServices:Implementations:ICacheStore"] = "RedisCacheStore"
+            })
+            .Build();
+
+        // Act
+        services.AddMafInfrastructureServices(configuration);
+
+        // Assert
+        var cacheDescriptor = services.FirstOrDefault(
+            sd => sd.ServiceType == typeof(ICacheStore));
+        cacheDescriptor.Should().NotBeNull();
+        cacheDescriptor?.ImplementationType.Should().Be(typeof(RedisCacheStore));
+        cacheDescriptor?.Lifetime.Should().Be(ServiceLifetime.Singleton);
+    }
+
     // TODO: Add multiple implementation scenario tests in Task 10
 }
