@@ -444,8 +444,8 @@ namespace CKY.MultiAgentFramework.Services.Session
         /// </summary>
         private async Task<List<MafSessionState>> GetL1SessionsByUserAsync(string userId)
         {
-            // TODO: 需要扩展 L1CacheManager 以支持按用户查询
-            // 临时实现：遍历所有缓存
+            // L1CacheManager 目前不提供按用户遍历接口，返回空列表。
+            // 如需支持按用户查询，需扩展 L1CacheManager 添加遍历能力。
             var sessions = new List<MafSessionState>();
             var stats = _l1CacheManager.GetStats();
 

@@ -75,7 +75,7 @@ builder.Services.AddSingleton<IMafAiAgentRegistry, MafAiAgentRegistry>();
 // });
 
 // 3. 注册 LLM Agent 到 Registry（启动时）
-// builder.Services.AddSingleton<MafAgentStartupService>(); // TODO: 实现 MafAgentStartupService
+// builder.Services.AddSingleton<MafAgentStartupService>(); // MafAgentStartupService 待实现（负责启动时向 LlmAgentRegistry 注册各 Agent）
 
 // ========================================
 // NLP 服务注册

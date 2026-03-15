@@ -13,7 +13,8 @@ namespace CKY.MultiAgentFramework.Core.Models.Task
 
         /// <summary>意图识别结果</summary>
         /// <remarks>
-        /// TODO: 定义 IntentRecognitionResult 类或使用适当的类型
+        /// 使用 <see cref="CKY.MultiAgentFramework.Core.Abstractions.IntentRecognitionResult"/> 类型，
+        /// 声明为 object? 以避免 Core/Models 层对 Abstractions 层的循环依赖。
         /// </remarks>
         public object? Intent { get; set; }
 

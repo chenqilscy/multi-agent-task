@@ -12,6 +12,7 @@ using CKY.MultiAgentFramework.Infrastructure.Vectorization.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Relational;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
 
 namespace CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 
@@ -93,21 +94,20 @@ public static class MafServiceRegistrationExtensions
 
         // ========================================
         // Session 存储服务注册
-        // TODO: Task 11 - Implement session store registration
         // ========================================
-        // var sessionImpl = configuration[SessionConfigKey];
-        // if (string.IsNullOrEmpty(sessionImpl) || sessionImpl == DatabaseSessionImplementation)
-        // {
-        //     services.AddScoped<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, DatabaseMafAiSessionStore>();
-        // }
-        // else if (sessionImpl == RedisSessionImplementation)
-        // {
-        //     services.AddSingleton<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, RedisMafAiSessionStore>();
-        // }
-        // else
-        // {
-        //     services.AddScoped<CKY.MultiAgentFramework.Core.Abstractions.IMafAiSessionStore, DatabaseMafAiSessionStore>();
-        // }
+        var sessionImpl = configuration[SessionConfigKey];
+        if (string.IsNullOrEmpty(sessionImpl) || sessionImpl == DatabaseSessionImplementation)
+        {
+            services.AddScoped<IMafAiSessionStore, DatabaseMafAiSessionStore>();
+        }
+        else if (sessionImpl == RedisSessionImplementation)
+        {
+            services.AddSingleton<IMafAiSessionStore, RedisMafAiSessionStore>();
+        }
+        else
+        {
+            services.AddScoped<IMafAiSessionStore, DatabaseMafAiSessionStore>();
+        }
 
         return services;
     }

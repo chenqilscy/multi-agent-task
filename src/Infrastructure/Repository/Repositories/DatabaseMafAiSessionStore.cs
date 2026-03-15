@@ -5,7 +5,7 @@ using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace CKY.MultiAgentFramework.Infrastructure.Relational
+namespace CKY.MultiAgentFramework.Infrastructure.Repository.Repositories
 {
     /// <summary>
     /// 基于 EF Core 数据库的 MafAiAgent 会话存储实现

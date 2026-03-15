@@ -357,7 +357,7 @@ namespace CKY.MultiAgentFramework.Services.Dialog
             try
             {
                 // 简单的JSON解析 - 提取 confidence 和 required_slots
-                // TODO: 后续可以使用 System.Text.Json 进行更完善的解析
+                // 使用正则表达式解析，如需完整 JSON 解析可改用 System.Text.Json
 
                 // 提取 confidence
                 var confidenceMatch = System.Text.RegularExpressions.Regex.Match(llmResponse, @"""confidence""\s*:\s*([\d.]+)");
