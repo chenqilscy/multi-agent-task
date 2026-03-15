@@ -1,9 +1,9 @@
 # CKY.MAF 实施补齐 TODO
 
 > **生成日期**: 2026-03-13
-> **当前完成度**: 65%
-> **目标完成度**: 95%
-> **预计工期**: 14个工作日
+> **最后更新**: 2026-03-15
+> **当前完成度**: 97%
+> **目标完成度**: 98%
 
 ---
 
@@ -293,16 +293,34 @@
 
 | 任务 | 负责人 | 状态 | 完成度 | 预计完成 |
 |------|--------|------|--------|----------|
-| Task 1: Redis缓存 | - | Pending | 0% | Day 2 |
-| Task 2: 任务调度器 | - | Pending | 0% | Day 4 |
-| Task 3: Agent继承 | - | Pending | 0% | Day 5 |
-| Task 4: Qdrant向量存储 | - | Pending | 0% | Day 7 |
-| Task 5: A2A通信 | - | Pending | 0% | Day 8 |
-| Task 6: Blazor UI | - | Pending | 0% | Day 10 |
-| Task 7: 集成测试 | - | Pending | 0% | Day 10 |
-| Task 8: SignalR | - | Pending | 0% | Day 12 |
-| Task 9: Prometheus | - | Pending | 0% | Day 13 |
-| Task 10: 文档更新 | - | Pending | 0% | Day 14 |
+| Task 1: Redis缓存 | - | ✅ 完成 | 100% | Day 2 |
+| Task 2: 任务调度器 | - | ✅ 完成 | 100% | Day 4 |
+| Task 3: Agent继承 | - | ✅ 完成 | 100% | Day 5 |
+| Task 4: Qdrant向量存储 | - | ✅ 完成 | 100% | Day 7 |
+| Task 5: A2A通信 | - | ✅ 完成 | 100% | Day 8 |
+| Task 6: Blazor UI | - | ✅ 完成 | 100% | Day 10 |
+| Task 7: 集成测试 | - | ✅ 完成 | 100% | Day 10 |
+| Task 8: SignalR | - | ✅ 完成 | 100% | Day 12 |
+| Task 9: Prometheus | - | ✅ 完成 | 100% | Day 13 |
+| Task 10: 文档更新 | - | ✅ 完成 | 100% | Day 14 |
+
+### 新增任务（2026-03-15）
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| 5 大 LLM 提供商 Agent 实现 | ✅ 完成 | 智谱AI、通义千问、文心一言、讯飞星火、MiniMax |
+| EF Core Repository 模式 | ✅ 完成 | MainTask/SubTask CRUD + UnitOfWork |
+| SecurityAgent 路由集成 | ✅ 完成 | 集成到 SmartHomeControlService |
+| 分布式追踪 (ActivitySource) | ✅ 完成 | Agent/Task/LLM 三层追踪，OTLP 导出 |
+| Grafana+Jaeger Docker Compose | ✅ 完成 | docker-compose.observability.yml |
+| SmartHome 对话示例 (P0+P1+P2) | ✅ 完成 | 18 份对话文档 |
+| CustomerService 对话示例 (P0+P1+P2) | ✅ 完成 | 25 份对话文档 |
+| 单元测试 | ✅ 348 通过 | 覆盖 Core/Services/Infrastructure/Resilience |
+| 集成测试 | ✅ 38 通过 | MemoryVectorStore/EfCore/MemoryCache/DI 注册 |
+| Docker 部署配置 | ✅ 完成 | 多阶段 Dockerfile + docker-compose.yml（含应用+基础设施） |
+| Grafana 预配置仪表盘 | ✅ 完成 | Agent/Task/LLM 三层仪表盘 JSON + 自动供给 |
+| Demo Agent 追踪埋点 | ✅ 完成 | SmartHomeControlService + CustomerServiceMainAgent Activity |
+| LLM 降级策略 (Level 5) | ✅ 完成 | DegradationManager + IRuleEngine + SmartHome/CS RuleEngine |
 
 ---
 
@@ -315,5 +333,5 @@
 
 ---
 
-**最后更新**: 2026-03-13
+**最后更新**: 2026-03-15
 **下次审查**: 每日站会时更新

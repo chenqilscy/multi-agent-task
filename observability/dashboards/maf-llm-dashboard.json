@@ -1,0 +1,262 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "LLM 调用总量",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(maf_llm_calls_total[1h]))",
+          "legendFormat": "调用次数"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 200 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "LLM 成功率",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(maf_llm_calls_total{status=\"success\"}[5m])) / sum(rate(maf_llm_calls_total[5m])) * 100",
+          "legendFormat": "成功率"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 100,
+          "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 90 },
+              { "color": "green", "value": 95 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "LLM 平均延迟 (P95)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(maf_llm_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P95 延迟"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "降级模式状态",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "max(maf_degradation_level) or vector(0)",
+          "legendFormat": "当前降级级别"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "正常", "color": "green" } } },
+            { "type": "value", "options": { "1": { "text": "L1 禁用推荐", "color": "blue" } } },
+            { "type": "value", "options": { "2": { "text": "L2 禁用向量搜索", "color": "yellow" } } },
+            { "type": "value", "options": { "3": { "text": "L3 仅L1缓存", "color": "orange" } } },
+            { "type": "value", "options": { "4": { "text": "L4 简化模型", "color": "semi-dark-orange" } } },
+            { "type": "value", "options": { "5": { "text": "L5 规则引擎", "color": "red" } } }
+          ],
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 4 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "LLM 调用速率（按提供商）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(maf_llm_calls_total[5m])) by (provider)",
+          "legendFormat": "{{provider}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "showPoints": "auto"
+          }
+        }
+      }
+    },
+    {
+      "title": "LLM 延迟分位数（按模型）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(maf_llm_latency_seconds_bucket[5m])) by (le, model))",
+          "legendFormat": "{{model}} P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(maf_llm_latency_seconds_bucket[5m])) by (le, model))",
+          "legendFormat": "{{model}} P95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(maf_llm_latency_seconds_bucket[5m])) by (le, model))",
+          "legendFormat": "{{model}} P99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "title": "LLM Token 使用估算",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(maf_llm_prompt_tokens_total[5m])) by (model)",
+          "legendFormat": "{{model}} Prompt"
+        },
+        {
+          "expr": "sum(rate(maf_llm_response_tokens_total[5m])) by (model)",
+          "legendFormat": "{{model}} Response"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": { "mode": "normal" }
+          }
+        }
+      }
+    },
+    {
+      "title": "LLM 错误率（按提供商）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(maf_llm_calls_total{status=\"failure\"}[5m])) by (provider) / sum(rate(maf_llm_calls_total[5m])) by (provider) * 100",
+          "legendFormat": "{{provider}} 错误率"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "thresholdsStyle": { "mode": "line+area" }
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "降级事件记录",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "changes(maf_degradation_level[5m])",
+          "legendFormat": "降级切换次数"
+        },
+        {
+          "expr": "maf_degradation_level",
+          "legendFormat": "当前降级级别"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "fillOpacity": 30,
+            "showPoints": "always"
+          }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["cky-maf", "llm"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "CKY.MAF - LLM 服务监控",
+  "uid": "maf-llm-dashboard",
+  "version": 1
+}

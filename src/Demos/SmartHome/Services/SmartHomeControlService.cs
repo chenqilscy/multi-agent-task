@@ -1,7 +1,11 @@
+using CKY.MultiAgentFramework.Core.Agents;
+using CKY.MultiAgentFramework.Core.Diagnostics;
 using CKY.MultiAgentFramework.Core.Models.Task;
+using CKY.MultiAgentFramework.Core.Resilience;
 using CKY.MultiAgentFramework.Demos.SmartHome.Agents;
 using CKY.MultiAgentFramework.Demos.SmartHome.Models;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace CKY.MultiAgentFramework.Demos.SmartHome.Services
 {
@@ -16,6 +20,9 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services
         private readonly MusicAgent _musicAgent;
         private readonly WeatherAgent _weatherAgent;
         private readonly TemperatureHistoryAgent _temperatureHistoryAgent;
+        private readonly SecurityAgent _securityAgent;
+        private readonly IDegradationManager _degradationManager;
+        private readonly IRuleEngine _ruleEngine;
         private readonly ILogger<SmartHomeControlService> _logger;
 
         public SmartHomeControlService(
@@ -24,6 +31,9 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services
             MusicAgent musicAgent,
             WeatherAgent weatherAgent,
             TemperatureHistoryAgent temperatureHistoryAgent,
+            SecurityAgent securityAgent,
+            IDegradationManager degradationManager,
+            IRuleEngine ruleEngine,
             ILogger<SmartHomeControlService> logger)
         {
             _lightingAgent = lightingAgent ?? throw new ArgumentNullException(nameof(lightingAgent));
@@ -32,6 +42,9 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services
             _weatherAgent = weatherAgent ?? throw new ArgumentNullException(nameof(weatherAgent));
             _temperatureHistoryAgent = temperatureHistoryAgent
                 ?? throw new ArgumentNullException(nameof(temperatureHistoryAgent));
+            _securityAgent = securityAgent ?? throw new ArgumentNullException(nameof(securityAgent));
+            _degradationManager = degradationManager ?? throw new ArgumentNullException(nameof(degradationManager));
+            _ruleEngine = ruleEngine ?? throw new ArgumentNullException(nameof(ruleEngine));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -40,9 +53,38 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services
         /// </summary>
         public async Task<SmartHomeResponse> ProcessCommandAsync(string command, CancellationToken ct = default)
         {
+            using var activity = MafActivitySource.Agent.StartActivity("smarthome.process_command");
+            activity?.SetTag("command.length", command.Length);
+
             try
             {
                 _logger.LogInformation("处理命令: {Command}", command);
+
+                // Level 5 降级：完全禁用 LLM，使用规则引擎处理
+                if (!_degradationManager.IsFeatureEnabled("llm") && _ruleEngine.CanHandle(command))
+                {
+                    _logger.LogWarning("LLM 已降级至 Level 5，使用规则引擎处理: {Command}", command);
+                    activity?.SetTag("routing.degradation", true);
+                    activity?.SetTag("routing.degradation_level", _degradationManager.CurrentLevel.ToString());
+
+                    var ruleRequest = new MafTaskRequest
+                    {
+                        TaskId = Guid.NewGuid().ToString(),
+                        UserInput = command,
+                        Parameters = new Dictionary<string, object>()
+                    };
+                    var ruleResponse = await _ruleEngine.ProcessAsync(ruleRequest, ct);
+
+                    activity?.SetTag("routing.agent", "RuleEngine");
+                    activity?.SetTag("routing.success", ruleResponse.Success);
+
+                    return new SmartHomeResponse
+                    {
+                        Success = ruleResponse.Success,
+                        Result = ruleResponse.Result ?? string.Empty,
+                        Error = ruleResponse.Error,
+                    };
+                }
 
                 // 创建任务请求
                 var request = new MafTaskRequest
@@ -54,42 +96,55 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services
 
                 // 根据命令类型路由到不同的Agent
                 MafTaskResponse? response = null;
+                string routedAgent;
 
                 if (ContainsKeywords(command, ["天气", "下雨", "气温", "晴天", "预报", "穿什么"]))
                 {
-                    // 天气查询（案例1）：提取城市实体
+                    routedAgent = "WeatherAgent";
                     ExtractCityEntity(command, request.Parameters);
                     ExtractDateEntity(command, request.Parameters);
-                    response = await _weatherAgent.ExecuteBusinessLogicAsync(request, ct);
+                    response = await ExecuteAgentWithTracingAsync(_weatherAgent, routedAgent, request, ct);
                 }
                 else if (ContainsKeywords(command, ["温度变化", "温度历史", "这段时间温度", "最近温度", "传感器"]))
                 {
-                    // 历史温度查询（案例2）：提取房间实体
+                    routedAgent = "TemperatureHistoryAgent";
                     ExtractRoomEntity(command, request.Parameters);
-                    response = await _temperatureHistoryAgent.ExecuteBusinessLogicAsync(request, ct);
+                    response = await ExecuteAgentWithTracingAsync(_temperatureHistoryAgent, routedAgent, request, ct);
+                }
+                else if (ContainsKeywords(command, ["门锁", "锁门", "上锁", "解锁", "开锁", "摄像头", "监控", "外出模式", "离家模式", "外出安防", "模拟有人", "模拟在家", "警报", "告警"]))
+                {
+                    routedAgent = "SecurityAgent";
+                    response = await ExecuteAgentWithTracingAsync(_securityAgent, routedAgent, request, ct);
                 }
                 else if (ContainsKeywords(command, ["灯", "照明", "亮度", "调亮", "调暗"]))
                 {
+                    routedAgent = "LightingAgent";
                     ExtractRoomEntity(command, request.Parameters);
-                    response = await _lightingAgent.ExecuteBusinessLogicAsync(request, ct);
+                    response = await ExecuteAgentWithTracingAsync(_lightingAgent, routedAgent, request, ct);
                 }
                 else if (ContainsKeywords(command, ["空调", "温度", "制热", "制冷", "度"]))
                 {
+                    routedAgent = "ClimateAgent";
                     ExtractRoomEntity(command, request.Parameters);
-                    response = await _climateAgent.ExecuteBusinessLogicAsync(request, ct);
+                    response = await ExecuteAgentWithTracingAsync(_climateAgent, routedAgent, request, ct);
                 }
                 else if (ContainsKeywords(command, ["音乐", "播放", "暂停", "歌曲"]))
                 {
-                    response = await _musicAgent.ExecuteBusinessLogicAsync(request, ct);
+                    routedAgent = "MusicAgent";
+                    response = await ExecuteAgentWithTracingAsync(_musicAgent, routedAgent, request, ct);
                 }
                 else
                 {
+                    activity?.SetTag("routing.result", "unrecognized");
                     return new SmartHomeResponse
                     {
                         Success = false,
-                        Result = "抱歉，我无法理解您的命令。请尝试使用照明、气候、音乐或天气查询相关的指令。"
+                        Result = "抱歉，我无法理解您的命令。请尝试使用照明、气候、音乐、安防或天气查询相关的指令。"
                     };
                 }
+
+                activity?.SetTag("routing.agent", routedAgent);
+                activity?.SetTag("routing.success", response.Success);
 
                 return new SmartHomeResponse
                 {
@@ -103,6 +158,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services
             }
             catch (Exception ex)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 _logger.LogError(ex, "处理命令时发生错误: {Command}", command);
                 return new SmartHomeResponse
                 {
@@ -111,6 +167,28 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services
                     Error = ex.Message
                 };
             }
+        }
+
+        /// <summary>
+        /// 带追踪的 Agent 执行
+        /// </summary>
+        private static async Task<MafTaskResponse> ExecuteAgentWithTracingAsync(
+            MafBusinessAgentBase agent,
+            string agentName,
+            MafTaskRequest request,
+            CancellationToken ct)
+        {
+            using var childActivity = MafActivitySource.Agent.StartActivity($"smarthome.agent.{agentName.ToLowerInvariant()}");
+            childActivity?.SetTag("agent.name", agentName);
+            childActivity?.SetTag("task.id", request.TaskId);
+
+            var response = await agent.ExecuteBusinessLogicAsync(request, ct);
+
+            childActivity?.SetTag("agent.success", response.Success);
+            if (!response.Success && response.Error != null)
+                childActivity?.SetTag("agent.error", response.Error);
+
+            return response;
         }
 
         /// <summary>

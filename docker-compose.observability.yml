@@ -1,0 +1,64 @@
+# CKY.MAF 可观测性基础设施
+# 启动: docker compose -f docker-compose.observability.yml up -d
+#
+# 访问地址:
+#   Jaeger UI (链路追踪):  http://localhost:16686
+#   Grafana (仪表盘):      http://localhost:3000  (admin/admin)
+#   Prometheus (指标):     http://localhost:9090
+#
+# 配置 Demo 应用连接:
+#   appsettings.Development.json:
+#   {
+#     "OpenTelemetry": {
+#       "OtlpEndpoint": "http://localhost:4317"
+#     }
+#   }
+
+services:
+  # ========================================
+  # Jaeger - 分布式链路追踪
+  # ========================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: maf-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+    restart: unless-stopped
+
+  # ========================================
+  # Prometheus - 指标采集
+  # ========================================
+  prometheus:
+    image: prom/prometheus:v2.40.0
+    container_name: maf-prometheus
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  # ========================================
+  # Grafana - 可视化仪表盘
+  # ========================================
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: maf-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./observability/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./observability/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - jaeger
+    restart: unless-stopped

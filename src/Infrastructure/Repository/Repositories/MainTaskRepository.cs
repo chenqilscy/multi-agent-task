@@ -66,7 +66,7 @@ namespace CKY.MultiAgentFramework.Infrastructure.Repository.Repositories
 
         public async Task DeleteAsync(int id, CancellationToken ct = default)
         {
-            var task = await _context.MainTasks.FindAsync(new[] { id }, ct);
+            var task = await _context.MainTasks.FindAsync(new object[] { id }, ct);
             if (task != null)
             {
                 _context.MainTasks.Remove(task);

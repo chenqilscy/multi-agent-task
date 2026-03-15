@@ -1,6 +1,7 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Agents;
 using CKY.MultiAgentFramework.Core.Agents.Specialized;
+using CKY.MultiAgentFramework.Core.Resilience;
 using CKY.MAF.Demos.SmartHome.Components;
 using CKY.MAF.Demos.SmartHome.Hubs;
 using CKY.MultiAgentFramework.Demos.SmartHome;
@@ -12,12 +13,15 @@ using CKY.MultiAgentFramework.Services.Registry;
 using CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
+using CKY.MultiAgentFramework.Core.Diagnostics;
 using CKY.MultiAgentFramework.Services.Monitoring;
 using CKY.MultiAgentFramework.Services.NLP;
 using CKY.MultiAgentFramework.Services.Registry;
 using CKY.MultiAgentFramework.Services.RealTime;
+using CKY.MultiAgentFramework.Services.Resilience;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,17 +43,43 @@ builder.Services.AddSingleton<IPrometheusMetricsCollector, PrometheusMetricsColl
 // 注册系统指标收集器
 builder.Services.AddSingleton<SystemMetricsCollector>();
 
-// 配置 OpenTelemetry Metrics 导出到 Prometheus
+// 配置 OpenTelemetry Metrics + Tracing 导出
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics =>
     {
         metrics
             .AddAspNetCoreInstrumentation()
             .AddMeter("CKY.MAF")
+            .AddMeter("CKY.MAF.BusinessAgent")
+            .AddMeter("CKY.MultiAgentFramework")
             .AddPrometheusExporter(options =>
             {
                 options.ScrapeResponseCacheDurationMilliseconds = 1000;
             });
+    })
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddSource(MafActivitySource.AgentSourceName)
+            .AddSource(MafActivitySource.TaskSourceName)
+            .AddSource(MafActivitySource.LlmSourceName);
+
+        // OTLP 导出（Jaeger / Grafana Tempo / OTEL Collector）
+        var otlpEndpoint = builder.Configuration["OpenTelemetry:OtlpEndpoint"];
+        if (!string.IsNullOrEmpty(otlpEndpoint))
+        {
+            tracing.AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri(otlpEndpoint);
+            });
+        }
+
+        // 开发环境启用控制台导出
+        if (builder.Environment.IsDevelopment())
+        {
+            tracing.AddConsoleExporter();
+        }
     });
 
 // ========================================
@@ -129,6 +159,7 @@ builder.Services.AddSingleton<ILightingService, SimulatedLightingService>();
 builder.Services.AddSingleton<IClimateService, SimulatedClimateService>();
 builder.Services.AddSingleton<IWeatherService, SimulatedWeatherService>();
 builder.Services.AddSingleton<ISensorDataService, SimulatedSensorDataService>();
+builder.Services.AddSingleton<ISecurityService, SimulatedSecurityService>();
 
 // 智能家居专用 Agent
 builder.Services.AddSingleton<LightingAgent>();
@@ -136,9 +167,17 @@ builder.Services.AddSingleton<ClimateAgent>();
 builder.Services.AddSingleton<MusicAgent>();
 builder.Services.AddSingleton<WeatherAgent>();
 builder.Services.AddSingleton<TemperatureHistoryAgent>();
+builder.Services.AddSingleton<SecurityAgent>();
 
 // 智能家居控制服务（聚合多个 Agent）
 builder.Services.AddSingleton<SmartHomeControlService>();
+
+// ========================================
+// 降级策略注册
+// ========================================
+
+builder.Services.AddSingleton<IDegradationManager, DegradationManager>();
+builder.Services.AddSingleton<IRuleEngine, SmartHomeRuleEngine>();
 
 // ========================================
 // 专业 Agent 注册

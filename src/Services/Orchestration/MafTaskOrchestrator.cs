@@ -1,7 +1,10 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Diagnostics;
 using CKY.MultiAgentFramework.Core.Enums;
 using CKY.MultiAgentFramework.Core.Models.Task;
+using CKY.MultiAgentFramework.Services.Monitoring;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace CKY.MultiAgentFramework.Services.Orchestration
 {
@@ -12,11 +15,15 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
     public class MafTaskOrchestrator : ITaskOrchestrator
     {
         private readonly ILogger<MafTaskOrchestrator> _logger;
+        private readonly IPrometheusMetricsCollector? _metrics;
         private readonly Dictionary<string, CancellationTokenSource> _activePlans = new();
 
-        public MafTaskOrchestrator(ILogger<MafTaskOrchestrator> logger)
+        public MafTaskOrchestrator(
+            ILogger<MafTaskOrchestrator> logger,
+            IPrometheusMetricsCollector? metrics = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _metrics = metrics;
         }
 
         /// <inheritdoc />
@@ -24,7 +31,13 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
             List<DecomposedTask> tasks,
             CancellationToken ct = default)
         {
+            using var activity = MafActivitySource.Task.StartActivity("task.create_plan");
+            activity?.SetTag("task.count", tasks.Count);
+
             _logger.LogInformation("Creating execution plan for {Count} tasks", tasks.Count);
+
+            // 记录计划创建指标
+            _metrics?.IncrementCounter(MafMetrics.TaskCreatedTotal, tasks.Count);
 
             var plan = new ExecutionPlan();
 
@@ -61,8 +74,14 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
             ExecutionPlan plan,
             CancellationToken ct = default)
         {
+            using var activity = MafActivitySource.Task.StartActivity("task.execute_plan");
+            activity?.SetTag("plan.id", plan.PlanId);
+            activity?.SetTag("plan.parallel_groups", plan.ParallelGroups.Count);
+            activity?.SetTag("plan.serial_groups", plan.SerialGroups.Count);
+
             _logger.LogInformation("Executing plan {PlanId}", plan.PlanId);
 
+            var stopwatch = Stopwatch.StartNew();
             var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             _activePlans[plan.PlanId] = cts;
 
@@ -105,6 +124,16 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
                 _activePlans.Remove(plan.PlanId);
                 cts.Dispose();
             }
+
+            activity?.SetTag("plan.total_results", results.Count);
+            activity?.SetTag("plan.success_count", results.Count(r => r.Success));
+            activity?.SetTag("plan.failure_count", results.Count(r => !r.Success));
+
+            // 记录计划执行指标
+            stopwatch.Stop();
+            _metrics?.RecordHistogram(MafMetrics.TaskDuration, stopwatch.Elapsed.TotalSeconds);
+            _metrics?.IncrementCounter(MafMetrics.TaskCompletedTotal, results.Count(r => r.Success));
+            _metrics?.IncrementCounter(MafMetrics.TaskFailedTotal, results.Count(r => !r.Success));
 
             return results;
         }

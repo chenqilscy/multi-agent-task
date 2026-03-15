@@ -31,6 +31,15 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services
 
         /// <summary>获取当前温度</summary>
         Task<int> GetCurrentTemperatureAsync(string room, CancellationToken ct = default);
+
+        /// <summary>关闭燃气阀门（紧急安全操作）</summary>
+        Task<bool> CloseGasValveAsync(CancellationToken ct = default);
+
+        /// <summary>打开燃气阀门</summary>
+        Task<bool> OpenGasValveAsync(CancellationToken ct = default);
+
+        /// <summary>获取燃气阀门状态</summary>
+        Task<bool> IsGasValveOpenAsync(CancellationToken ct = default);
     }
 
     /// <summary>
@@ -119,5 +128,73 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services
         /// </summary>
         Task<TemperatureRecord> GetCurrentTemperatureAsync(
             string room, CancellationToken ct = default);
+    }
+
+    // ============================
+    // 安防相关模型和接口
+    // ============================
+
+    /// <summary>门锁状态</summary>
+    public class DoorLockStatus
+    {
+        public string Location { get; set; } = "大门";
+        public bool IsLocked { get; set; }
+        public DateTime LastChanged { get; set; }
+    }
+
+    /// <summary>摄像头状态</summary>
+    public class CameraStatus
+    {
+        public string Location { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public bool HasMotionDetection { get; set; }
+    }
+
+    /// <summary>安防警报</summary>
+    public class SecurityAlert
+    {
+        public string AlertId { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty; // intrusion, smoke, gas_leak, water_leak
+        public string Location { get; set; } = string.Empty;
+        public string Severity { get; set; } = "medium"; // low, medium, high, critical
+        public DateTime Timestamp { get; set; }
+        public string Description { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// 安防服务接口
+    /// 管理门锁、摄像头和安全检测
+    /// </summary>
+    public interface ISecurityService
+    {
+        /// <summary>锁定门锁</summary>
+        Task<bool> LockDoorAsync(string location = "大门", CancellationToken ct = default);
+
+        /// <summary>解锁门锁</summary>
+        Task<bool> UnlockDoorAsync(string location = "大门", CancellationToken ct = default);
+
+        /// <summary>获取门锁状态</summary>
+        Task<DoorLockStatus> GetDoorLockStatusAsync(string location = "大门", CancellationToken ct = default);
+
+        /// <summary>启用/禁用摄像头</summary>
+        Task<bool> SetCameraActiveAsync(string location, bool active, CancellationToken ct = default);
+
+        /// <summary>获取所有摄像头状态</summary>
+        Task<List<CameraStatus>> GetCameraStatusListAsync(CancellationToken ct = default);
+
+        /// <summary>启动外出安防模式</summary>
+        Task<bool> EnableAwayModeAsync(CancellationToken ct = default);
+
+        /// <summary>关闭外出安防模式</summary>
+        Task<bool> DisableAwayModeAsync(CancellationToken ct = default);
+
+        /// <summary>获取最近的安防警报</summary>
+        Task<List<SecurityAlert>> GetRecentAlertsAsync(int count = 10, CancellationToken ct = default);
+
+        /// <summary>模拟有人在家（随机开关灯）</summary>
+        Task<bool> EnablePresenceSimulationAsync(CancellationToken ct = default);
+
+        /// <summary>关闭模拟有人在家</summary>
+        Task<bool> DisablePresenceSimulationAsync(CancellationToken ct = default);
     }
 }

@@ -1,6 +1,8 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Models.LLM;
 using Microsoft.Extensions.Logging;
+using System.Text;
+using System.Text.Json;
 
 namespace CKY.MultiAgentFramework.Core.Agents.Providers
 {
@@ -9,73 +11,212 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
     /// </summary>
     /// <remarks>
     /// 模型支持：
-    /// - Baichuan2-Turbo: 快速模型（低成本、低延迟）
-    /// - Baichuan2-Turbo-192k: 长文本模型（支持 192K 上下文）
-    /// - Baichuan2-53B: 大参数模型（更强推理能力）
-    /// - Baichuan-13B-Chat: 对话优化模型
+    /// - Baichuan2-Turbo: 通用模型
+    /// - Baichuan2-53B: 大参数模型
+    /// - Baichuan-Text-Embedding: 文本嵌入模型
     ///
-    /// API 特点：
-    /// - 支持流式和非流式调用
-    /// - 支持长文本理解（192K tokens）
-    /// - 支持多轮对话
-    /// - 支持搜索增强
-    ///
-    /// 使用场景：
-    /// - 长文本处理（文档总结、合同分析）
-    /// - 知识问答
-    /// - 对话系统
-    /// - 内容生成
-    ///
-    /// 配置要求：
+    /// 配置示例：
     /// <code>
     /// var config = new LlmProviderConfig
     /// {
     ///     ProviderName = "Baichuan",
     ///     ApiKey = "your-api-key",
-    ///     ModelId = "Baichuan2-Turbo"
+    ///     SecretKey = "your-secret-key",
+    ///     ModelId = "Baichuan2-Turbo",
+    ///     BaseUrl = "https://api.baichuan-ai.com/v1/chat"
     /// };
     /// </code>
     ///
-    /// 实现状态：
-    /// - 待实现：百川 API 调用
-    /// - 待实现：流式输出
-    /// - 待实现：长文本处理支持
-    ///
-    /// 参考文档：
-    /// https://platform.baichuan-ai.com/docs
+    /// 参考文档：https://platform.baichuan-ai.com/docs
     /// </remarks>
     public class BaichuanLlmAgent : MafAiAgent
     {
+        private readonly HttpClient _httpClient;
+        private readonly string _secretKey;
+
         /// <summary>
         /// 初始化 BaichuanLlmAgent 类的新实例
         /// </summary>
-        /// <param name="config">LLM 配置</param>
-        /// <param name="logger">日志记录器</param>
-        public BaichuanLlmAgent(LlmProviderConfig config, ILogger logger)
+        public BaichuanLlmAgent(
+            LlmProviderConfig config,
+            ILogger logger,
+            HttpClient? httpClient = null)
             : base(config, logger)
         {
+            _httpClient = httpClient ?? new HttpClient
+            {
+                BaseAddress = new Uri(config.ApiBaseUrl ?? "https://api.baichuan-ai.com/v1")
+            };
+
+            // 百川需要 SecretKey
+            if (!config.AdditionalParameters.TryGetValue("SecretKey", out var secretKeyObj))
+            {
+                throw new ArgumentException("Baichuan requires 'SecretKey' in AdditionalParameters", nameof(config));
+            }
+            _secretKey = secretKeyObj.ToString() ?? string.Empty;
         }
 
         /// <inheritdoc />
-        public override Task<string> ExecuteAsync(
+        public override async Task<string> ExecuteAsync(
             string modelId,
             string prompt,
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // 在此处实现百川 HTTP API 调用
-            throw new NotImplementedException("BaichuanLlmAgent.ExecuteAsync not yet implemented");
+            Logger.LogDebug("[BaichuanLlmAgent] ExecuteAsync called with model: {Model}", modelId);
+
+            try
+            {
+                var requestBody = new
+                {
+                    model = modelId,
+                    messages = BuildMessages(prompt, systemPrompt),
+                    temperature = 0.7,
+                    top_p = 0.9,
+                    max_tokens = 2000
+                };
+
+                var jsonContent = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions");
+                request.Content = content;
+                request.Headers.Add("Authorization", $"Bearer {GetApiKey()}");
+
+                var response = await _httpClient.SendAsync(request, ct);
+                response.EnsureSuccessStatusCode();
+
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                var result = JsonSerializer.Deserialize<BaichuanResponse>(responseBody);
+
+                if (result?.Choices?.Length > 0)
+                {
+                    return result.Choices[0].Message.Content;
+                }
+
+                throw new InvalidOperationException("Invalid response from Baichuan API");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[BaichuanLlmAgent] ExecuteAsync failed");
+                throw;
+            }
         }
 
         /// <inheritdoc />
-        public override IAsyncEnumerable<string> ExecuteStreamingAsync(
+        public override async IAsyncEnumerable<string> ExecuteStreamingAsync(
             string modelId,
             string prompt,
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // 在此处实现百川流式 API 调用
-            throw new NotImplementedException("BaichuanLlmAgent.ExecuteStreamingAsync not yet implemented");
+            Logger.LogDebug("[BaichuanLlmAgent] ExecuteStreamingAsync called with model: {Model}", modelId);
+
+            var requestBody = new
+            {
+                model = modelId,
+                messages = BuildMessages(prompt, systemPrompt),
+                temperature = 0.7,
+                top_p = 0.9,
+                max_tokens = 2000,
+                stream = true
+            };
+
+            var jsonContent = JsonSerializer.Serialize(requestBody);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions");
+            request.Content = content;
+            request.Headers.Add("Authorization", $"Bearer {GetApiKey()}");
+
+            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            response.EnsureSuccessStatusCode();
+
+            using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var reader = new StreamReader(stream);
+
+            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync(ct);
+                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
+                    continue;
+
+                var jsonLine = line.Substring(6);
+                if (jsonLine.Trim() == "[DONE]")
+                    break;
+
+                BaichuanStreamResponse? chunk = null;
+                try
+                {
+                    chunk = JsonSerializer.Deserialize<BaichuanStreamResponse>(jsonLine);
+                }
+                catch (JsonException)
+                {
+                    continue;
+                }
+
+                if (chunk?.Choices?.Length > 0 && chunk.Choices[0].Delta?.Content != null)
+                {
+                    yield return chunk.Choices[0].Delta.Content;
+                }
+            }
         }
+
+        private static object[] BuildMessages(string prompt, string? systemPrompt)
+        {
+            var messages = new List<object>();
+
+            if (!string.IsNullOrWhiteSpace(systemPrompt))
+            {
+                messages.Add(new { role = "system", content = systemPrompt });
+            }
+
+            messages.Add(new { role = "user", content = prompt });
+
+            return messages.ToArray();
+        }
+
+        #region Response Models
+
+        private class BaichuanResponse
+        {
+            public BaichuanChoice[]? Choices { get; set; }
+            public BaichuanUsage? Usage { get; set; }
+        }
+
+        private class BaichuanChoice
+        {
+            public BaichuanMessage Message { get; set; } = new();
+            public string? Finish_reason { get; set; }
+        }
+
+        private class BaichuanMessage
+        {
+            public string Content { get; set; } = string.Empty;
+        }
+
+        private class BaichuanUsage
+        {
+            public int Prompt_tokens { get; set; }
+            public int Completion_tokens { get; set; }
+            public int Total_tokens { get; set; }
+        }
+
+        private class BaichuanStreamResponse
+        {
+            public BaichuanStreamChoice[]? Choices { get; set; }
+        }
+
+        private class BaichuanStreamChoice
+        {
+            public BaichuanStreamDelta? Delta { get; set; }
+        }
+
+        private class BaichuanStreamDelta
+        {
+            public string? Content { get; set; }
+        }
+
+        #endregion
     }
 }

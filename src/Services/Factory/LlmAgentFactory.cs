@@ -3,6 +3,7 @@ using CKY.MultiAgentFramework.Core.Agents;
 using CKY.MultiAgentFramework.Core.Agents.Providers;
 using CKY.MultiAgentFramework.Core.Models.LLM;
 using Microsoft.Extensions.Logging;
+using System.Net.Http;
 
 namespace CKY.MultiAgentFramework.Services.Factory
 {
@@ -24,15 +25,18 @@ namespace CKY.MultiAgentFramework.Services.Factory
         private readonly ILogger<LlmAgentFactory> _logger;
         private readonly ILlmProviderConfigRepository _configRepository;
         private readonly ILoggerFactory _loggerFactory;
+        private readonly IHttpClientFactory? _httpClientFactory;
 
         public LlmAgentFactory(
             ILogger<LlmAgentFactory> logger,
             ILlmProviderConfigRepository configRepository,
-            ILoggerFactory? loggerFactory = null)
+            ILoggerFactory? loggerFactory = null,
+            IHttpClientFactory? httpClientFactory = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _configRepository = configRepository ?? throw new ArgumentNullException(nameof(configRepository));
             _loggerFactory = loggerFactory ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
+            _httpClientFactory = httpClientFactory;
         }
 
         #region 核心创建方法
@@ -282,8 +286,8 @@ namespace CKY.MultiAgentFramework.Services.Factory
         /// 创建智谱AI Agent
         /// </summary>
         /// <remarks>
-        /// 注意：ZhipuAIAgent 需要 HttpClient，需要通过依赖注入提供。
-        /// 这里抛出 NotImplementedException，提醒需要在工厂中添加 HttpClient 支持。
+        /// ZhipuAIAgent 需要 HttpClient，通过 IHttpClientFactory 提供。
+        /// 如果未提供 IHttpClientFactory，则抛出异常。
         /// </remarks>
         private async Task<MafAiAgent> CreateZhipuAIAgentAsync(
             LlmProviderConfig config,
@@ -291,13 +295,22 @@ namespace CKY.MultiAgentFramework.Services.Factory
         {
             await Task.CompletedTask;
 
-            // ZhipuAIAgent 需要通过依赖注入提供 HttpClient。
-            // 请在工厂中注入 IHttpClientFactory，并在此处构造：
-            //   return new ZhipuAIAgent(config, logger, httpClientFactory.CreateClient(nameof(ZhipuAIAgent)));
-            throw new NotImplementedException(
-                "ZhipuAIAgent requires HttpClient. " +
-                "Please inject IHttpClientFactory or HttpClient into LlmAgentFactory. " +
-                "Example: return new ZhipuAIAgent(config, logger, httpClient);");
+            if (_httpClientFactory == null)
+            {
+                throw new InvalidOperationException(
+                    "ZhipuAIAgent requires IHttpClientFactory. " +
+                    "Please register IHttpClientFactory in DI container: services.AddHttpClient();");
+            }
+
+            var logger = _loggerFactory.CreateLogger<ZhipuAIAgent>();
+            var httpClient = _httpClientFactory.CreateClient(nameof(ZhipuAIAgent));
+
+            // 配置 HttpClient
+            httpClient.BaseAddress = new Uri(config.ApiBaseUrl ?? "https://open.bigmodel.cn/api/paas/v4/");
+            httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {GetApiKey(config)}");
+            httpClient.DefaultRequestHeaders.Add("Content-Type", "application/json");
+
+            return new ZhipuAIAgent(config, logger, httpClient);
         }
 
         /// <summary>
@@ -310,7 +323,16 @@ namespace CKY.MultiAgentFramework.Services.Factory
             await Task.CompletedTask;
 
             var logger = _loggerFactory.CreateLogger<TongyiLlmAgent>();
-            return new TongyiLlmAgent(config, logger);
+            HttpClient? httpClient = null;
+
+            if (_httpClientFactory != null)
+            {
+                httpClient = _httpClientFactory.CreateClient(nameof(TongyiLlmAgent));
+                httpClient.BaseAddress = new Uri(config.ApiBaseUrl ?? "https://dashscope.aliyuncs.com/compatible-mode/v1");
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {GetApiKey(config)}");
+            }
+
+            return new TongyiLlmAgent(config, logger, httpClient);
         }
 
         /// <summary>
@@ -334,7 +356,15 @@ namespace CKY.MultiAgentFramework.Services.Factory
             await Task.CompletedTask;
 
             var logger = _loggerFactory.CreateLogger<WenxinLlmAgent>();
-            return new WenxinLlmAgent(config, logger);
+            HttpClient? httpClient = null;
+
+            if (_httpClientFactory != null)
+            {
+                httpClient = _httpClientFactory.CreateClient(nameof(WenxinLlmAgent));
+                httpClient.BaseAddress = new Uri(config.ApiBaseUrl ?? "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat");
+            }
+
+            return new WenxinLlmAgent(config, logger, httpClient);
         }
 
         /// <summary>
@@ -347,7 +377,14 @@ namespace CKY.MultiAgentFramework.Services.Factory
             await Task.CompletedTask;
 
             var logger = _loggerFactory.CreateLogger<XunfeiLlmAgent>();
-            return new XunfeiLlmAgent(config, logger);
+            HttpClient? httpClient = null;
+
+            if (_httpClientFactory != null)
+            {
+                httpClient = _httpClientFactory.CreateClient(nameof(XunfeiLlmAgent));
+            }
+
+            return new XunfeiLlmAgent(config, logger, httpClient);
         }
 
         /// <summary>
@@ -360,7 +397,15 @@ namespace CKY.MultiAgentFramework.Services.Factory
             await Task.CompletedTask;
 
             var logger = _loggerFactory.CreateLogger<BaichuanLlmAgent>();
-            return new BaichuanLlmAgent(config, logger);
+            HttpClient? httpClient = null;
+
+            if (_httpClientFactory != null)
+            {
+                httpClient = _httpClientFactory.CreateClient(nameof(BaichuanLlmAgent));
+                httpClient.BaseAddress = new Uri(config.ApiBaseUrl ?? "https://api.baichuan-ai.com/v1");
+            }
+
+            return new BaichuanLlmAgent(config, logger, httpClient);
         }
 
         /// <summary>
@@ -373,7 +418,23 @@ namespace CKY.MultiAgentFramework.Services.Factory
             await Task.CompletedTask;
 
             var logger = _loggerFactory.CreateLogger<MiniMaxLlmAgent>();
-            return new MiniMaxLlmAgent(config, logger);
+            HttpClient? httpClient = null;
+
+            if (_httpClientFactory != null)
+            {
+                httpClient = _httpClientFactory.CreateClient(nameof(MiniMaxLlmAgent));
+                httpClient.BaseAddress = new Uri(config.ApiBaseUrl ?? "https://api.minimax.chat/v1");
+            }
+
+            return new MiniMaxLlmAgent(config, logger, httpClient);
+        }
+
+        /// <summary>
+        /// 从配置获取 API Key
+        /// </summary>
+        private static string GetApiKey(LlmProviderConfig config)
+        {
+            return config.ApiKey ?? string.Empty;
         }
 
         #endregion

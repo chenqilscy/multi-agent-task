@@ -1,0 +1,45 @@
+---
+# 用例元数据模板
+# 复制此模板到每个用例文档的头部，并填写完整信息
+
+metadata:
+  # === 基本信息 ===
+  case_id: ""           # 用例唯一标识，如：SH-MORNING-001
+  journey: ""           # 用户旅程名称，如：早晨唤醒
+  journey_order: 1      # 在旅程中的顺序
+
+  # === 分类标签 ===
+  case_type: ""         # primary（主流程）| variant（变体）| exception（异常）| boundary（边界）
+  domain: ""            # smarthome | customerservice
+  complexity: ""        # L1（单Agent）| L2（多轮对话）| L3（多Agent协作）| L4（复杂编排）
+
+  # === 覆盖范围 ===
+  agents:               # 涉及的Agent列表
+    - ""
+  capabilities:         # 涉及的能力标签
+    - ""
+  coverage:
+    single-agent: false
+    multi-agent: false
+    multi-turn: false
+    error-handling: false
+
+  # === 用途标注 ===
+  demo_value: 0         # 演示价值：1-5星
+  test_priority: ""     # 测试优先级：P0（必须）| P1（重要）| P2（一般）
+  doc_importance: ""    # 文档重要性：high（必须）| medium（建议）| low（可选）
+
+  # === 执行属性 ===
+  estimated_duration_seconds: 0
+  requires_external_service: false
+  requires_hardware: false
+
+  # === 依赖关系 ===
+  depends_on: []
+  enables: []
+
+  # === 状态管理 ===
+  status: ""            # designed | implementing | testing | completed
+  assigned_to: ""
+  last_updated: ""      # YYYY-MM-DD
+---

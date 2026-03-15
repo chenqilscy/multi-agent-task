@@ -1,4 +1,6 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Diagnostics;
+using CKY.MultiAgentFramework.Core.Resilience;
 using CKY.MultiAgentFramework.Demos.CustomerService;
 using CKY.MultiAgentFramework.Demos.CustomerService.Agents;
 using CKY.MultiAgentFramework.Demos.CustomerService.Models;
@@ -6,10 +8,13 @@ using CKY.MultiAgentFramework.Demos.CustomerService.Services;
 using CKY.MultiAgentFramework.Demos.CustomerService.Services.Implementations;
 using CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 using CKY.MultiAgentFramework.Services.NLP;
+using CKY.MultiAgentFramework.Services.Resilience;
 using CKY.MultiAgentFramework.Demos.CustomerService.Components;
 using Microsoft.EntityFrameworkCore;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,6 +53,12 @@ builder.Services.AddSingleton<ITicketService, SimulatedTicketService>();
 builder.Services.AddSingleton<IKnowledgeBaseService, SimulatedKnowledgeBaseService>();
 builder.Services.AddSingleton<IUserBehaviorService, SimulatedUserBehaviorService>();
 
+// 主动服务事件驱动
+builder.Services.AddSingleton<IProactiveEventBus, InMemoryProactiveEventBus>();
+builder.Services.AddSingleton<IProactiveEventHandler, ShippingDelayEventHandler>();
+builder.Services.AddSingleton<IProactiveEventHandler, MembershipExpiringEventHandler>();
+builder.Services.AddSingleton<IProactiveEventHandler, BirthdayGreetingEventHandler>();
+
 // 会话管理（多轮对话）
 builder.Services.AddSingleton<ConversationManager>();
 
@@ -61,11 +72,55 @@ builder.Services.AddSingleton<TicketAgent>();
 builder.Services.AddSingleton<CustomerServiceMainAgent>();
 
 // ========================================
+// 降级策略注册
+// ========================================
+
+builder.Services.AddSingleton<IDegradationManager, DegradationManager>();
+builder.Services.AddSingleton<IRuleEngine, CustomerServiceRuleEngine>();
+
+// ========================================
 // Blazor 服务
 // ========================================
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// ========================================
+// OpenTelemetry Metrics + Tracing
+// ========================================
+
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics =>
+    {
+        metrics
+            .AddAspNetCoreInstrumentation()
+            .AddMeter("CKY.MAF")
+            .AddMeter("CKY.MAF.BusinessAgent")
+            .AddMeter("CKY.MultiAgentFramework")
+            .AddPrometheusExporter();
+    })
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddSource(MafActivitySource.AgentSourceName)
+            .AddSource(MafActivitySource.TaskSourceName)
+            .AddSource(MafActivitySource.LlmSourceName);
+
+        var otlpEndpoint = builder.Configuration["OpenTelemetry:OtlpEndpoint"];
+        if (!string.IsNullOrEmpty(otlpEndpoint))
+        {
+            tracing.AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri(otlpEndpoint);
+            });
+        }
+
+        if (builder.Environment.IsDevelopment())
+        {
+            tracing.AddConsoleExporter();
+        }
+    });
 
 var app = builder.Build();
 
@@ -81,5 +136,8 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// Prometheus 指标端点
+app.MapPrometheusScrapingEndpoint();
 
 app.Run();

@@ -1,8 +1,11 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Diagnostics;
 using CKY.MultiAgentFramework.Core.Models.Task;
 using CKY.MultiAgentFramework.Core.Models.LLM;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 
 namespace CKY.MultiAgentFramework.Core.Agents
 {
@@ -32,6 +35,22 @@ namespace CKY.MultiAgentFramework.Core.Agents
 
         /// <summary>LLM Agent 注册表（用于获取合适的LLM实例）</summary>
         protected readonly IMafAiAgentRegistry LlmRegistry;
+
+        #region 监控指标
+
+        private static readonly Meter BusinessAgentMeter = new("CKY.MAF.BusinessAgent", "1.0.0");
+        private static readonly Counter<long> AgentExecutionsCounter =
+            BusinessAgentMeter.CreateCounter<long>("maf_business_agent_executions_total", "invocations", "Total business agent executions");
+        private static readonly Counter<long> AgentErrorsCounter =
+            BusinessAgentMeter.CreateCounter<long>("maf_business_agent_errors_total", "errors", "Total business agent execution errors");
+        private static readonly Histogram<double> AgentDurationHistogram =
+            BusinessAgentMeter.CreateHistogram<double>("maf_business_agent_duration_seconds", "s", "Business agent execution duration");
+        private static readonly Counter<long> LlmCallsCounter =
+            BusinessAgentMeter.CreateCounter<long>("maf_business_agent_llm_calls_total", "calls", "Total LLM calls from business agents");
+        private static readonly Histogram<double> LlmCallDurationHistogram =
+            BusinessAgentMeter.CreateHistogram<double>("maf_business_agent_llm_duration_seconds", "s", "LLM call duration from business agents");
+
+        #endregion
 
         /// <summary>
         /// 构造函数
@@ -87,12 +106,33 @@ namespace CKY.MultiAgentFramework.Core.Agents
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
+            using var activity = MafActivitySource.Agent.StartActivity("business_agent.call_llm");
+            activity?.SetTag("agent.id", AgentId);
+            activity?.SetTag("agent.name", Name);
+            activity?.SetTag("llm.scenario", scenario.ToString());
+            activity?.SetTag("llm.prompt_length", prompt.Length);
+
+            var stopwatch = Stopwatch.StartNew();
+            LlmCallsCounter.Add(1, new KeyValuePair<string, object?>("agent", Name));
+
             var llmAgent = await LlmRegistry.GetBestAgentAsync(scenario, ct);
-            return await llmAgent.ExecuteAsync(
+
+            activity?.SetTag("llm.provider", llmAgent.Config.ProviderName);
+            activity?.SetTag("llm.model", llmAgent.Config.ModelId);
+
+            var result = await llmAgent.ExecuteAsync(
                 llmAgent.GetCurrentModelId(),
                 prompt,
                 systemPrompt,
                 ct);
+
+            stopwatch.Stop();
+            LlmCallDurationHistogram.Record(stopwatch.Elapsed.TotalSeconds,
+                new KeyValuePair<string, object?>("agent", Name),
+                new KeyValuePair<string, object?>("provider", llmAgent.Config.ProviderName));
+
+            activity?.SetTag("llm.response_length", result.Length);
+            return result;
         }
 
         /// <summary>

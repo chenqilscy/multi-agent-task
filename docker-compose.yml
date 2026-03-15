@@ -1,0 +1,138 @@
+# CKY.MAF 完整部署配置（应用 + 基础设施 + 可观测性）
+#
+# 启动全部服务:
+#   docker compose up -d
+#
+# 仅启动基础设施:
+#   docker compose up -d redis jaeger prometheus grafana
+#
+# 仅启动应用:
+#   docker compose up -d smarthome customerservice
+#
+# 访问地址:
+#   SmartHome Demo:       http://localhost:5001
+#   CustomerService Demo: http://localhost:5002
+#   Jaeger UI (链路追踪): http://localhost:16686
+#   Grafana (仪表盘):     http://localhost:3000  (admin/admin)
+#   Prometheus (指标):    http://localhost:9090
+
+services:
+  # ========================================
+  # 基础设施服务
+  # ========================================
+
+  redis:
+    image: redis:7-alpine
+    container_name: maf-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ========================================
+  # 可观测性基础设施
+  # ========================================
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: maf-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.40.0
+    container_name: maf-prometheus
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      smarthome:
+        condition: service_started
+      customerservice:
+        condition: service_started
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: maf-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./observability/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./observability/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - jaeger
+    restart: unless-stopped
+
+  # ========================================
+  # 应用服务
+  # ========================================
+
+  smarthome:
+    build:
+      context: ./src
+      dockerfile: Demos/SmartHome/Dockerfile
+    container_name: maf-smarthome
+    ports:
+      - "5001:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__Redis=redis:6379
+      - MafStorage__RelationalDatabase__Provider=SQLite
+      - MafStorage__RelationalDatabase__SqlitePath=/app/data/maf_smart_home.db
+      - OpenTelemetry__OtlpEndpoint=http://jaeger:4317
+    volumes:
+      - smarthome-data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    restart: unless-stopped
+
+  customerservice:
+    build:
+      context: ./src
+      dockerfile: Demos/CustomerService/Dockerfile
+    container_name: maf-customerservice
+    ports:
+      - "5002:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__Redis=redis:6379
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/customer_service.db
+      - OpenTelemetry__OtlpEndpoint=http://jaeger:4317
+    volumes:
+      - customerservice-data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  smarthome-data:
+  customerservice-data:
+  grafana-data:

@@ -28,6 +28,8 @@
     <ProjectReference Include="..\..\Services\CKY.MAF.Services.csproj" />
     <ProjectReference Include="..\..\Infrastructure\Repository\CKY.MAF.Repository.csproj" />
     <ProjectReference Include="..\..\Infrastructure\DependencyInjection\CKY.MAF.Infrastructure.DependencyInjection.csproj" />
+    <ProjectReference Include="..\..\Demos\SmartHome\CKY.MAF.Demos.SmartHome.csproj" />
+    <ProjectReference Include="..\..\Demos\CustomerService\CKY.MAF.Demos.CustomerService.csproj" />
   </ItemGroup>
 
   <!-- 添加排除模式来防止重复程序集属性 -->

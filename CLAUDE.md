@@ -11,11 +11,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Architecture Philosophy**: Dependency Inversion Principle (DIP) with 5-layer architecture
 - **Layer 5**: Demo应用层 (Blazor Server applications)
 - **Layer 4**: 业务服务层 (Task scheduling, orchestration)
-- **Layer 3**: 基础设施层 (Concrete implementations: Redis, PostgreSQL, Qdrant)
-- **Layer 2**: 存储抽象层 (Domain services: ISessionStorage, IMemoryManager, ITaskRepository)
-- **Layer 1**: 核心抽象层 (Core abstractions: ICacheStore, IVectorStore, IRelationalDatabase)
+- **Layer 3**: 基础设施层 (EF Core, Redis, Qdrant)
+- **Layer 2**: 存储抽象层 (Domain services: ISessionStorage, IMemoryManager, IRepository)
+- **Layer 1**: 核心抽象层 (Core abstractions: ICacheStore, IVectorStore, IRepository)
 
-**Critical Design Rule**: Core layer has ZERO external dependencies (except Microsoft Agent Framework). All storage implementations are in Infrastructure layer and fully replaceable.
+**Critical Design Rule**: Core layer has ZERO external dependencies (except Microsoft Agent Framework). All storage implementations are in Infrastructure layer and fully replaceable. Uses EF Core for relational database access.
 
 ## Technology Stack
 
@@ -26,14 +26,87 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Storage**:
   - L1: IMemoryCache (in-memory)
   - L2: Redis (distributed cache)
-  - L3: PostgreSQL (relational database)
+  - L3: PostgreSQL/SQLite (relational database via EF Core)
   - Vector: Qdrant (semantic search)
+  - ORM: Entity Framework Core 9.0.0
 - **Testing**: xUnit, FluentAssertions, Moq, Testcontainers
 - **LLM Integration**: MS AF native interfaces only - NO SemanticKernel, NO direct provider SDKs
   - Primary: 智谱AI (GLM-4/GLM-4-Plus)
   - Fallback: 通义千问/文心一言/讯飞星火
   - Implement custom `ILlmService` in Infrastructure layer for each provider
 - **Monitoring**: Prometheus, Grafana, distributed tracing
+
+## Quick Start Guide
+
+### 快速开始（5 分钟上手）
+
+**1. 构建项目**
+```bash
+cd src
+dotnet build CKY.MAF.slnx
+```
+
+**2. 运行单元测试**
+```bash
+dotnet test tests/UnitTests/CKY.MAF.Tests.csproj
+```
+
+**3. 应用数据库迁移**
+```bash
+# Linux/Mac
+bash scripts/migrate-apply.sh
+
+# Windows PowerShell
+powershell scripts/migrate-apply.ps1
+```
+
+**4. 使用 Repository 模式**
+```csharp
+// 在服务中注入 Repository
+public class MyService
+{
+    private readonly IMainTaskRepository _taskRepository;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public MyService(IMainTaskRepository taskRepository, IUnitOfWork unitOfWork)
+    {
+        _taskRepository = taskRepository;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<MainTask> CreateTaskAsync(string title)
+    {
+        var task = new MainTask { Title = title };
+        await _taskRepository.AddAsync(task);
+        await _unitOfWork.SaveChangesAsync();
+        return task;
+    }
+}
+```
+
+**5. 配置 LLM Agent**
+```csharp
+// 使用内置的 AddMafBuiltinServices 扩展方法
+builder.Services.AddMafBuiltinServices(builder.Configuration);
+
+// 或手动配置特定 LLM 提供商
+var config = new LlmProviderConfig
+{
+    ProviderName = "ZhipuAI",
+    ApiKey = "your-api-key",
+    ModelId = "glm-4"
+};
+builder.Services.AddSingleton<MafAiAgent, ZhipuAILlmAgent>(sp =>
+    new ZhipuAILlmAgent(config, sp.GetRequiredService<ILogger<ZhipuAILlmAgent>>()));
+```
+
+### 常见命令速查
+
+| 操作 | 命令 |
+|------|------|
+| 添加新迁移 | `dotnet ef migrations add <Name> --project src/Infrastructure/Repository/CKY.MAF.Repository.csproj --startup-project src/Services/CKY.MAF.Services.csproj --output-dir Data/Migrations` |
+| 回滚迁移 | `dotnet ef database update <TargetMigration> --project src/Infrastructure/Repository/CKY.MAF.Repository.csproj --startup-project src/Services/CKY.MAF.Services.csproj` |
+| 查看待定迁移 | `dotnet ef migrations list --project src/Infrastructure/Repository/CKY.MAF.Repository.csproj --startup-project src/Services/CKY.MAF.Services.csproj` |
 
 ## Documentation Structure
 
@@ -56,9 +129,9 @@ All design documentation is in `docs/specs/` directory (15 documents, ~384KB tot
 
 **Navigation**: See `docs/specs/README.md` for complete document index and role-based reading recommendations.
 
-## Planned Project Structure
+## Current Project Structure
 
-(From implementation roadmap - not yet created)
+(Updated for EF Core and Repository pattern)
 
 ```
 CKY.MAF/
@@ -68,9 +141,11 @@ CKY.MAF/
 │       ├── Interfaces/
 │       │   ├── ICacheStore.cs                 # Cache storage abstraction
 │       │   ├── IVectorStore.cs                # Vector storage abstraction
-│       │   └── IRelationalDatabase.cs         # Database abstraction
+│       │   ├── IMainTaskRepository.cs          # Repository interfaces
+│       │   ├── ISubTaskRepository.cs
+│       │   └── IUnitOfWork.cs                 # Unit of Work pattern
 │       └── Models/
-│           ├── MainTask.cs
+│           ├── MainTask.cs                    # EF Core entities
 │           ├── SubTask.cs
 │           └── MafAgentBase.cs : AIAgent
 │
@@ -84,16 +159,27 @@ CKY.MAF/
 │   └── Orchestration/
 │       └── MafTaskOrchestrator.cs
 │
-├── Infrastructure/
-│   ├── Caching/
-│   │   ├── RedisCacheStore.cs : ICacheStore   # Layer 3
-│   │   └── MemoryCacheStore.cs : ICacheStore  # Testing
-│   ├── Relational/
-│   │   ├── PostgreSqlDatabase.cs : IRelationalDatabase
-│   │   └── InMemoryDatabase.cs : IRelationalDatabase
-│   └── Vectorization/
-│       ├── QdrantVectorStore.cs : IVectorStore
-│       └── MemoryVectorStore.cs : IVectorStore
+├── Infrastructure/Repository/
+│   ├── CKY.MAF.Repository.csproj              # EF Core data access (Layer 3)
+│   ├── Data/
+│   │   ├── MafDbContext.cs                    # EF Core DbContext
+│   │   ├── MafDbContextFactory.cs             # Design-time factory
+│   │   ├── EntityTypeConfigurations/         # EF Core configurations
+│   │   └── Migrations/                        # EF Core migrations
+│   ├── Repositories/
+│   │   ├── MainTaskRepository.cs              # Repository implementations
+│   │   ├── SubTaskRepository.cs
+│   │   └── UnitOfWork.cs                      # Unit of Work implementation
+│   └── Relational/
+│       └── EfCoreRelationalDatabase.cs        # EF Core implementation
+│
+├── Infrastructure/Caching/
+│   ├── RedisCacheStore.cs : ICacheStore       # Layer 3
+│   └── MemoryCacheStore.cs : ICacheStore      # Testing
+│
+├── Infrastructure/Vectorization/
+│   ├── QdrantVectorStore.cs : IVectorStore
+│   └── MemoryVectorStore.cs : IVectorStore
 │
 └── Demos/
     └── SmartHome/
@@ -101,8 +187,6 @@ CKY.MAF/
 ```
 
 ## Build and Test Commands
-
-(To be implemented - from roadmap)
 
 ```bash
 # Build entire solution
@@ -117,6 +201,12 @@ dotnet test CKY.MAF.Tests.Unit
 # Run with coverage
 dotnet test --collect:"XPlat Code Coverage"
 
+# EF Core Migrations
+dotnet ef migrations add <MigrationName> --project src/Infrastructure/Repository/CKY.MAF.Repository.csproj --startup-project src/Services/CKY.MAF.Services.csproj --output-dir Data/Migrations
+
+# Apply EF Core migrations
+dotnet ef database update --project src/Infrastructure/Repository/CKY.MAF.Repository.csproj --startup-project src/Services/CKY.MAF.Services.csproj
+
 # Run specific test
 dotnet test --filter "FullyQualifiedName~MafTaskSchedulerTests"
 
@@ -130,13 +220,19 @@ dotnet run --project CKY.MAF.Demos.SmartHome
 ## Key Design Patterns
 
 ### 1. Dependency Injection Pattern
-All Services layer components depend on abstractions (ICacheStore, IVectorStore, IRelationalDatabase), NOT concrete implementations. Concrete implementations are registered at startup:
+All Services layer components depend on abstractions (ICacheStore, IVectorStore, IMainTaskRepository, IUnitOfWork), NOT concrete implementations. Concrete implementations are registered at startup:
 
 ```csharp
 // Program.cs (Demo application)
 services.AddSingleton<ICacheStore, RedisCacheStore>();
-services.AddSingleton<IRelationalDatabase, PostgreSqlDatabase>();
 services.AddSingleton<IVectorStore, QdrantVectorStore>();
+
+// EF Core DbContext and Repository pattern
+services.AddDbContext<MafDbContext>(options =>
+    options.UseSqlite("Data Source=maf.db"));
+services.AddScoped<IUnitOfWork, UnitOfWork>();
+services.AddScoped<IMainTaskRepository, MainTaskRepository>();
+services.AddScoped<ISubTaskRepository, SubTaskRepository>();
 ```
 
 ### 2. Main-Agent/Sub-Agent Pattern
@@ -464,9 +560,32 @@ However, **code identifiers** use English naming conventions (PascalCase for typ
 
 ## Current Project Status
 
-**Phase**: Design/Architecture Complete (15 documents, ~384KB)
-**Implementation**: Not started yet
-**Next Steps**: See `11-implementation-roadmap.md` for 6-phase implementation plan (36 days estimated)
+**Last Updated**: 2026-03-15
+
+**Completed Features**:
+- ✅ Core 抽象层（领域模型、接口定义）
+- ✅ Repository 模式实现（EF Core + SQLite/PostgreSQL）
+- ✅ 基础设施层（Redis 缓存、向量存储）
+- ✅ 业务服务层（任务调度、意图识别）
+- ✅ EF Core 数据库迁移支持
+- ✅ 5 大 LLM 提供商 Agent 实现（智谱AI、通义千问、文心一言、讯飞星火、MiniMax）
+- ✅ 压缩上下文统计信息收集
+
+**In Progress**:
+- 🔄 Demo 项目更新（使用新的 Repository 模式）
+- 🔄 集成测试完善
+
+**TODO**:
+- ⏳ PostgreSQL 生产环境配置优化
+- ⏳ Qdrant 向量存储 API 调整
+- ⏳ LLM Agent 的 HttpClient 支持（LlmAgentFactory）
+
+**Key Components**:
+- `Core/CKY.MAF.Core.csproj` - 核心抽象层
+- `Infrastructure/Repository/CKY.MAF.Repository.csproj` - EF Core 数据访问
+- `Infrastructure/Caching/CKY.MAF.Infrastructure.Caching.csproj` - Redis 缓存
+- `Infrastructure/Vectorization/CKY.MAF.Infrastructure.Vectorization.csproj` - 向量存储
+- `Services/CKY.MAF.Services.csproj` - 业务服务层
 
 ## Resources
 

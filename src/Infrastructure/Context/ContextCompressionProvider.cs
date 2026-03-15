@@ -34,6 +34,12 @@ namespace CKY.MultiAgentFramework.Infrastructure.Context
         private readonly ContextCompressionOptions _options;
         private readonly ILLMCompressionService? _compressionService;
 
+        // 统计信息跟踪字段
+        private int _totalCompressions = 0;
+        private double _totalCompressionRatio = 0.0;
+        private DateTime _lastCompressionTime = DateTime.MinValue;
+        private readonly object _statsLock = new();
+
         /// <summary>
         /// 构造函数（无 LLM 压缩服务）
         /// </summary>
@@ -81,14 +87,16 @@ namespace CKY.MultiAgentFramework.Infrastructure.Context
                     _options.MaxTokens);
 
                 // 执行压缩
-                var compressedContext = await CompressContextAsync(currentContext, cancellationToken);
+                var compressedContext = await CompressContextAsync(currentContext, currentTokenCount, cancellationToken);
 
                 var newTokenCount = EstimateTokenCount(compressedContext);
+                var reductionRatio = 100.0 * (currentTokenCount - newTokenCount) / currentTokenCount;
+
                 _logger.LogInformation(
                     "[ContextCompression] 压缩完成：{OldCount} -> {NewCount} tokens (减少 {Reduction}%)",
                     currentTokenCount,
                     newTokenCount,
-                    100 * (currentTokenCount - newTokenCount) / currentTokenCount);
+                    reductionRatio);
 
                 return compressedContext;
             }
@@ -112,10 +120,10 @@ namespace CKY.MultiAgentFramework.Infrastructure.Context
         /// <summary>
         /// 压缩上下文
         /// </summary>
-        private async Task<AIContext> CompressContextAsync(AIContext context, CancellationToken ct)
+        private async Task<AIContext> CompressContextAsync(AIContext context, int originalTokenCount, CancellationToken ct)
         {
             var messages = context.Messages.ToList();
-            var totalTokens = EstimateTokenCount(context);
+            var totalTokens = originalTokenCount;
 
             // 根据超过程度决定压缩策略
             var excessRatio = (double)totalTokens / _options.MaxTokens;
@@ -123,17 +131,17 @@ namespace CKY.MultiAgentFramework.Infrastructure.Context
             if (excessRatio <= 1.5)
             {
                 // Level 2: 压缩最旧的 50%
-                return await CompressOldestMessagesAsync(context, 0.5, ct);
+                return await CompressOldestMessagesAsync(context, 0.5, totalTokens, ct);
             }
             else if (excessRatio <= 2.0)
             {
                 // Level 3: 压缩最旧的 70%
-                return await CompressOldestMessagesAsync(context, 0.7, ct);
+                return await CompressOldestMessagesAsync(context, 0.7, totalTokens, ct);
             }
             else
             {
                 // Level 4: 压缩最旧的 90%
-                return await CompressOldestMessagesAsync(context, 0.9, ct);
+                return await CompressOldestMessagesAsync(context, 0.9, totalTokens, ct);
             }
         }
 
@@ -143,6 +151,7 @@ namespace CKY.MultiAgentFramework.Infrastructure.Context
         private async Task<AIContext> CompressOldestMessagesAsync(
             AIContext context,
             double compressionRatio,
+            int originalTokenCount,
             CancellationToken ct)
         {
             var messages = context.Messages.ToList();
@@ -185,7 +194,19 @@ namespace CKY.MultiAgentFramework.Infrastructure.Context
             newMessages.AddRange(toKeep);
 
             // 返回新的上下文
-            return context with { Messages = newMessages };
+            var newContext = context with { Messages = newMessages };
+
+            // 更新统计信息
+            lock (_statsLock)
+            {
+                _totalCompressions++;
+                var newTokenCount = EstimateTokenCount(newContext);
+                var compressionRatio = (double)(originalTokenCount - newTokenCount) / originalTokenCount;
+                _totalCompressionRatio = ((_totalCompressionRatio * (_totalCompressions - 1)) + compressionRatio) / _totalCompressions;
+                _lastCompressionTime = DateTime.UtcNow;
+            }
+
+            return newContext;
         }
 
         /// <summary>
@@ -242,13 +263,15 @@ namespace CKY.MultiAgentFramework.Infrastructure.Context
         /// </summary>
         public CompressionStats GetStats()
         {
-            // 统计信息收集功能待实现（需要在 CompressAndStoreAsync 中增加计数器）
-            return new CompressionStats
+            lock (_statsLock)
             {
-                TotalCompressions = 0,
-                AverageCompressionRatio = 0.0,
-                LastCompressionTime = DateTime.MinValue
-            };
+                return new CompressionStats
+                {
+                    TotalCompressions = _totalCompressions,
+                    AverageCompressionRatio = _totalCompressionRatio,
+                    LastCompressionTime = _lastCompressionTime
+                };
+            }
         }
     }
 }

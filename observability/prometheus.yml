@@ -1,0 +1,23 @@
+# Prometheus 配置 - CKY.MAF 指标采集
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # SmartHome Demo 应用（Docker Compose 内部网络）
+  - job_name: 'maf-smarthome'
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['smarthome:8080']
+        labels:
+          app: 'smarthome'
+
+  # CustomerService Demo 应用（Docker Compose 内部网络）
+  - job_name: 'maf-customerservice'
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['customerservice:8080']
+        labels:
+          app: 'customerservice'

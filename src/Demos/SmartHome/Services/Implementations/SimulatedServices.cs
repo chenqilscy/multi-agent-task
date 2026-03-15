@@ -4,10 +4,67 @@ using Microsoft.Extensions.Logging;
 namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
 {
     /// <summary>
-    /// 照明服务简单实现（模拟）
-    /// 实际生产中应替换为与具体硬件平台（如小米、Tuya）的集成
+    /// 故障注入接口 - 用于测试和演示故障场景
     /// </summary>
-    public class SimulatedLightingService : ILightingService
+    public interface IFaultInjectable
+    {
+        /// <summary>注入故障（设置为 true 后，后续调用将抛出异常）</summary>
+        void InjectFault(string faultType, string? message = null);
+
+        /// <summary>清除所有注入的故障</summary>
+        void ClearFaults();
+    }
+
+    /// <summary>
+    /// 故障注入基类，封装通用故障注入逻辑
+    /// </summary>
+    public abstract class FaultInjectableServiceBase : IFaultInjectable
+    {
+        private readonly Dictionary<string, string> _faults = new(StringComparer.OrdinalIgnoreCase);
+
+        public void InjectFault(string faultType, string? message = null)
+        {
+            _faults[faultType] = message ?? $"Injected fault: {faultType}";
+        }
+
+        public void ClearFaults()
+        {
+            _faults.Clear();
+        }
+
+        /// <summary>如果有对应类型的故障注入，则抛出异常</summary>
+        protected void ThrowIfFaultInjected(string faultType)
+        {
+            if (_faults.TryGetValue(faultType, out var message))
+                throw new InvalidOperationException(message);
+        }
+
+        /// <summary>如果有任何故障注入，则抛出异常</summary>
+        protected void ThrowIfAnyFaultInjected()
+        {
+            if (_faults.Count > 0)
+            {
+                var first = _faults.First();
+                throw new InvalidOperationException(first.Value);
+            }
+        }
+
+        /// <summary>检查指定类型的故障是否已注入</summary>
+        protected bool HasFault(string faultType) => _faults.ContainsKey(faultType);
+
+        /// <summary>模拟超时延迟</summary>
+        protected async Task SimulateTimeoutIfInjectedAsync(string faultType, CancellationToken ct)
+        {
+            if (_faults.TryGetValue(faultType, out _))
+                throw new TimeoutException($"Service timeout: {faultType}");
+        }
+    }
+
+    /// <summary>
+    /// 照明服务简单实现（模拟）
+    /// 支持故障注入：device_offline, device_failure
+    /// </summary>
+    public class SimulatedLightingService : FaultInjectableServiceBase, ILightingService
     {
         private readonly ILogger<SimulatedLightingService> _logger;
         private readonly Dictionary<string, (bool IsOn, int Brightness, string Color)> _state = new();
@@ -19,6 +76,8 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
 
         public Task TurnOnAsync(string room, CancellationToken ct = default)
         {
+            ThrowIfFaultInjected("device_offline");
+            ThrowIfFaultInjected("device_failure");
             _logger.LogInformation("Turning on light in {Room}", room);
             _state[room] = (true, 100, "#FFFFFF");
             return Task.CompletedTask;
@@ -26,6 +85,8 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
 
         public Task TurnOffAsync(string room, CancellationToken ct = default)
         {
+            ThrowIfFaultInjected("device_offline");
+            ThrowIfFaultInjected("device_failure");
             _logger.LogInformation("Turning off light in {Room}", room);
             _state[room] = (false, 0, "#000000");
             return Task.CompletedTask;
@@ -33,6 +94,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
 
         public Task SetBrightnessAsync(string room, int brightness, CancellationToken ct = default)
         {
+            ThrowIfFaultInjected("device_offline");
             _logger.LogInformation("Setting brightness in {Room} to {Brightness}%", room, brightness);
             var current = _state.GetValueOrDefault(room, (true, 100, "#FFFFFF"));
             _state[room] = (current.Item1, brightness, current.Item3);
@@ -41,6 +103,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
 
         public Task SetColorAsync(string room, string colorHex, CancellationToken ct = default)
         {
+            ThrowIfFaultInjected("device_offline");
             _logger.LogInformation("Setting color in {Room} to {Color}", room, colorHex);
             var current = _state.GetValueOrDefault(room, (true, 100, "#FFFFFF"));
             _state[room] = (current.Item1, current.Item2, colorHex);
@@ -50,11 +113,13 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
 
     /// <summary>
     /// 气候控制服务简单实现（模拟）
+    /// 支持故障注入：device_offline, device_failure
     /// </summary>
-    public class SimulatedClimateService : IClimateService
+    public class SimulatedClimateService : FaultInjectableServiceBase, IClimateService
     {
         private readonly ILogger<SimulatedClimateService> _logger;
         private readonly Dictionary<string, (int Temperature, string Mode)> _state = new();
+        private bool _gasValveOpen = true;
 
         public SimulatedClimateService(ILogger<SimulatedClimateService> logger)
         {
@@ -63,6 +128,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
 
         public Task SetTemperatureAsync(string room, int temperature, CancellationToken ct = default)
         {
+            ThrowIfFaultInjected("device_offline");
             _logger.LogInformation("Setting temperature in {Room} to {Temperature}°C", room, temperature);
             var current = _state.GetValueOrDefault(room, (26, "auto"));
             _state[room] = (temperature, current.Item2);
@@ -71,6 +137,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
 
         public Task SetModeAsync(string room, string mode, CancellationToken ct = default)
         {
+            ThrowIfFaultInjected("device_offline");
             _logger.LogInformation("Setting climate mode in {Room} to {Mode}", room, mode);
             var current = _state.GetValueOrDefault(room, (26, "auto"));
             _state[room] = (current.Item1, mode);
@@ -79,16 +146,38 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
 
         public Task<int> GetCurrentTemperatureAsync(string room, CancellationToken ct = default)
         {
+            ThrowIfFaultInjected("device_offline");
             var temp = _state.GetValueOrDefault(room, (26, "auto")).Item1;
             return Task.FromResult(temp);
+        }
+
+        public Task<bool> CloseGasValveAsync(CancellationToken ct = default)
+        {
+            ThrowIfFaultInjected("device_failure");
+            _logger.LogWarning("EMERGENCY: Closing gas valve!");
+            _gasValveOpen = false;
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> OpenGasValveAsync(CancellationToken ct = default)
+        {
+            ThrowIfFaultInjected("device_failure");
+            _logger.LogInformation("Opening gas valve");
+            _gasValveOpen = true;
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> IsGasValveOpenAsync(CancellationToken ct = default)
+        {
+            return Task.FromResult(_gasValveOpen);
         }
     }
 
     /// <summary>
     /// 天气服务模拟实现（案例1：天气查询）
-    /// 生产环境应替换为真实天气 API（如高德、和风天气）
+    /// 支持故障注入：service_unavailable, timeout
     /// </summary>
-    public class SimulatedWeatherService : IWeatherService
+    public class SimulatedWeatherService : FaultInjectableServiceBase, IWeatherService
     {
         private static readonly Random _rng = new(42);
 
@@ -103,6 +192,8 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
 
         public Task<WeatherInfo> GetWeatherAsync(string city, DateOnly date, CancellationToken ct = default)
         {
+            ThrowIfFaultInjected("service_unavailable");
+            ThrowIfFaultInjected("timeout");
             var conditions = _cityConditions.GetValueOrDefault(city, ["晴", "多云", "阴"]);
             var condition = conditions[_rng.Next(conditions.Length)];
             var baseTemp = city switch
@@ -195,6 +286,115 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
                 Humidity = Math.Round(50.0 + _rng.NextDouble() * 20.0, 1),
             };
             return Task.FromResult(record);
+        }
+    }
+
+    /// <summary>
+    /// 安防服务模拟实现
+    /// 支持故障注入：device_offline, device_failure
+    /// </summary>
+    public class SimulatedSecurityService : FaultInjectableServiceBase, ISecurityService
+    {
+        private readonly ILogger<SimulatedSecurityService> _logger;
+        private readonly Dictionary<string, DoorLockStatus> _doorLocks = new();
+        private readonly Dictionary<string, CameraStatus> _cameras = new();
+        private readonly List<SecurityAlert> _alerts = new();
+        private bool _awayMode;
+        private bool _presenceSimulation;
+
+        public SimulatedSecurityService(ILogger<SimulatedSecurityService> logger)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+            // 初始化默认门锁
+            _doorLocks["大门"] = new DoorLockStatus { Location = "大门", IsLocked = true, LastChanged = DateTime.Now };
+
+            // 初始化默认摄像头
+            _cameras["门口"] = new CameraStatus { Location = "门口", IsActive = false, HasMotionDetection = true };
+            _cameras["客厅"] = new CameraStatus { Location = "客厅", IsActive = false, HasMotionDetection = true };
+            _cameras["车库"] = new CameraStatus { Location = "车库", IsActive = false, HasMotionDetection = false };
+        }
+
+        public Task<bool> LockDoorAsync(string location = "大门", CancellationToken ct = default)
+        {
+            ThrowIfFaultInjected("device_offline");
+            _logger.LogInformation("Locking door at {Location}", location);
+            _doorLocks[location] = new DoorLockStatus { Location = location, IsLocked = true, LastChanged = DateTime.Now };
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> UnlockDoorAsync(string location = "大门", CancellationToken ct = default)
+        {
+            ThrowIfFaultInjected("device_offline");
+            _logger.LogInformation("Unlocking door at {Location}", location);
+            _doorLocks[location] = new DoorLockStatus { Location = location, IsLocked = false, LastChanged = DateTime.Now };
+            return Task.FromResult(true);
+        }
+
+        public Task<DoorLockStatus> GetDoorLockStatusAsync(string location = "大门", CancellationToken ct = default)
+        {
+            var status = _doorLocks.GetValueOrDefault(location,
+                new DoorLockStatus { Location = location, IsLocked = false, LastChanged = DateTime.Now });
+            return Task.FromResult(status);
+        }
+
+        public Task<bool> SetCameraActiveAsync(string location, bool active, CancellationToken ct = default)
+        {
+            ThrowIfFaultInjected("device_offline");
+            _logger.LogInformation("Setting camera at {Location} to {Active}", location, active ? "active" : "inactive");
+            if (_cameras.TryGetValue(location, out var camera))
+            {
+                camera.IsActive = active;
+                return Task.FromResult(true);
+            }
+            return Task.FromResult(false);
+        }
+
+        public Task<List<CameraStatus>> GetCameraStatusListAsync(CancellationToken ct = default)
+        {
+            return Task.FromResult(_cameras.Values.ToList());
+        }
+
+        public Task<bool> EnableAwayModeAsync(CancellationToken ct = default)
+        {
+            ThrowIfFaultInjected("device_failure");
+            _logger.LogInformation("Enabling away mode: locking doors, activating cameras");
+            _awayMode = true;
+            foreach (var door in _doorLocks.Values)
+                door.IsLocked = true;
+            foreach (var camera in _cameras.Values)
+                camera.IsActive = true;
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> DisableAwayModeAsync(CancellationToken ct = default)
+        {
+            _logger.LogInformation("Disabling away mode");
+            _awayMode = false;
+            foreach (var camera in _cameras.Values)
+                camera.IsActive = false;
+            return Task.FromResult(true);
+        }
+
+        public Task<List<SecurityAlert>> GetRecentAlertsAsync(int count = 10, CancellationToken ct = default)
+        {
+            var recent = _alerts.OrderByDescending(a => a.Timestamp).Take(count).ToList();
+            return Task.FromResult(recent);
+        }
+
+        public Task<bool> EnablePresenceSimulationAsync(CancellationToken ct = default)
+        {
+            ThrowIfFaultInjected("device_failure");
+            _logger.LogInformation("Enabling presence simulation (random light switching)");
+            _presenceSimulation = true;
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> DisablePresenceSimulationAsync(CancellationToken ct = default)
+        {
+            _logger.LogInformation("Disabling presence simulation");
+            _presenceSimulation = false;
+            return Task.FromResult(true);
         }
     }
 }

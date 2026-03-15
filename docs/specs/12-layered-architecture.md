@@ -1,11 +1,13 @@
 # CKY.MAF 分层依赖架构设计
 
-> **文档版本**: v2.2
+> **文档版本**: v2.3
 > **创建日期**: 2026-03-13
-> **最后更新**: 2026-03-14
+> **最后更新**: 2026-03-15
 > **设计原则**: 依赖倒置原则（DIP）+ 接口隔离原则（ISP）
 > **重要更新**:
-> - ✅ 实现Repository层（EfCore、Redis、MemoryVector）
+> - ✅ 完全迁移至 EF Core（移除 Dapper）
+> - ✅ 实现Repository模式（IRepository、UnitOfWork）
+> - ✅ 添加数据库迁移支持（EF Core Migrations）
 > - ✅ 统一Agent架构（MafAgentBase纯业务基类，不继承AIAgent）
 > - ✅ MafAiAgent继承AIAgent，通过IMafAiAgentRegistry组合调用
 
@@ -87,8 +89,8 @@
 │                                                             │
 │  外部依赖：                                                  │
 │  - StackExchange.Redis 2.11.8                               │
-│  - Microsoft.Data.Sqlite 9.0.0                              │
-│  - Dapper 2.1.72                                            │
+│  - Microsoft.EntityFrameworkCore.Sqlite 9.0.0                │
+│  - Microsoft.EntityFrameworkCore.Design 9.0.0               │
 │                                                             │
 │  依赖：Core (实现抽象接口)                                   │
 └─────────────────────────────────────────────────────────────┘
@@ -486,9 +488,10 @@ namespace CKY.MultiAgentFramework.Core.Abstractions.Interfaces
 ```
 
 **可选实现**：
-- `PostgreSqlDatabase` - 使用 Npgsql + Dapper
-- `MySqlDatabase` - 使用 MySqlConnector + Dapper
-- `InMemoryDatabase` - 内存数据库（测试用）
+- `EfCoreRelationalDatabase` - 使用 EF Core + SQLite（开发/测试）
+- `PostgreSqlDatabase` - 使用 EF Core + Npgsql（生产环境，待实现）
+- `MySqlDatabase` - 使用 EF Core + MySqlConnector（生产环境，待实现）
+- `InMemoryDatabase` - EF Core 内存数据库（测试用）
 
 ---
 
@@ -546,7 +549,7 @@ namespace CKY.MultiAgentFramework.Infrastructure.Caching
 
 ---
 
-### Infrastructure.Relational - PostgreSQL 实现
+### Infrastructure.Relational - PostgreSQL 实现（待实现）
 
 **项目文件**：`CKY.MAF.Infrastructure.Relational.PostgreSql.csproj`
 
@@ -554,8 +557,8 @@ namespace CKY.MultiAgentFramework.Infrastructure.Caching
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\Core\CKY.MAF.Core.csproj" />
-    <PackageReference Include="Npgsql" Version="8.0.3" />
-    <PackageReference Include="Dapper" Version="2.1.35" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0" />
   </ItemGroup>
 </Project>
 ```

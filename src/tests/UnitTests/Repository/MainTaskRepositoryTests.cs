@@ -125,7 +125,7 @@ public class MainTaskRepositoryTests : RepositoryTestBase
         await _repository.AddAsync(lowPriorityTask);
 
         // Act
-        var result = await _repository.GetHighPriorityTasksAsync(50);
+        var result = await _repository.GetHighPriorityTasksAsync((int)TaskPriority.High);
 
         // Assert
         result.Should().HaveCount(1);
@@ -206,7 +206,7 @@ public class MainTaskRepositoryTests : RepositoryTestBase
         await _repository.AddAsync(task2);
 
         // Act
-        var result = await _repository.GetHighPriorityTasksAsync(50);
+        var result = await _repository.GetHighPriorityTasksAsync((int)TaskPriority.High);
 
         // Assert
         result.Should().HaveCount(2);

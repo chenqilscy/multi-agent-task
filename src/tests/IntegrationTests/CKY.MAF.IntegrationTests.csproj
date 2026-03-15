@@ -12,6 +12,7 @@
     <PackageReference Include="FluentAssertions" Version="8.8.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
     <!-- Testcontainers for integration testing -->
@@ -28,6 +29,7 @@
     <ProjectReference Include="..\..\Services\CKY.MAF.Services.csproj" />
     <ProjectReference Include="..\..\Infrastructure\Repository\CKY.MAF.Repository.csproj" />
     <ProjectReference Include="..\..\Infrastructure\Caching\CKY.MAF.Infrastructure.Caching.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\Vectorization\CKY.MAF.Infrastructure.Vectorization.csproj" />
     <ProjectReference Include="..\..\Infrastructure\DependencyInjection\CKY.MAF.Infrastructure.DependencyInjection.csproj" />
   </ItemGroup>
 

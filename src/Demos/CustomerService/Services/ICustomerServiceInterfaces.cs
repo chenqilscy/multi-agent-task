@@ -240,4 +240,64 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Services
         /// <summary>获取用户常用的默认实体值（用于自动填充）</summary>
         Task<Dictionary<string, string>> GetDefaultEntitiesAsync(string userId, CancellationToken ct = default);
     }
+
+    // ============================
+    // 主动服务事件驱动模型和接口
+    // ============================
+
+    /// <summary>主动服务事件类型</summary>
+    public enum ProactiveEventType
+    {
+        /// <summary>发货延迟通知</summary>
+        ShippingDelay,
+        /// <summary>促销活动推荐</summary>
+        PromotionRecommendation,
+        /// <summary>会员权益到期提醒</summary>
+        MembershipExpiring,
+        /// <summary>生日祝福和优惠券</summary>
+        BirthdayGreeting,
+        /// <summary>工单处理完成通知</summary>
+        TicketResolved,
+    }
+
+    /// <summary>主动服务事件</summary>
+    public class ProactiveEvent
+    {
+        public string EventId { get; set; } = Guid.NewGuid().ToString("N")[..8];
+        public ProactiveEventType EventType { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public Dictionary<string, object> Data { get; set; } = new();
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public bool IsHandled { get; set; }
+    }
+
+    /// <summary>
+    /// 主动服务事件处理器接口
+    /// </summary>
+    public interface IProactiveEventHandler
+    {
+        /// <summary>该处理器支持的事件类型</summary>
+        ProactiveEventType EventType { get; }
+
+        /// <summary>处理事件并生成通知消息</summary>
+        Task<string> HandleEventAsync(ProactiveEvent proactiveEvent, CancellationToken ct = default);
+    }
+
+    /// <summary>
+    /// 主动服务事件总线接口
+    /// 负责事件的发布和订阅
+    /// </summary>
+    public interface IProactiveEventBus
+    {
+        /// <summary>发布事件</summary>
+        Task PublishAsync(ProactiveEvent proactiveEvent, CancellationToken ct = default);
+
+        /// <summary>注册事件处理器</summary>
+        void RegisterHandler(IProactiveEventHandler handler);
+
+        /// <summary>获取用户的未处理事件</summary>
+        Task<List<ProactiveEvent>> GetPendingEventsAsync(string userId, CancellationToken ct = default);
+    }
 }

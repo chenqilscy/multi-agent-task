@@ -3,10 +3,46 @@ using Microsoft.Extensions.Logging;
 namespace CKY.MultiAgentFramework.Demos.CustomerService.Services.Implementations
 {
     /// <summary>
-    /// 订单服务模拟实现
-    /// 生产环境应替换为真实订单系统的适配器
+    /// 故障注入接口 - 用于测试和演示故障场景
     /// </summary>
-    public class SimulatedOrderService : IOrderService
+    public interface IFaultInjectable
+    {
+        /// <summary>注入故障</summary>
+        void InjectFault(string faultType, string? message = null);
+
+        /// <summary>清除所有故障</summary>
+        void ClearFaults();
+    }
+
+    /// <summary>
+    /// 故障注入基类
+    /// </summary>
+    public abstract class FaultInjectableServiceBase : IFaultInjectable
+    {
+        private readonly Dictionary<string, string> _faults = new(StringComparer.OrdinalIgnoreCase);
+
+        public void InjectFault(string faultType, string? message = null)
+        {
+            _faults[faultType] = message ?? $"Injected fault: {faultType}";
+        }
+
+        public void ClearFaults()
+        {
+            _faults.Clear();
+        }
+
+        protected void ThrowIfFaultInjected(string faultType)
+        {
+            if (_faults.TryGetValue(faultType, out var message))
+                throw new InvalidOperationException(message);
+        }
+    }
+
+    /// <summary>
+    /// 订单服务模拟实现
+    /// 支持故障注入：timeout, service_unavailable
+    /// </summary>
+    public class SimulatedOrderService : FaultInjectableServiceBase, IOrderService
     {
         private readonly ILogger<SimulatedOrderService> _logger;
 
@@ -48,6 +84,8 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Services.Implementations
 
         public Task<OrderInfo?> GetOrderAsync(string orderId, CancellationToken ct = default)
         {
+            ThrowIfFaultInjected("timeout");
+            ThrowIfFaultInjected("service_unavailable");
             _logger.LogInformation("Fetching order {OrderId}", orderId);
             _orders.TryGetValue(orderId, out var order);
             return Task.FromResult(order);

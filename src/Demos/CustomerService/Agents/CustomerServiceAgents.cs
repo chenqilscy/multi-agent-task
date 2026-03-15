@@ -360,6 +360,7 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
             // 创建工单
             var title = ExtractTitle(userInput);
             var category = DetectCategory(userInput);
+            var priority = DetectPriority(userInput, request.Parameters);
             var userId2 = request.Parameters.TryGetValue("userId", out var uid2)
                 ? uid2?.ToString() ?? "anonymous"
                 : "anonymous";
@@ -370,15 +371,22 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
                 Title = title,
                 Description = userInput,
                 Category = category,
-                Priority = "normal",
+                Priority = priority,
             }, ct);
+
+            var priorityLabel = priority switch
+            {
+                "urgent" => "🔴 紧急",
+                "high" => "🟠 高",
+                _ => "🟢 普通",
+            };
 
             return new MafTaskResponse
             {
                 TaskId = request.TaskId,
                 Success = true,
-                Result = $"✅ 工单已创建成功\n• 工单编号：{ticketId}\n• 类别：{category}\n• 我们会在24小时内处理您的工单，请耐心等待。",
-                Data = new { TicketId = ticketId },
+                Result = $"✅ 工单已创建成功\n• 工单编号：{ticketId}\n• 类别：{category}\n• 优先级：{priorityLabel}\n• 我们会在{(priority == "urgent" ? "2小时" : "24小时")}内处理您的工单，请耐心等待。",
+                Data = new { TicketId = ticketId, Priority = priority },
             };
         }
 
@@ -393,5 +401,27 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
             : input.Contains("退款") || input.Contains("退货") ? "refund"
             : input.Contains("产品") || input.Contains("质量") ? "product"
             : "other";
+
+        /// <summary>
+        /// 检测工单优先级，支持关键词和情绪升级
+        /// </summary>
+        internal static string DetectPriority(string input, Dictionary<string, object> parameters)
+        {
+            // 情绪升级（由 MainAgent 传入）
+            if (parameters.TryGetValue("emotionEscalation", out var esc) && esc?.ToString() == "true")
+                return "urgent";
+
+            // 紧急关键词
+            if (input.Contains("紧急") || input.Contains("马上") || input.Contains("立刻")
+                || input.Contains("尽快") || input.Contains("急") || input.Contains("被盗")
+                || input.Contains("安全") || input.Contains("账号异常"))
+                return "urgent";
+
+            // 高优先级关键词
+            if (input.Contains("重要") || input.Contains("严重") || input.Contains("影响很大"))
+                return "high";
+
+            return "normal";
+        }
     }
 }

@@ -1,4 +1,5 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Diagnostics;
 using CKY.MultiAgentFramework.Core.Models.LLM;
 using CKY.MultiAgentFramework.Core.Models.Session;
 using Microsoft.Agents.AI;
@@ -183,6 +184,12 @@ namespace CKY.MultiAgentFramework.Core.Agents
             AgentRunOptions? options = null,
             CancellationToken cancellationToken = default)
         {
+            using var agentActivity = MafActivitySource.Agent.StartActivity("agent.run", ActivityKind.Internal);
+            agentActivity?.SetTag("agent.id", AgentId);
+            agentActivity?.SetTag("agent.name", AgentName);
+            agentActivity?.SetTag("agent.provider", Config.ProviderName);
+            agentActivity?.SetTag("agent.model", Config.ModelId);
+
             var stopwatch = Stopwatch.StartNew();
             var agentSuccess = false;
 
@@ -202,6 +209,8 @@ namespace CKY.MultiAgentFramework.Core.Agents
                 // 提取用户消息文本
                 var prompt = userMessage.Text ?? string.Empty;
 
+                agentActivity?.SetTag("agent.prompt_length", prompt.Length);
+
                 // 会话状态管理（使用 MafAgentSession）
                 MafAgentSession? mafAgentSession = null;
                 if (session is MafAgentSession mafSession)
@@ -220,32 +229,52 @@ namespace CKY.MultiAgentFramework.Core.Agents
                         // 新会话，生成会话 ID
                         mafAgentSession.MafSession.SessionId = Guid.NewGuid().ToString();
                     }
+
+                    agentActivity?.SetTag("session.id", mafAgentSession.MafSession.SessionId);
+                    agentActivity?.SetTag("session.turn", mafAgentSession.MafSession.TurnCount);
                 }
 
                 // LLM API 调用监控
-                var llmStopwatch = Stopwatch.StartNew();
                 string responseText;
 
-                try
+                using (var llmActivity = MafActivitySource.Llm.StartActivity("llm.call", ActivityKind.Client))
                 {
-                    // 调用子类实现的 ExecuteAsync 方法
-                    responseText = await ExecuteAsync(
-                        Config.ModelId,
-                        prompt,
-                        systemPrompt,
-                        cancellationToken);
+                    llmActivity?.SetTag("llm.provider", Config.ProviderName);
+                    llmActivity?.SetTag("llm.model", Config.ModelId);
+                    llmActivity?.SetTag("llm.prompt_length", prompt.Length);
 
-                    llmStopwatch.Stop();
+                    var llmStopwatch = Stopwatch.StartNew();
 
-                    // 记录 LLM API 调用指标
-                    RecordLlmApiCall(success: true, latency: llmStopwatch.Elapsed);
-                }
-                catch (Exception ex)
-                {
-                    llmStopwatch.Stop();
-                    RecordLlmApiCall(success: false, latency: llmStopwatch.Elapsed);
-                    Logger.LogError(ex, "[MafAiAgent] LLM API call failed");
-                    throw;
+                    try
+                    {
+                        // 调用子类实现的 ExecuteAsync 方法
+                        responseText = await ExecuteAsync(
+                            Config.ModelId,
+                            prompt,
+                            systemPrompt,
+                            cancellationToken);
+
+                        llmStopwatch.Stop();
+
+                        llmActivity?.SetTag("llm.success", true);
+                        llmActivity?.SetTag("llm.response_length", responseText.Length);
+                        llmActivity?.SetTag("llm.latency_ms", llmStopwatch.ElapsedMilliseconds);
+
+                        // 记录 LLM API 调用指标
+                        RecordLlmApiCall(success: true, latency: llmStopwatch.Elapsed);
+                    }
+                    catch (Exception ex)
+                    {
+                        llmStopwatch.Stop();
+
+                        llmActivity?.SetTag("llm.success", false);
+                        llmActivity?.SetTag("llm.latency_ms", llmStopwatch.ElapsedMilliseconds);
+                        llmActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+
+                        RecordLlmApiCall(success: false, latency: llmStopwatch.Elapsed);
+                        Logger.LogError(ex, "[MafAiAgent] LLM API call failed");
+                        throw;
+                    }
                 }
 
                 // 更新会话状态（如果启用）
@@ -283,6 +312,13 @@ namespace CKY.MultiAgentFramework.Core.Agents
             {
                 // 记录 Agent 执行指标
                 RecordAgentExecution(success: agentSuccess, duration: stopwatch.Elapsed);
+
+                agentActivity?.SetTag("agent.success", agentSuccess);
+                agentActivity?.SetTag("agent.duration_ms", stopwatch.ElapsedMilliseconds);
+                if (!agentSuccess)
+                {
+                    agentActivity?.SetStatus(ActivityStatusCode.Error, "Agent execution failed");
+                }
             }
         }
 

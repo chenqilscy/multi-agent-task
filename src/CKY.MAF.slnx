@@ -1,13 +1,12 @@
 <Solution>
   <Folder Name="/src/" />
+
+  <!-- Layer 1: Core -->
   <Folder Name="/src/Core/">
     <Project Path="Core/CKY.MAF.Core.csproj" />
   </Folder>
-  <!-- Demo project temporarily excluded - needs updates after EF Core refactor -->
-  <!-- <Folder Name="/src/Demos/" />
-  <Folder Name="/src/Demos/SmartHome/">
-    <Project Path="Demos/SmartHome/CKY.MAF.Demos.SmartHome.csproj" />
-  </Folder> -->
+
+  <!-- Layer 3: Infrastructure -->
   <Folder Name="/src/Infrastructure/">
     <Folder Name="/src/Infrastructure/Caching/">
       <Project Path="Infrastructure/Caching/CKY.MAF.Infrastructure.Caching.csproj" />
@@ -21,10 +20,25 @@
     <Folder Name="/src/Infrastructure/Vectorization/">
       <Project Path="Infrastructure/Vectorization/CKY.MAF.Infrastructure.Vectorization.csproj" />
     </Folder>
+    <Project Path="Infrastructure/Caching/CKY.MAF.Infrastructure.Caching.csproj" />
+    <Project Path="Infrastructure/DependencyInjection/CKY.MAF.Infrastructure.DependencyInjection.csproj" />
   </Folder>
+
+  <!-- Layer 4: Services -->
   <Folder Name="/src/Services/">
     <Project Path="Services/CKY.MAF.Services.csproj" />
   </Folder>
+
+  <!-- Layer 5: Demos -->
+  <Folder Name="/src/Demos/" />
+  <Folder Name="/src/Demos/SmartHome/">
+    <Project Path="Demos/SmartHome/CKY.MAF.Demos.SmartHome.csproj" />
+  </Folder>
+  <Folder Name="/src/Demos/CustomerService/">
+    <Project Path="Demos/CustomerService/CKY.MAF.Demos.CustomerService.csproj" />
+  </Folder>
+
+  <!-- Tests -->
   <Folder Name="/src/tests/" />
   <Folder Name="/src/tests/IntegrationTests/">
     <Project Path="tests/IntegrationTests/CKY.MAF.IntegrationTests.csproj" />
