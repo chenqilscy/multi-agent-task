@@ -278,46 +278,38 @@ namespace CKY.MultiAgentFramework.Services.Dialog
         /// </summary>
         private List<KeyInformation> ParseKeyInformationFromLlmResponse(string response)
         {
-            try
+            var keyInfos = new List<KeyInformation>();
+
+            // Try to parse JSON array
+            using var document = JsonDocument.Parse(response);
+            var root = document.RootElement;
+
+            if (root.TryGetProperty("key_info", out var keyInfoArray))
             {
-                var keyInfos = new List<KeyInformation>();
-
-                // Try to parse JSON array
-                using var document = JsonDocument.Parse(response);
-                var root = document.RootElement;
-
-                if (root.TryGetProperty("key_info", out var keyInfoArray))
+                foreach (var item in keyInfoArray.EnumerateArray())
                 {
-                    foreach (var item in keyInfoArray.EnumerateArray())
+                    var keyInfo = new KeyInformation
                     {
-                        var keyInfo = new KeyInformation
-                        {
-                            Type = item.TryGetProperty("type", out var type) ? type.GetString() ?? string.Empty : string.Empty,
-                            Content = item.TryGetProperty("content", out var content) ? content.GetString() ?? string.Empty : string.Empty,
-                            Importance = item.TryGetProperty("importance", out var importance) ? importance.GetDouble() : 0.5,
-                            Tags = new List<string>()
-                        };
+                        Type = item.TryGetProperty("type", out var type) ? type.GetString() ?? string.Empty : string.Empty,
+                        Content = item.TryGetProperty("content", out var content) ? content.GetString() ?? string.Empty : string.Empty,
+                        Importance = item.TryGetProperty("importance", out var importance) ? importance.GetDouble() : 0.5,
+                        Tags = new List<string>()
+                    };
 
-                        if (item.TryGetProperty("tags", out var tags))
+                    if (item.TryGetProperty("tags", out var tags))
+                    {
+                        foreach (var tag in tags.EnumerateArray())
                         {
-                            foreach (var tag in tags.EnumerateArray())
-                            {
-                                keyInfo.Tags.Add(tag.GetString() ?? string.Empty);
-                            }
+                            keyInfo.Tags.Add(tag.GetString() ?? string.Empty);
                         }
-
-                        keyInfos.Add(keyInfo);
                     }
-                }
 
-                _logger.LogDebug("Parsed {Count} key information items from LLM response", keyInfos.Count);
-                return keyInfos;
+                    keyInfos.Add(keyInfo);
+                }
             }
-            catch (JsonException ex)
-            {
-                _logger.LogWarning(ex, "Failed to parse key information JSON, returning empty list");
-                return new List<KeyInformation>();
-            }
+
+            _logger.LogDebug("Parsed {Count} key information items from LLM response", keyInfos.Count);
+            return keyInfos;
         }
 
         /// <summary>
@@ -346,7 +338,7 @@ namespace CKY.MultiAgentFramework.Services.Dialog
             foreach (var msg in messages.Take(5)) // Limit to first 5 messages
             {
                 var content = GetContentAsString(msg.Content);
-                if (content.Length > 10)
+                if (content.Length > 0) // Changed from > 10 to > 0 to handle short messages
                 {
                     keyInfos.Add(new KeyInformation
                     {
