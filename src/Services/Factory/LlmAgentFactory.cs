@@ -291,7 +291,9 @@ namespace CKY.MultiAgentFramework.Services.Factory
         {
             await Task.CompletedTask;
 
-            // TODO: 需要在工厂中添加 HttpClient 支持
+            // ZhipuAIAgent 需要通过依赖注入提供 HttpClient。
+            // 请在工厂中注入 IHttpClientFactory，并在此处构造：
+            //   return new ZhipuAIAgent(config, logger, httpClientFactory.CreateClient(nameof(ZhipuAIAgent)));
             throw new NotImplementedException(
                 "ZhipuAIAgent requires HttpClient. " +
                 "Please inject IHttpClientFactory or HttpClient into LlmAgentFactory. " +

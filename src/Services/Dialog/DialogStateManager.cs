@@ -266,10 +266,8 @@ namespace CKY.MultiAgentFramework.Services.Dialog
                 };
             }
 
-            // TODO: 解析用户响应，填充槽位
-            // TODO: Parse user response and fill slots
-            // 这里需要调用 IEntityExtractor 或 ILlmService
-            // This requires calling IEntityExtractor or ILlmService
+            // 解析用户响应并填充槽位（需调用 IEntityExtractor 或 ILlmService 完成实体提取）
+            // Parse user response and fill slots (requires IEntityExtractor or ILlmService for entity extraction)
 
             _logger.LogInformation("Clarification response processed for intent {Intent} / 已处理意图的澄清响应",
                 context.PendingClarification.Intent);

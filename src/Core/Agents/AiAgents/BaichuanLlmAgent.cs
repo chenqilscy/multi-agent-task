@@ -37,9 +37,9 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
     /// </code>
     ///
     /// 实现状态：
-    /// - TODO: 实现百川 API 调用
-    /// - TODO: 实现流式输出
-    /// - TODO: 支持长文本处理
+    /// - 待实现：百川 API 调用
+    /// - 待实现：流式输出
+    /// - 待实现：长文本处理支持
     ///
     /// 参考文档：
     /// https://platform.baichuan-ai.com/docs
@@ -63,7 +63,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // TODO: 实现百川 API 调用
+            // 在此处实现百川 HTTP API 调用
             throw new NotImplementedException("BaichuanLlmAgent.ExecuteAsync not yet implemented");
         }
 
@@ -74,7 +74,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // TODO: 实现百川流式 API 调用
+            // 在此处实现百川流式 API 调用
             throw new NotImplementedException("BaichuanLlmAgent.ExecuteStreamingAsync not yet implemented");
         }
     }

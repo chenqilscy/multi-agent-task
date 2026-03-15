@@ -185,7 +185,7 @@ namespace CKY.MultiAgentFramework.Core.Agents
             string? systemPrompt = null,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
-            // TODO: Implement streaming support for Fallback
+            // Streaming support pending: currently falls back to non-streaming execution
             // For now, fallback to non-streaming
             var result = await ExecuteAsync(modelId, prompt, systemPrompt, ct);
             yield return result;

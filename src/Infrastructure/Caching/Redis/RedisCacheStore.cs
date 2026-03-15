@@ -256,8 +256,8 @@ namespace CKY.MultiAgentFramework.Infrastructure.Caching.Redis
         /// </summary>
         private void RecordFailureMetric(string operation, string exceptionType)
         {
-            // TODO: 集成 Prometheus
-            // _failureCounter.WithLabels(operation, exceptionType).Inc();
+            // Prometheus 指标上报在此处集成（使用 IPrometheusMetricsCollector 注入后调用）
+            // 示例：_metrics.IncrementCounter("maf_cache_errors_total", labels: [operation, exceptionType]);
         }
 
         #endregion

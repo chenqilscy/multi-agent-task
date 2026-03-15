@@ -66,7 +66,7 @@ namespace CKY.MultiAgentFramework.Services.Dialog
                 result.ShortTermMemories.Add(new ShortTermMemory
                 {
                     Key = key,
-                    Value = slot.Value,
+                    Value = slot.Value ?? new object(),
                     Expiry = TimeSpan.FromHours(24),
                     Reason = "临时信息"
                 });

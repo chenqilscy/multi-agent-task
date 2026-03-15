@@ -343,6 +343,9 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
                     case "maf_agents_active":
                         _activeAgentsValue = (int)value;
                         break;
+                    case MafMetrics.HttpRequestInProgress:
+                        _httpInProgress = (int)value;
+                        break;
                     case "maf_cache_hit_rate":
                         _cacheHitRateValue = value;
                         break;

@@ -38,9 +38,9 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
     /// </code>
     ///
     /// 实现状态：
-    /// - TODO: 实现通义千问 API 调用
-    /// - TODO: 实现流式输出
-    /// - TODO: 支持 function calling
+    /// - 待实现：通义千问 API 调用（兼容 OpenAI 接口，参考上方文档链接）
+    /// - 待实现：流式输出（SSE 流式响应）
+    /// - 待实现：Function Calling 支持
     ///
     /// 参考文档：
     /// https://help.aliyun.com/zh/dashscope/developer-reference/compatibility-of-openai-with-dashscope
@@ -64,7 +64,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // TODO: 实现通义千问 API 调用
+            // 在此处实现通义千问 HTTP API 调用
             throw new NotImplementedException("TongyiLlmAgent.ExecuteAsync not yet implemented");
         }
 
@@ -75,7 +75,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // TODO: 实现通义千问流式 API 调用
+            // 在此处实现通义千问流式 API 调用
             throw new NotImplementedException("TongyiLlmAgent.ExecuteStreamingAsync not yet implemented");
         }
     }

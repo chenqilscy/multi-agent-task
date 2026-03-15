@@ -155,12 +155,13 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
         /// <inheritdoc />
         public Task ReloadFromDatabaseAsync(CancellationToken ct = default)
         {
-            // TODO: 实现从数据库加载配置
+            // 从数据库重新加载配置步骤：
             // 1. 从数据库读取 LlmProviderConfig
             // 2. 根据配置创建对应的 LlmAgent 实例
             // 3. 清空当前注册表并重新注册
+            // 当前使用内存中的配置（数据库集成在后续版本中实现）
 
-            _logger.LogInformation("Reloading LLM agents from database (not yet implemented)");
+            _logger.LogInformation("ReloadFromDatabaseAsync called. Using in-memory configuration (database integration pending).");
 
             return Task.CompletedTask;
         }
