@@ -24,6 +24,23 @@ public interface ISlotManager
         CancellationToken ct = default);
 
     /// <summary>
+    /// 检测缺失的必填槽位（带对话上下文，支持自动填充）
+    /// Detect missing required slots with dialog context (supports auto-filling)
+    /// </summary>
+    /// <param name="userInput">用户输入文本</param>
+    /// <param name="intent">意图识别结果</param>
+    /// <param name="entities">实体提取结果</param>
+    /// <param name="context">对话上下文（用于自动填充历史偏好槽位）</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>槽位检测结果，包含缺失的槽位和已检测到的槽位值</returns>
+    Task<SlotDetectionResult> DetectMissingSlotsAsync(
+        string userInput,
+        IntentRecognitionResult intent,
+        EntityExtractionResult entities,
+        DialogContext context,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// 填充槽位值
     /// Fill slot values
     /// </summary>
