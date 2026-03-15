@@ -617,6 +617,214 @@ namespace CKY.MultiAgentFramework.Tests.UnitTests.Services.Dialog
             // Assert
             Assert.Empty(result);
         }
+
+        [Fact]
+        public async Task FillSlots_HistoricalAndPreviousBothExist_HistoricalTakesPriority()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "control_device",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition { SlotName = "Device", Description = "设备", Required = true },
+                    new SlotDefinition { SlotName = "Location", Description = "位置", Required = true }
+                }
+            };
+            mockProvider.Setup(p => p.GetDefinition("control_device")).Returns(slotDef);
+
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var providedSlots = new Dictionary<string, object> { ["Device"] = "空调" };
+            var context = new DialogContext
+            {
+                HistoricalSlots = new Dictionary<string, object>
+                {
+                    ["control_device.Location"] = "客厅"  // 历史偏好
+                },
+                PreviousIntent = "control_device",
+                PreviousSlots = new Dictionary<string, object>
+                {
+                    ["Device"] = "空调",
+                    ["Location"] = "卧室"  // 上一轮值
+                }
+            };
+
+            // Act
+            var result = await manager.FillSlotsAsync("control_device", providedSlots, context);
+
+            // Assert
+            Assert.Equal("客厅", result["Location"]);  // 历史偏好优先
+        }
+
+        [Fact]
+        public async Task FillSlots_PreviousIntentDifferent_DoesNotReuseSlots()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "query_weather",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition { SlotName = "Location", Description = "城市", Required = true }
+                }
+            };
+            mockProvider.Setup(p => p.GetDefinition("query_weather")).Returns(slotDef);
+
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var providedSlots = new Dictionary<string, object>();
+            var context = new DialogContext
+            {
+                PreviousIntent = "control_device",  // 不同的意图
+                PreviousSlots = new Dictionary<string, object>
+                {
+                    ["Location"] = "卧室"
+                }
+            };
+
+            // Act
+            var result = await manager.FillSlotsAsync("query_weather", providedSlots, context);
+
+            // Assert
+            Assert.False(result.ContainsKey("Location"));  // 不应复用
+        }
+
+        [Fact]
+        public async Task FillSlots_NullContext_DoesNotThrow()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "control_device",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition
+                    {
+                        SlotName = "Device",
+                        Description = "设备",
+                        Required = true,
+                        HasDefaultValue = true,
+                        DefaultValue = "空调"
+                    }
+                }
+            };
+            mockProvider.Setup(p => p.GetDefinition("control_device")).Returns(slotDef);
+
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var providedSlots = new Dictionary<string, object>();
+
+            // Act & Assert
+            var result = await manager.FillSlotsAsync("control_device", providedSlots, null!);
+
+            Assert.Equal("空调", result["Device"]);  // 使用默认值
+        }
+
+        [Fact]
+        public async Task FillSlots_EmptyHistoricalSlots_DoesNotThrow()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "control_device",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition
+                    {
+                        SlotName = "Device",
+                        Description = "设备",
+                        Required = true,
+                        HasDefaultValue = true,
+                        DefaultValue = "空调"
+                    }
+                }
+            };
+            mockProvider.Setup(p => p.GetDefinition("control_device")).Returns(slotDef);
+
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var providedSlots = new Dictionary<string, object>();
+            var context = new DialogContext
+            {
+                HistoricalSlots = new Dictionary<string, object>()  // 空字典
+            };
+
+            // Act & Assert
+            var result = await manager.FillSlotsAsync("control_device", providedSlots, context);
+
+            Assert.Equal("空调", result["Device"]);  // 使用默认值
+        }
+
+        [Fact]
+        public async Task DetectMissingSlots_LlmReturnsMalformedJson_ReturnsDefaultConfidence()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            mockProvider.Setup(p => p.GetDefinition("unknown")).Returns((IntentSlotDefinition?)null);
+
+            var testAgent = new TestMafAiAgent(returnMalformedJson: true);
+
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            mockRegistry.Setup(r => r.GetBestAgentAsync(LlmScenario.Intent, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(testAgent);
+
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var intent = new IntentRecognitionResult { PrimaryIntent = "unknown" };
+            var entities = new EntityExtractionResult { Entities = new Dictionary<string, object>() };
+
+            // Act
+            var result = await manager.DetectMissingSlotsAsync("test", intent, entities);
+
+            // Assert
+            Assert.Equal(0.5, result.Confidence);  // Default confidence when regex doesn't match
+            Assert.Empty(result.MissingSlots);  // No slots parsed from malformed JSON
+        }
+
+        [Fact]
+        public async Task DetectMissingSlots_LlmReturnsEmptyJson_ReturnsDefaultConfidence()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            mockProvider.Setup(p => p.GetDefinition("unknown")).Returns((IntentSlotDefinition?)null);
+
+            var testAgent = new TestMafAiAgent(returnEmptyJson: true);
+
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            mockRegistry.Setup(r => r.GetBestAgentAsync(LlmScenario.Intent, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(testAgent);
+
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var intent = new IntentRecognitionResult { PrimaryIntent = "unknown" };
+            var entities = new EntityExtractionResult { Entities = new Dictionary<string, object>() };
+
+            // Act
+            var result = await manager.DetectMissingSlotsAsync("test", intent, entities);
+
+            // Assert
+            Assert.Equal(0.5, result.Confidence);  // Default confidence when regex doesn't match
+            Assert.Empty(result.MissingSlots);  // No slots parsed from empty JSON
+        }
     }
 
     /// <summary>
@@ -624,7 +832,10 @@ namespace CKY.MultiAgentFramework.Tests.UnitTests.Services.Dialog
     /// </summary>
     internal class TestMafAiAgent : MafAiAgent
     {
-        public TestMafAiAgent() : base(
+        private readonly bool _returnMalformedJson;
+        private readonly bool _returnEmptyJson;
+
+        public TestMafAiAgent(bool returnMalformedJson = false, bool returnEmptyJson = false) : base(
             new LlmProviderConfig
             {
                 ProviderName = "test",
@@ -635,10 +846,22 @@ namespace CKY.MultiAgentFramework.Tests.UnitTests.Services.Dialog
             },
             Mock.Of<ILogger<MafAiAgent>>())
         {
+            _returnMalformedJson = returnMalformedJson;
+            _returnEmptyJson = returnEmptyJson;
         }
 
         public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
         {
+            if (_returnMalformedJson)
+            {
+                return Task.FromResult("invalid json {{{");
+            }
+
+            if (_returnEmptyJson)
+            {
+                return Task.FromResult("{}");
+            }
+
             // 返回模拟的 LLM 响应
             return Task.FromResult(@"{
                 ""required_slots"": [
