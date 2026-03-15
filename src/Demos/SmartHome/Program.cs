@@ -21,12 +21,8 @@ using OpenTelemetry.Metrics;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 配置 EF Core SQLite
-builder.Services.AddDbContext<MafDbContext>(options =>
-    options.UseSqlite("Data Source=smart_home.db"));
-
-// 自动注册 Infrastructure 服务
-builder.Services.AddMafInfrastructureServices(builder.Configuration);
+// 🚀 使用快速注册方法（推荐）
+builder.Services.AddMafBuiltinServices(builder.Configuration);
 
 // 注册工作单元和仓储
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
