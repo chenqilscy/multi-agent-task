@@ -139,6 +139,44 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
                 var executionPlan = await _taskOrchestrator.CreatePlanAsync(decomposition.SubTasks, ct);
                 var executionResults = await _taskOrchestrator.ExecutePlanAsync(executionPlan, ct);
 
+                // 7.5 SubAgent槽位缺失处理（新增）
+                foreach (var result in executionResults)
+                {
+                    if (!result.Success && !string.IsNullOrEmpty(result.Error) &&
+                        result.Error.Contains("slot", StringComparison.OrdinalIgnoreCase) &&
+                        result.Error.Contains("missing", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Logger.LogWarning("SubAgent {TaskId} reported missing slots. Attempting auto-fill from history.", result.TaskId);
+
+                        // 从HistoricalSlots查找缺失的槽位值
+                        var filledCount = 0;
+                        foreach (var kvp in dialogContext.HistoricalSlots)
+                        {
+                            if (!request.Parameters.ContainsKey(kvp.Key))
+                            {
+                                var parts = kvp.Key.Split('.');
+                                if (parts.Length == 2 && parts[0] == intent.PrimaryIntent)
+                                {
+                                    var slotName = parts[1];
+                                    request.Parameters[slotName] = kvp.Value;
+                                    filledCount++;
+                                    Logger.LogInformation("Auto-filled slot {Slot}={Value} from history (intent={Intent})",
+                                        slotName, kvp.Value, intent.PrimaryIntent);
+                                }
+                            }
+                        }
+
+                        if (filledCount > 0)
+                        {
+                            Logger.LogInformation("Auto-filled {Count} slots from history, retrying task {TaskId}", filledCount, result.TaskId);
+                            // 重新执行该任务
+                            var newPlan = await _taskOrchestrator.CreatePlanAsync(decomposition.SubTasks, ct);
+                            executionResults = await _taskOrchestrator.ExecutePlanAsync(newPlan, ct);
+                            break; // 重新执行后跳出循环
+                        }
+                    }
+                }
+
                 // 8. 结果聚合
                 var aggregated = await _resultAggregator.AggregateAsync(
                     executionResults,
