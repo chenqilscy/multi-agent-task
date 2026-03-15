@@ -1,7 +1,9 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Models.Dialog;
 using CKY.MultiAgentFramework.Core.Models.Task;
 using CKY.MultiAgentFramework.Demos.SmartHome.Agents;
 using CKY.MultiAgentFramework.Demos.SmartHome.Services;
+using CKY.MultiAgentFramework.Services.Dialog;
 using Microsoft.Extensions.Logging;
 
 namespace CKY.MultiAgentFramework.Demos.SmartHome
@@ -18,6 +20,9 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
         private readonly ITaskOrchestrator _taskOrchestrator;
         private readonly IResultAggregator _resultAggregator;
         private readonly IEntityExtractor _entityExtractor;
+        private readonly IDialogStateManager _stateManager;
+        private readonly IMemoryClassifier _memoryClassifier;
+        private readonly IContextCompressor _contextCompressor;
 
         public override string AgentId => "smarthome:main:agent:001";
         public override string Name => "SmartHomeMainAgent";
@@ -36,6 +41,9 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
             ITaskOrchestrator taskOrchestrator,
             IResultAggregator resultAggregator,
             IEntityExtractor entityExtractor,
+            IDialogStateManager stateManager,
+            IMemoryClassifier memoryClassifier,
+            IContextCompressor contextCompressor,
             IMafAiAgentRegistry llmRegistry,
             ILogger<SmartHomeMainAgent> logger)
             : base(llmRegistry, logger)
@@ -46,6 +54,9 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
             _taskOrchestrator = taskOrchestrator ?? throw new ArgumentNullException(nameof(taskOrchestrator));
             _resultAggregator = resultAggregator ?? throw new ArgumentNullException(nameof(resultAggregator));
             _entityExtractor = entityExtractor ?? throw new ArgumentNullException(nameof(entityExtractor));
+            _stateManager = stateManager ?? throw new ArgumentNullException(nameof(stateManager));
+            _memoryClassifier = memoryClassifier ?? throw new ArgumentNullException(nameof(memoryClassifier));
+            _contextCompressor = contextCompressor ?? throw new ArgumentNullException(nameof(contextCompressor));
         }
 
         public override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
@@ -56,6 +67,15 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
 
             try
             {
+                // 0. 加载对话上下文（新增）
+                var dialogContext = await _stateManager.LoadOrCreateAsync(
+                    request.ConversationId,
+                    request.UserId,
+                    ct);
+
+                Logger.LogInformation("Dialog context loaded: TurnCount={TurnCount}, PreviousIntent={PreviousIntent}",
+                    dialogContext.TurnCount, dialogContext.PreviousIntent);
+
                 // 1. 意图识别
                 var intent = await _intentRecognizer.RecognizeAsync(request.UserInput, ct);
                 Logger.LogInformation("Recognized intent: {Intent} (confidence: {Confidence})",
@@ -124,6 +144,33 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
                     executionResults,
                     request.UserInput,
                     ct);
+
+                // 8.5 更新对话状态和进行记忆分类（新增）
+                var slotDict = request.Parameters.ToDictionary(p => p.Key, p => p.Value);
+                await _stateManager.UpdateAsync(
+                    dialogContext,
+                    intent.PrimaryIntent,
+                    slotDict,
+                    executionResults,
+                    ct);
+
+                // 8.6 记忆分类（新增）
+                var classificationResult = await _memoryClassifier.ClassifyAndStoreAsync(
+                    intent.PrimaryIntent,
+                    slotDict,
+                    dialogContext,
+                    ct);
+
+                Logger.LogInformation("Memory classification: {LongTerm} long-term, {ShortTerm} short-term",
+                    classificationResult.LongTermMemories.Count, classificationResult.ShortTermMemories.Count);
+
+                // 8.7 每5轮触发上下文压缩（新增）
+                if (dialogContext.TurnCount > 0 && dialogContext.TurnCount % 5 == 0)
+                {
+                    Logger.LogInformation("Triggering context compression (TurnCount={TurnCount})", dialogContext.TurnCount);
+                    var compressionResult = await _contextCompressor.CompressAndStoreAsync(dialogContext, ct);
+                    Logger.LogInformation("Context compression complete: ratio={Ratio:0.2}", compressionResult.CompressionRatio);
+                }
 
                 // 9. 生成响应
                 var response = new MafTaskResponse
