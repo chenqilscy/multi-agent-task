@@ -54,50 +54,52 @@
 docs/specs/
 ├── 📖 README.md                                # 本文档
 │
-├── 📐 核心架构文档（6个）
-│   ├── 01-architecture-overview.md              # 架构概览 ⭐ 20KB
-│   ├── 02-architecture-diagrams.md              # 架构图表集 ⭐ 21KB
-│   ├── 03-task-scheduling-design.md             # 任务调度系统 ⭐ 59KB
-│   ├── 04-langgraph-comparison.md               # LangGraph对比 11KB
-│   ├── 05-industry-frameworks-comparison.md     # 业界框架对比 14KB
-│   └── 12-layered-architecture.md               # 分层依赖架构 ⭐ 22KB
+├── 📐 核心文档（2个）⭐ 必读
+│   ├── 00-CORE-ARCHITECTURE.md                 # 核心架构（整合版）
+│   └── 01-IMPLEMENTATION-GUIDE.md               # 实现指南（整合版）
 │
-├── 📐 规范文档（3个）
-│   ├── 06-interface-design-spec.md              # 接口设计规范 51KB
-│   ├── 07-ui-design-spec.md                     # UI设计规范 20KB
-│   └── 08-deployment-guide.md                   # 部署指南 20KB
-│
-└── 💻 实现文档（5个）
-    ├── 09-implementation-guide.md               # 实现指南 43KB
-    ├── 10-testing-guide.md                      # 测试指南 27KB
-    ├── 11-implementation-roadmap.md             # 实施路线图 20KB
-    ├── 13-performance-benchmarks.md             # 性能基准测试 17KB
-    └── 14-error-handling-guide.md               # 错误处理指南 ⭐ 36KB
+├── 📊 专题文档（8个）
+│   ├── 02-architecture-diagrams.md             # 架构图表集
+│   ├── 03-task-scheduling-design.md            # 任务调度系统
+│   ├── 07-ui-design-spec.md                    # UI设计规范
+│   ├── 08-deployment-guide.md                  # 部署指南
+│   ├── 10-testing-guide.md                     # 测试指南
+│   ├── 13-performance-benchmarks.md           # 性能基准测试
+│   ├── 14-error-handling-guide.md              # 错误处理指南
+│   └── MICROSOFT_AGENT_FRAMEWORK_INTEGRATION.md # MS AF集成
 ```
 
-**总计**: 14个核心文档，约384KB
+**总计**: 10个文档（精简后）
 
 ---
 
 ## 🎯 快速导航（按角色）
 
 ### 🏗️ 架构师/技术负责人
-1. [01-架构设计概览](./01-architecture-overview.md) ⭐ **必读**
-2. [12-分层依赖架构](./12-layered-architecture.md) ⭐ **重点**
-3. [06-接口设计规范](./06-interface-design-spec.md)
-4. [03-任务调度系统](./03-task-scheduling-design.md)
-5. [02-架构图表集](./02-architecture-diagrams.md)
-6. [05-业界框架对比](./05-industry-frameworks-comparison.md)
+1. [00-核心架构文档](./00-CORE-ARCHITECTURE.md) ⭐ **必读**
+2. [02-架构图表集](./02-architecture-diagrams.md)
+3. [03-任务调度系统](./03-task-scheduling-design.md)
+4. [13-性能基准测试](./13-performance-benchmarks.md)
+5. [14-错误处理指南](./14-error-handling-guide.md) ⭐ **重点**
 
 ### 💻 开发人员
-1. [01-架构设计概览](./01-architecture-overview.md)
-2. [12-分层依赖架构](./12-layered-architecture.md) ⭐ **重点**
-3. [09-实现指南](./09-implementation-guide.md) ⭐ **重点**
-4. [06-接口设计规范](./06-interface-design-spec.md)
-5. [10-测试指南](./10-testing-guide.md)
-6. [08-部署指南](./08-deployment-guide.md)
+1. [00-核心架构文档](./00-CORE-ARCHITECTURE.md) ⭐ **必读**
+2. [01-实现指南](./01-IMPLEMENTATION-GUIDE.md) ⭐ **重点**
+3. [02-架构图表集](./02-architecture-diagrams.md)
+4. [10-测试指南](./10-testing-guide.md)
+5. [14-错误处理指南](./14-error-handling-guide.md)
 
 ### 🎨 前端开发人员
+1. [00-核心架构文档](./00-CORE-ARCHITECTURE.md)
+2. [07-UI设计规范](./07-ui-design-spec.md) ⭐ **重点**
+3. [02-架构图表集](./02-architecture-diagrams.md)
+
+### 🔧 运维人员
+1. [00-核心架构文档](./00-CORE-ARCHITECTURE.md)
+2. [08-部署指南](./08-deployment-guide.md) ⭐ **重点**
+3. [13-性能基准测试](./13-performance-benchmarks.md) ⭐ **重点**
+4. [14-错误处理指南](./14-error-handling-guide.md) ⭐ **重点**
+5. [02-架构图表集](./02-architecture-diagrams.md)
 1. [01-架构设计概览](./01-architecture-overview.md)
 2. [07-UI设计规范](./07-ui-design-spec.md) ⭐ **重点**
 3. [02-架构图表集](./02-architecture-diagrams.md)
@@ -113,23 +115,40 @@ docs/specs/
 
 ---
 
-## 📖 各文档详细说明
+## 📖 核心文档详细说明
 
-### 1. 架构设计概览
-**文件**: `01-architecture-overview.md` | **大小**: 20KB
+### 1. 核心架构文档 ⭐ 必读
+**文件**: `00-CORE-ARCHITECTURE.md` | **大小**: 24KB
 
 **内容**：
-- 核心设计原则（SOLID）
-- 分层架构概览
-- 核心概念介绍
-- 技术栈选择
-- 快速开始指南
+- 整合后的核心架构设计
+- 基于Microsoft Agent Framework的定位
+- 5层分层依赖架构详解
+- LLM服务架构设计
+- Main-Agent + Sub-Agent模式
+- 弹性与容错策略
+- 监控与可观测性
 
-**适合人群**: 所有人
+**适合人群**: 所有人 ⭐ **优先阅读**
 
 ---
 
-### 2. 架构图表集
+### 2. 实现指南 ⭐ 必读
+**文件**: `01-IMPLEMENTATION-GUIDE.md` | **大小**: 38KB
+
+**内容**：
+- 项目结构规范
+- 核心接口定义（已验证与代码一致）
+- Agent实现模式
+- 依赖注入配置
+- 错误处理最佳实践
+- 测试策略
+
+**适合人群**: 开发人员 ⭐ **优先阅读**
+
+---
+
+### 3. 架构图表集
 **文件**: `02-architecture-diagrams.md` | **大小**: 21KB
 
 **内容**：
@@ -137,14 +156,13 @@ docs/specs/
 - 接口类图
 - 状态机图
 - 序列图
-- 流程图
 - 部署架构图
 
 **适合人群**: 所有人
 
 ---
 
-### 3. 任务调度系统
+### 4. 任务调度系统
 **文件**: `03-task-scheduling-design.md` | **大小**: 59KB
 
 **内容**：
@@ -153,70 +171,26 @@ docs/specs/
 - 任务调度算法
 - 执行策略
 - 异常处理
-- 实际案例
 
 **适合人群**: 架构师、核心开发人员
 
 ---
 
-### 4. LangGraph对比分析
-**文件**: `04-langgraph-comparison.md` | **大小**: 11KB
-
-**内容**：
-- CKY.MAF vs LangGraph 核心功能对比（10个维度）
-- CKY.MAF独有优势分析（8大特性）
-- 使用场景建议
-- 混合使用可能性
-
-**适合人群**: 架构师、技术决策者
-
----
-
-### 5. 业界框架对比
-**文件**: `05-industry-frameworks-comparison.md` | **大小**: 14KB
-
-**内容**：
-- 业界主流框架概览（Microsoft生态、Python生态）
-- 6大框架详细功能对比矩阵
-- CKY.MAF独有优势分析（6项业界首创）
-- 框架选型决策树
-- 技术对比细节
-
-**适合人群**: 架构师、技术负责人、CTO
-
----
-
-### 6. 接口设计规范
-**文件**: `06-interface-design-spec.md` | **大小**: 45KB
-
-**内容**：
-- 所有抽象接口定义
-- 接口继承关系
-- 数据模型定义
-- 枚举类型定义
-- 接口使用示例
-
-**适合人群**: 架构师、开发人员
-
----
-
-### 7. UI设计规范
+### 5. UI设计规范
 **文件**: `07-ui-design-spec.md` | **大小**: 20KB
 
 **内容**：
 - 前端架构设计
-- 技术栈选择
-- 实时通信设计
+- Blazor Server实现
+- 实时通信设计（SignalR）
 - 对话式UI设计
 - 设备控制UI
-- 多场景UI
-- 响应式设计
 
 **适合人群**: 前端开发人员、UI/UX设计师
 
 ---
 
-### 8. 部署指南
+### 6. 部署指南
 **文件**: `08-deployment-guide.md` | **大小**: 20KB
 
 **内容**：
@@ -225,102 +199,62 @@ docs/specs/
 - Kubernetes部署
 - 配置管理
 - 监控和日志
-- 性能优化
 - 安全加固
 
 **适合人群**: 运维人员、DevOps工程师
 
 ---
 
-### 9. 实现指南
-**文件**: `09-implementation-guide.md` | **大小**: 43KB
-
-**内容**：
-- 目录结构规划
-- 代码实现模式
-- 基类实现示例
-- 服务层实现
-- Demo场景实现
-- 依赖注入配置
-- 最佳实践
-
-**适合人群**: 开发人员
-
----
-
-### 10. 测试指南
+### 7. 测试指南
 **文件**: `10-testing-guide.md` | **大小**: 31KB
 
 **内容**：
-- 测试金字塔策略（70%单测、25%集成、5%E2E）
-- 44个单元测试场景（覆盖7个核心接口）
-- 17个集成测试场景
-- 完整代码示例
-- 测试工具链（xUnit、FluentAssertions、Moq、Testcontainers）
-- 覆盖率目标设定
+- 测试金字塔策略（70/25/5）
+- 单元测试场景
+- 集成测试策略
+- 测试工具链
 
 **适合人群**: 开发人员、测试工程师
 
 ---
 
-### 11. 实施路线图
-**文件**: `11-implementation-roadmap.md` | **大小**: 20KB
-
-**内容**：
-- 6个阶段实施计划（36天）
-- 详细任务分解和验收标准
-- NuGet包依赖管理（遵循DIP原则）
-- CI/CD配置指南
-- 里程碑和交付物
-
-**适合人群**: 项目经理、Tech Lead、开发人员
-
----
-
-### 12. 分层依赖架构 ⭐ NEW
-**文件**: `12-layered-architecture.md` | **大小**: 22KB
-
-**内容**：
-- 依赖倒置原则（DIP）应用
-- 5层架构设计（Demo → Services → Infrastructure → Abstractions → Core）
-- 存储抽象接口设计（ICacheStore、IVectorStore、IRelationalDatabase）
-- 具体实现层组织（Redis、PostgreSQL、Qdrant）
-- 依赖注入配置示例
-- 单元测试和集成测试策略
-- 扩展性指南
-
-**适合人群**: 架构师、Tech Lead、开发人员 ⭐ **重点**
-
----
-
-### 13. 性能基准测试
+### 8. 性能基准测试
 **文件**: `13-performance-benchmarks.md` | **大小**: 17KB
 
 **内容**：
-- 响应时间指标（P50/P95/P99目标值）
-- 吞吐量和并发指标
-- 资源占用限制（CPU/内存/GC）
-- 基准测试方法（BenchmarkDotNet）
+- 响应时间指标（P50/P95/P99）
+- 吞吐量指标
+- 资源占用限制
 - 性能优化策略
-- 监控指标定义
 
 **适合人群**: 架构师、运维人员、性能工程师
 
 ---
 
-### 14. 错误处理指南 ⭐ NEW
+### 9. 错误处理指南 ⭐ 重点
 **文件**: `14-error-handling-guide.md` | **大小**: 36KB
 
 **内容**：
-- 错误分类体系（异常类型、错误码）
-- 重试策略（指数退避+抖动，各服务推荐配置）
-- 熔断器模式（LLM/Redis/PostgreSQL/Qdrant各组件参数）
-- 服务降级策略（5个级别，从禁用推荐到规则引擎兜底）
-- 各组件错误处理规范（LLM、Redis、PostgreSQL）
-- 日志与监控（结构化日志、Prometheus指标、告警规则）
-- 错误处理测试策略（单元测试+集成测试示例）
+- 错误分类体系
+- 重试策略（指数退避+抖动）
+- 熔断器模式
+- 服务降级策略（5级）
+- 日志与监控
 
 **适合人群**: 架构师、后端开发人员、运维人员 ⭐ **重点**
+
+---
+
+### 10. MS Agent Framework集成
+**文件**: `MICROSOFT_AGENT_FRAMEWORK_INTEGRATION.md` | **大小**: 187行
+
+**内容**：
+- MS AF集成说明
+- AIAgent基类使用
+- A2A通信机制
+- 集成最佳实践
+
+**适合人群**: 架构师、开发人员
 
 ---
 
