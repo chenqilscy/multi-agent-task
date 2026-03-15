@@ -22,9 +22,16 @@ namespace CKY.MultiAgentFramework.Core.Models.Dialog
     /// </summary>
     public class ShortTermMemory
     {
+        /// <summary>记忆键（格式：intent.slot）</summary>
         public string Key { get; set; } = string.Empty;
+
+        /// <summary>记忆值</summary>
         public object Value { get; set; } = new();
+
+        /// <summary>过期时间（默认24小时）</summary>
         public TimeSpan Expiry { get; set; } = TimeSpan.FromHours(24);
+
+        /// <summary>分类原因</summary>
         public string Reason { get; set; } = string.Empty;
     }
 
@@ -34,10 +41,19 @@ namespace CKY.MultiAgentFramework.Core.Models.Dialog
     /// </summary>
     public class LongTermMemory
     {
+        /// <summary>记忆键（格式：intent.slot）</summary>
         public string Key { get; set; } = string.Empty;
+
+        /// <summary>记忆值</summary>
         public string Value { get; set; } = string.Empty;
+
+        /// <summary>重要性评分（0-1）</summary>
         public double ImportanceScore { get; set; }
+
+        /// <summary>标签列表</summary>
         public List<string> Tags { get; set; } = new();
+
+        /// <summary>分类原因</summary>
         public string Reason { get; set; } = string.Empty;
     }
 
@@ -47,8 +63,13 @@ namespace CKY.MultiAgentFramework.Core.Models.Dialog
     /// </summary>
     public class ForgettingCandidate
     {
+        /// <summary>记忆ID</summary>
         public string MemoryId { get; set; } = string.Empty;
+
+        /// <summary>遗忘决策</summary>
         public ForgettingDecision Decision { get; set; }
+
+        /// <summary>决策原因</summary>
         public string Reason { get; set; } = string.Empty;
     }
 
