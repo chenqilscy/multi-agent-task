@@ -11,12 +11,15 @@ namespace CKY.MultiAgentFramework.Services.NLP
     public class IntentDriftDetector
     {
         private readonly ILogger<IntentDriftDetector> _logger;
+        private readonly string[] _topicSwitchTriggers;
 
-        // 话题转换触发词
-        private static readonly string[] TopicSwitchTriggers = ["对了", "另外", "顺便", "还有", "对了再说", "另外问一下"];
-
-        public IntentDriftDetector(ILogger<IntentDriftDetector> logger)
+        public IntentDriftDetector(
+            IEnumerable<string>? topicSwitchTriggers,
+            ILogger<IntentDriftDetector> logger)
         {
+            // Fixed: Make topic triggers configurable via constructor injection
+            _topicSwitchTriggers = topicSwitchTriggers?.ToArray()
+                ?? new[] { "对了", "另外", "顺便", "还有", "对了再说", "另外问一下" };
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -107,7 +110,7 @@ namespace CKY.MultiAgentFramework.Services.NLP
         /// </summary>
         private bool HasTopicSwitchTrigger(string input)
         {
-            return TopicSwitchTriggers.Any(trigger => input.Contains(trigger));
+            return _topicSwitchTriggers.Any(trigger => input.Contains(trigger));
         }
 
         /// <summary>

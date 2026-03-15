@@ -48,9 +48,17 @@ namespace CKY.MultiAgentFramework.Services.NLP
                     _logger.LogDebug("Session loaded for coreference resolution: {SessionId}", session.SessionId);
                 }
             }
+            catch (System.Text.Json.JsonException ex)
+            {
+                _logger.LogError(ex, "JSON parsing failed while loading session");
+            }
+            catch (System.InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Session storage operation failed");
+            }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to load session for coreference resolution");
+                _logger.LogWarning(ex, "Unexpected error loading session for coreference resolution");
             }
 
             return userInput;
@@ -90,9 +98,19 @@ namespace CKY.MultiAgentFramework.Services.NLP
                 _logger.LogDebug("LLM resolved coreferences: {Original} -> {Resolved}", userInput, resolved);
                 return resolved;
             }
+            catch (System.Text.Json.JsonException ex)
+            {
+                _logger.LogError(ex, "JSON parsing failed during coreference resolution");
+                return await RuleBasedResolution(userInput, entities, context);
+            }
+            catch (System.InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation during coreference resolution");
+                return await RuleBasedResolution(userInput, entities, context);
+            }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "LLM-based coreference resolution failed, falling back to rule-based");
+                _logger.LogWarning(ex, "Unexpected error in LLM-based coreference resolution, falling back to rule-based");
                 return await RuleBasedResolution(userInput, entities, context);
             }
         }
