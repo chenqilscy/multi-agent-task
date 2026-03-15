@@ -97,10 +97,13 @@ namespace CKY.MultiAgentFramework.Services.Dialog
         {
             _logger.LogInformation("Using LLM to detect slots for unknown intent: {Intent}", intent);
 
+            // Sanitize user input to prevent prompt injection
+            var sanitizedInput = System.Text.RegularExpressions.Regex.Replace(userInput, @"[\r\n\t]", " ");
+
             var prompt = $@"
 分析用户请求，识别完成该意图所需的槽位信息：
 
-用户输入：{userInput}
+用户输入：{sanitizedInput}
 识别意图：{intent}
 
 请分析：
@@ -126,9 +129,27 @@ namespace CKY.MultiAgentFramework.Services.Dialog
 
                 return ParseLlmSlotDetection(response, intent, entities);
             }
+            catch (System.Text.Json.JsonException ex)
+            {
+                _logger.LogError(ex, "JSON parsing failed during LLM slot detection for intent: {Intent}", intent);
+                return new SlotDetectionResult
+                {
+                    Intent = intent,
+                    Confidence = 0.0
+                };
+            }
+            catch (System.InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation during LLM slot detection for intent: {Intent}", intent);
+                return new SlotDetectionResult
+                {
+                    Intent = intent,
+                    Confidence = 0.0
+                };
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "LLM slot detection failed for intent: {Intent}", intent);
+                _logger.LogError(ex, "Unexpected error in LLM slot detection for intent: {Intent}", intent);
                 return new SlotDetectionResult
                 {
                     Intent = intent,
@@ -175,14 +196,34 @@ namespace CKY.MultiAgentFramework.Services.Dialog
                     Confidence = confidence
                 };
             }
-            catch (Exception ex)
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException ex)
             {
-                _logger.LogWarning(ex, "Failed to parse LLM response, returning default result");
+                _logger.LogWarning(ex, "Regex timeout while parsing LLM response");
                 return new SlotDetectionResult
                 {
                     Intent = intent,
                     DetectedSlots = entities.Entities,
                     Confidence = 0.3 // Low confidence for parsing failures
+                };
+            }
+            catch (FormatException ex)
+            {
+                _logger.LogWarning(ex, "Invalid format while parsing LLM response");
+                return new SlotDetectionResult
+                {
+                    Intent = intent,
+                    DetectedSlots = entities.Entities,
+                    Confidence = 0.3
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Unexpected error parsing LLM response, returning default result");
+                return new SlotDetectionResult
+                {
+                    Intent = intent,
+                    DetectedSlots = entities.Entities,
+                    Confidence = 0.3
                 };
             }
         }
