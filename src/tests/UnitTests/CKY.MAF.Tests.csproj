@@ -31,7 +31,6 @@
 
   <!-- 添加排除模式来防止重复程序集属性 -->
   <ItemGroup>
-    <Compile Remove="Core\**" />
     <Compile Remove="Factory\**" />
     <Compile Remove="Infrastructure\**" />
     <Compile Remove="LLM\**" />
