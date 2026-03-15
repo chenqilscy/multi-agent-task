@@ -1,5 +1,6 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Models.Dialog;
+using CKY.MultiAgentFramework.Core.Models.LLM;
 using Microsoft.Extensions.Logging;
 
 namespace CKY.MultiAgentFramework.Services.Dialog
@@ -42,16 +43,22 @@ namespace CKY.MultiAgentFramework.Services.Dialog
             _logger.LogDebug("Detecting missing slots for intent: {Intent}", intent.PrimaryIntent);
 
             var slotDef = _slotDefinitionProvider.GetDefinition(intent.PrimaryIntent);
-            if (slotDef == null)
+
+            if (slotDef != null)
             {
-                _logger.LogWarning("No slot definition found for intent: {Intent}", intent.PrimaryIntent);
-                return new SlotDetectionResult
-                {
-                    Intent = intent.PrimaryIntent,
-                    Confidence = 0.0
-                };
+                // 预定义意图 → 使用模板检测
+                return await DetectWithTemplateAsync(slotDef, entities, ct);
             }
 
+            // 未知意图 → 使用LLM动态识别
+            return await DetectWithLlmAsync(userInput, intent.PrimaryIntent, entities, ct);
+        }
+
+        private async Task<SlotDetectionResult> DetectWithTemplateAsync(
+            IntentSlotDefinition slotDef,
+            EntityExtractionResult entities,
+            CancellationToken ct)
+        {
             var missingSlots = new List<SlotDefinition>();
             var detectedSlots = new Dictionary<string, object>();
 
@@ -75,11 +82,109 @@ namespace CKY.MultiAgentFramework.Services.Dialog
 
             return new SlotDetectionResult
             {
-                Intent = intent.PrimaryIntent,
+                Intent = slotDef.Intent,
                 MissingSlots = missingSlots,
                 DetectedSlots = detectedSlots,
                 Confidence = confidence
             };
+        }
+
+        private async Task<SlotDetectionResult> DetectWithLlmAsync(
+            string userInput,
+            string intent,
+            EntityExtractionResult entities,
+            CancellationToken ct)
+        {
+            _logger.LogInformation("Using LLM to detect slots for unknown intent: {Intent}", intent);
+
+            var prompt = $@"
+分析用户请求，识别完成该意图所需的槽位信息：
+
+用户输入：{userInput}
+识别意图：{intent}
+
+请分析：
+1. 完成该意图需要哪些信息槽位（slots）？
+2. 用户已提供了哪些槽位？
+3. 缺失哪些槽位？
+
+返回JSON格式：
+{{
+  ""required_slots"": [
+    {{ ""name"": ""Location"", ""description"": ""城市"", ""provided"": false }},
+    {{ ""name"": ""Date"", ""description"": ""日期"", ""provided"": true, ""value"": ""今天"" }}
+  ],
+  ""confidence"": 0.5
+}}
+";
+
+            try
+            {
+                var llmAgent = await _llmRegistry.GetBestAgentAsync(LlmScenario.Intent, ct);
+                var modelId = llmAgent.GetCurrentModelId();
+                var response = await llmAgent.ExecuteAsync(modelId, prompt, null, ct);
+
+                return ParseLlmSlotDetection(response, intent, entities);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "LLM slot detection failed for intent: {Intent}", intent);
+                return new SlotDetectionResult
+                {
+                    Intent = intent,
+                    Confidence = 0.0
+                };
+            }
+        }
+
+        private SlotDetectionResult ParseLlmSlotDetection(
+            string llmResponse,
+            string intent,
+            EntityExtractionResult entities)
+        {
+            try
+            {
+                // 简单的JSON解析 - 提取 confidence 和 required_slots
+                // TODO: 后续可以使用 System.Text.Json 进行更完善的解析
+
+                // 提取 confidence
+                var confidenceMatch = System.Text.RegularExpressions.Regex.Match(llmResponse, @"""confidence""\s*:\s*([\d.]+)");
+                var confidence = confidenceMatch.Success ? double.Parse(confidenceMatch.Groups[1].Value) : 0.5;
+
+                // 使用 entities.Entities 作为已检测到的槽位
+                var detectedSlots = new Dictionary<string, object>(entities.Entities);
+
+                // 提取缺失的槽位（简单解析）
+                var missingSlots = new List<SlotDefinition>();
+                var slotMatches = System.Text.RegularExpressions.Regex.Matches(llmResponse, @"""name""\s*:\s*""([^""]+)""\s*,\s*""description""\s*:\s*""([^""]+)""\s*,\s*""provided""\s*:\s*false");
+
+                foreach (System.Text.RegularExpressions.Match match in slotMatches)
+                {
+                    missingSlots.Add(new SlotDefinition
+                    {
+                        SlotName = match.Groups[1].Value,
+                        Description = match.Groups[2].Value
+                    });
+                }
+
+                return new SlotDetectionResult
+                {
+                    Intent = intent,
+                    DetectedSlots = detectedSlots,
+                    MissingSlots = missingSlots,
+                    Confidence = confidence
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse LLM response, returning default result");
+                return new SlotDetectionResult
+                {
+                    Intent = intent,
+                    DetectedSlots = entities.Entities,
+                    Confidence = 0.3 // Low confidence for parsing failures
+                };
+            }
         }
 
         public Task<Dictionary<string, object>> FillSlotsAsync(

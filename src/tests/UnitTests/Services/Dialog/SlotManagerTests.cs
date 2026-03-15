@@ -1,5 +1,7 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Agents;
 using CKY.MultiAgentFramework.Core.Models.Dialog;
+using CKY.MultiAgentFramework.Core.Models.LLM;
 using CKY.MultiAgentFramework.Services.Dialog;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -230,6 +232,72 @@ namespace CKY.MultiAgentFramework.Tests.UnitTests.Services.Dialog
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);
+        }
+
+        [Fact]
+        public async Task DetectMissingSlots_WithUnknownIntent_UsesLlm()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            mockProvider.Setup(p => p.GetDefinition("unknown_intent")).Returns((IntentSlotDefinition?)null);
+
+            // 使用测试专用的简单 Agent 实现
+            var testAgent = new TestMafAiAgent();
+
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            mockRegistry.Setup(r => r.GetBestAgentAsync(LlmScenario.Intent, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(testAgent);
+
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var intent = new IntentRecognitionResult { PrimaryIntent = "unknown_intent" };
+            var entities = new EntityExtractionResult { Entities = new Dictionary<string, object>() };
+
+            // Act
+            var result = await manager.DetectMissingSlotsAsync("unknown request", intent, entities);
+
+            // Assert
+            mockRegistry.Verify(r => r.GetBestAgentAsync(LlmScenario.Intent, It.IsAny<CancellationToken>()), Times.Once);
+            Assert.Equal("unknown_intent", result.Intent);
+            Assert.Equal(0.5, result.Confidence);
+        }
+    }
+
+    /// <summary>
+    /// 测试用的 MafAiAgent 实现
+    /// </summary>
+    internal class TestMafAiAgent : MafAiAgent
+    {
+        public TestMafAiAgent() : base(
+            new LlmProviderConfig
+            {
+                ProviderName = "test",
+                ModelId = "test-model",
+                ApiKey = "test-key",
+                ApiBaseUrl = "https://test.example.com",
+                SupportedScenarios = new List<LlmScenario> { LlmScenario.Intent }
+            },
+            Mock.Of<ILogger<MafAiAgent>>())
+        {
+        }
+
+        public override Task<string> ExecuteAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
+        {
+            // 返回模拟的 LLM 响应
+            return Task.FromResult(@"{
+                ""required_slots"": [
+                    { ""name"": ""Location"", ""description"": ""城市"", ""provided"": false },
+                    { ""name"": ""Date"", ""description"": ""日期"", ""provided"": true, ""value"": ""今天"" }
+                ],
+                ""confidence"": 0.5
+            }");
+        }
+
+        public override IAsyncEnumerable<string> ExecuteStreamingAsync(string modelId, string prompt, string? systemPrompt = null, CancellationToken ct = default)
+        {
+            // 返回模拟的流式响应
+            return AsyncEnumerable.Empty<string>();
         }
     }
 }
