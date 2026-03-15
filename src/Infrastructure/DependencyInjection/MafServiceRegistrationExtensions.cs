@@ -1,5 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using StackExchange.Redis;
+using Microsoft.EntityFrameworkCore;
 
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Memory;
@@ -7,6 +10,7 @@ using CKY.MultiAgentFramework.Infrastructure.Caching.Redis;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Relational;
+using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
 
 namespace CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 
@@ -105,5 +109,146 @@ public static class MafServiceRegistrationExtensions
         // }
 
         return services;
+    }
+
+    /// <summary>
+    /// 添加 CKY.MAF 内置推荐实现（简化版一键注册）
+    /// </summary>
+    /// <remarks>
+    /// <para><b>自动注册的服务：</b></para>
+    /// <list type="bullet">
+    ///   <item>ICacheStore → RedisCacheStore（带自动连接和日志）</item>
+    ///   <item>IVectorStore → MemoryVectorStore</item>
+    ///   <item>IRelationalDatabase → EfCoreRelationalDatabase (SQLite/PostgreSQL)</item>
+    /// </list>
+    /// <para><b>配置示例：</b></para>
+    /// <code>
+    /// // appsettings.json
+    /// {
+    ///   "ConnectionStrings": {
+    ///     "Redis": "localhost:6379",
+    ///     "PostgreSQL": "Host=localhost;Port=5432;Database=mafdb;Username=maf;Password=***"
+    ///   },
+    ///   "MafStorage": {
+    ///     "UseBuiltinImplementations": true,
+    ///     "RelationalDatabase": {
+    ///       "Provider": "SQLite",  // 或 "PostgreSQL"
+    ///       "SqlitePath": "maf.db"
+    ///     }
+    ///   }
+    /// }
+    /// </code>
+    /// </remarks>
+    /// <param name="services">服务集合</param>
+    /// <param name="configuration">配置对象</param>
+    /// <returns>服务集合（链式调用）</returns>
+    public static IServiceCollection AddMafBuiltinServices(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // 注册内置存储实现
+        services.AddMafStorageImplementations(configuration);
+
+        return services;
+    }
+
+    /// <summary>
+    /// 注册 MAF 存储实现（内置逻辑）
+    /// </summary>
+    private static void AddMafStorageImplementations(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var useBuiltin = configuration.GetValue<bool>(
+            "MafStorage:UseBuiltinImplementations", true);
+
+        if (!useBuiltin)
+        {
+            // 生产环境：使用现有的配置驱动注册
+            services.AddMafInfrastructureServices(configuration);
+            return;
+        }
+
+        // 注册 ICacheStore → RedisCacheStore（增强版：带连接管理）
+        services.AddRedisCacheStore(configuration);
+
+        // 注册 IVectorStore → MemoryVectorStore
+        services.AddSingleton<IVectorStore, MemoryVectorStore>();
+
+        // 注册 IRelationalDatabase → EfCoreRelationalDatabase（增强版：支持 PostgreSQL）
+        services.AddEfCoreRelationalDatabase(configuration);
+    }
+
+    /// <summary>
+    /// 注册 Redis 缓存存储（增强版：带连接管理和日志）
+    /// </summary>
+    private static void AddRedisCacheStore(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddSingleton<IConnectionMultiplexer>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<RedisCacheStore>>();
+            var connectionString = configuration.GetConnectionString("Redis");
+
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                logger.LogWarning("Redis connection string not configured. Using fallback: localhost:6379");
+                connectionString = "localhost:6379";
+            }
+
+            try
+            {
+                return ConnectionMultiplexer.Connect(connectionString);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to connect to Redis at {ConnectionString}", connectionString);
+                throw;
+            }
+        });
+
+        services.AddSingleton<ICacheStore, RedisCacheStore>();
+    }
+
+    /// <summary>
+    /// 注册 EF Core 关系数据库（增强版：支持 PostgreSQL）
+    /// </summary>
+    private static void AddEfCoreRelationalDatabase(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var provider = configuration.GetValue<string>(
+            "MafStorage:RelationalDatabase:Provider", "SQLite");
+
+        services.AddDbContext<MafDbContext>(options =>
+        {
+            if (provider.Equals("SQLite", StringComparison.OrdinalIgnoreCase))
+            {
+                // SQLite: 文件数据库，零配置
+                var dbPath = configuration.GetValue<string>(
+                    "MafStorage:RelationalDatabase:SqlitePath", "maf.db");
+                options.UseSqlite($"Data Source={dbPath}");
+            }
+            else if (provider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase))
+            {
+                // PostgreSQL: 生产环境
+                var connectionString = configuration.GetConnectionString("PostgreSQL");
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    throw new InvalidOperationException(
+                        "PostgreSQL connection string is required when Provider is set to PostgreSQL");
+                }
+                options.UseNpgsql(connectionString);
+            }
+            else
+            {
+                throw new NotSupportedException(
+                    $"Database provider '{provider}' is not supported. " +
+                    "Supported providers: SQLite, PostgreSQL");
+            }
+        });
+
+        services.AddScoped<IRelationalDatabase, EfCoreRelationalDatabase>();
     }
 }
