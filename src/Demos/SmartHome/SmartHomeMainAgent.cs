@@ -17,6 +17,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
         private readonly IAgentMatcher _agentMatcher;
         private readonly ITaskOrchestrator _taskOrchestrator;
         private readonly IResultAggregator _resultAggregator;
+        private readonly IEntityExtractor _entityExtractor;
 
         public override string AgentId => "smarthome:main:agent:001";
         public override string Name => "SmartHomeMainAgent";
@@ -34,6 +35,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
             IAgentMatcher agentMatcher,
             ITaskOrchestrator taskOrchestrator,
             IResultAggregator resultAggregator,
+            IEntityExtractor entityExtractor,
             IMafAiAgentRegistry llmRegistry,
             ILogger<SmartHomeMainAgent> logger)
             : base(llmRegistry, logger)
@@ -43,6 +45,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
             _agentMatcher = agentMatcher ?? throw new ArgumentNullException(nameof(agentMatcher));
             _taskOrchestrator = taskOrchestrator ?? throw new ArgumentNullException(nameof(taskOrchestrator));
             _resultAggregator = resultAggregator ?? throw new ArgumentNullException(nameof(resultAggregator));
+            _entityExtractor = entityExtractor ?? throw new ArgumentNullException(nameof(entityExtractor));
         }
 
         public override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
@@ -58,7 +61,44 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
                 Logger.LogInformation("Recognized intent: {Intent} (confidence: {Confidence})",
                     intent.PrimaryIntent, intent.Confidence);
 
-                // 2. 任务分解
+                // 意图置信度过低时，请求用户澄清
+                if (intent.Confidence < 0.3)
+                {
+                    return BuildLowConfidenceResponse(request.TaskId, intent);
+                }
+
+                // 2. 实体提取
+                var extractionResult = await _entityExtractor.ExtractAsync(request.UserInput, ct);
+                var entities = extractionResult.ExtractedEntities
+                    .GroupBy(e => e.EntityType)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.OrderByDescending(e => e.Confidence).First().EntityValue,
+                        StringComparer.OrdinalIgnoreCase);
+
+                // 3. 澄清判断：检查必需实体是否齐全
+                var clarification = CheckRequiredEntities(intent.PrimaryIntent, entities);
+                if (clarification != null)
+                {
+                    Logger.LogInformation("Clarification needed for intent {Intent}: {Question}",
+                        intent.PrimaryIntent, clarification.Question);
+
+                    return new MafTaskResponse
+                    {
+                        TaskId = request.TaskId,
+                        Success = false,
+                        NeedsClarification = true,
+                        ClarificationQuestion = clarification.Question,
+                        ClarificationOptions = clarification.Options,
+                        Result = clarification.Question,
+                    };
+                }
+
+                // 4. 将提取到的实体注入请求参数（覆盖现有值以确保实体最新）
+                foreach (var entity in entities)
+                    request.Parameters[entity.Key] = entity.Value;
+
+                // 5. 任务分解
                 var decomposition = await _taskDecomposer.DecomposeAsync(request.UserInput, intent, ct);
                 Logger.LogInformation("Decomposed into {Count} sub-tasks", decomposition.SubTasks.Count);
 
@@ -72,20 +112,20 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
                     };
                 }
 
-                // 3. Agent匹配
+                // 6. Agent匹配
                 var agentMapping = await _agentMatcher.MatchBatchAsync(decomposition.SubTasks, ct);
 
-                // 4. 任务编排
+                // 7. 任务编排与执行（独立子任务并行，有依赖的串行）
                 var executionPlan = await _taskOrchestrator.CreatePlanAsync(decomposition.SubTasks, ct);
                 var executionResults = await _taskOrchestrator.ExecutePlanAsync(executionPlan, ct);
 
-                // 5. 结果聚合
+                // 8. 结果聚合
                 var aggregated = await _resultAggregator.AggregateAsync(
                     executionResults,
                     request.UserInput,
                     ct);
 
-                // 6. 生成响应
+                // 9. 生成响应
                 var response = new MafTaskResponse
                 {
                     TaskId = request.TaskId,
@@ -114,6 +154,77 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
                     Error = ex.Message
                 };
             }
+        }
+
+        /// <summary>
+        /// 针对不同意图检查必需实体是否齐全
+        /// </summary>
+        private static ClarificationInfo? CheckRequiredEntities(
+            string intent, Dictionary<string, string> entities)
+        {
+            return intent switch
+            {
+                "QueryWeather" => CheckWeatherEntities(entities),
+                "QueryTemperatureHistory" => CheckTempHistoryEntities(entities),
+                _ => null // 其他意图暂不强制澄清
+            };
+        }
+
+        private static ClarificationInfo? CheckWeatherEntities(Dictionary<string, string> entities)
+        {
+            // 天气查询必需：城市
+            if (!entities.ContainsKey("City") || string.IsNullOrWhiteSpace(entities["City"]))
+            {
+                return new ClarificationInfo
+                {
+                    Question = "请问您想查询哪个城市的天气？",
+                    Options = ["北京", "上海", "广州", "成都", "杭州"],
+                };
+            }
+            return null;
+        }
+
+        private static ClarificationInfo? CheckTempHistoryEntities(Dictionary<string, string> entities)
+        {
+            // 温度历史查询必需：房间
+            if (!entities.ContainsKey("Room") || string.IsNullOrWhiteSpace(entities["Room"]))
+            {
+                return new ClarificationInfo
+                {
+                    Question = "请问您想查询哪个房间的温度历史？",
+                    Options = ["客厅", "卧室", "厨房", "书房"],
+                };
+            }
+            return null;
+        }
+
+        private static MafTaskResponse BuildLowConfidenceResponse(
+            string taskId, IntentRecognitionResult intent)
+        {
+            var candidateHints = new List<string>
+            {
+                "控制设备（如：打开客厅的灯）",
+                "查询天气（如：今天北京天气怎么样）",
+                "查看温度历史（如：客厅最近的温度变化）",
+                "播放音乐（如：播放轻音乐）",
+            };
+
+            return new MafTaskResponse
+            {
+                TaskId = taskId,
+                Success = false,
+                NeedsClarification = true,
+                ClarificationQuestion = "抱歉，我没有完全理解您的意思，您可能想要：",
+                ClarificationOptions = candidateHints,
+                Result = "抱歉，我没有完全理解您的意思，请尝试更清晰地描述您的需求。",
+            };
+        }
+
+        /// <summary>澄清信息</summary>
+        private sealed class ClarificationInfo
+        {
+            public string Question { get; set; } = string.Empty;
+            public List<string> Options { get; set; } = new();
         }
     }
 }

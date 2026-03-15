@@ -19,6 +19,8 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
                 ["AdjustClimate"] = "climate",
                 ["PlayMusic"] = "music",
                 ["SecurityControl"] = "security",
+                ["QueryWeather"] = "weather",
+                ["QueryTemperatureHistory"] = "temperature-history",
                 ["GeneralQuery"] = "general"
             };
         }

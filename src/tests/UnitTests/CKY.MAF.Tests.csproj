@@ -31,14 +31,12 @@
 
   <!-- 添加排除模式来防止重复程序集属性 -->
   <ItemGroup>
-    <Compile Remove="Core\**" />
     <Compile Remove="Factory\**" />
     <Compile Remove="Infrastructure\**" />
     <Compile Remove="LLM\**" />
     <Compile Remove="NLP\**" />
     <Compile Remove="Orchestration\**" />
     <Compile Remove="Scheduling\**" />
-    <Compile Remove="Services\**" />
     <Compile Remove="Storage\**" />
     <EmbeddedResource Remove="Core\**" />
     <EmbeddedResource Remove="Factory\**" />
@@ -47,7 +45,6 @@
     <EmbeddedResource Remove="NLP\**" />
     <EmbeddedResource Remove="Orchestration\**" />
     <EmbeddedResource Remove="Scheduling\**" />
-    <EmbeddedResource Remove="Services\**" />
     <EmbeddedResource Remove="Storage\**" />
     <None Remove="Core\**" />
     <None Remove="Factory\**" />
@@ -56,7 +53,6 @@
     <None Remove="NLP\**" />
     <None Remove="Orchestration\**" />
     <None Remove="Scheduling\**" />
-    <None Remove="Services\**" />
     <None Remove="Storage\**" />
   </ItemGroup>
 

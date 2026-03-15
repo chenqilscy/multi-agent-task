@@ -3,8 +3,12 @@ using CKY.MultiAgentFramework.Core.Agents;
 using CKY.MultiAgentFramework.Core.Agents.Specialized;
 using CKY.MAF.Demos.SmartHome.Components;
 using CKY.MAF.Demos.SmartHome.Hubs;
+using CKY.MultiAgentFramework.Demos.SmartHome;
+using CKY.MultiAgentFramework.Demos.SmartHome.Agents;
 using CKY.MultiAgentFramework.Demos.SmartHome.Providers;
 using CKY.MultiAgentFramework.Demos.SmartHome.Services;
+using CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations;
+using CKY.MultiAgentFramework.Services.Registry;
 using CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
@@ -57,7 +61,7 @@ builder.Services.AddOpenTelemetry()
 // ========================================
 
 // 1. 注册 LLM Agent Registry
-builder.Services.AddSingleton<IMafAiAgentRegistry, LlmAgentRegistry>();
+builder.Services.AddSingleton<IMafAiAgentRegistry, MafAiAgentRegistry>();
 
 // 2. 注册 LLM Agent（可选 - 需要配置 API Key 时启用）
 // builder.Services.AddSingleton<MafAiAgent>(sp =>
@@ -75,7 +79,7 @@ builder.Services.AddSingleton<IMafAiAgentRegistry, LlmAgentRegistry>();
 // });
 
 // 3. 注册 LLM Agent 到 Registry（启动时）
-builder.Services.AddSingleton<MafAgentStartupService>();
+// builder.Services.AddSingleton<MafAgentStartupService>(); // TODO: 实现 MafAgentStartupService
 
 // ========================================
 // NLP 服务注册
@@ -118,6 +122,28 @@ builder.Services.AddSingleton<IIntentProviderMapping>(sp =>
 // 5. 注册 Entity Extractor
 builder.Services.AddSingleton<IEntityExtractor, IntentDrivenEntityExtractor>();
 
+// 6. 注册天气实体模式提供者
+builder.Services.AddSingleton<WeatherEntityPatternProvider>();
+
+// ========================================
+// 智能家居服务注册
+// ========================================
+
+builder.Services.AddSingleton<ILightingService, SimulatedLightingService>();
+builder.Services.AddSingleton<IClimateService, SimulatedClimateService>();
+builder.Services.AddSingleton<IWeatherService, SimulatedWeatherService>();
+builder.Services.AddSingleton<ISensorDataService, SimulatedSensorDataService>();
+
+// 智能家居专用 Agent
+builder.Services.AddSingleton<LightingAgent>();
+builder.Services.AddSingleton<ClimateAgent>();
+builder.Services.AddSingleton<MusicAgent>();
+builder.Services.AddSingleton<WeatherAgent>();
+builder.Services.AddSingleton<TemperatureHistoryAgent>();
+
+// 智能家居控制服务（聚合多个 Agent）
+builder.Services.AddSingleton<SmartHomeControlService>();
+
 // ========================================
 // 专业 Agent 注册
 // ========================================
@@ -155,7 +181,7 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors = true);
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
     // The default HSTS value is 30 days. You may want to see https://aka.ms/aspnetcore/hsts.
     app.UseHsts();
 }
