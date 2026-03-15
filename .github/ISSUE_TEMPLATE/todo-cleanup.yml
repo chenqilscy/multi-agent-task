@@ -1,0 +1,74 @@
+name: TODO 清理
+description: 用于跟踪代码中发现的 TODO 项
+title: "[TODO] "
+labels: ["todo", "cleanup"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## TODO 清理 Issue
+
+        这个 Issue 用于跟踪代码中发现的 TODO 项。创建后请删除文件中的 TODO 注释并引用此 Issue。
+
+  - type: input
+    id: source-file
+    attributes:
+      label: 源文件位置
+      description: 包含 TODO 的源文件路径
+      placeholder: "src/Services/Orchestration/MafTaskOrchestrator.cs"
+    validations:
+      required: true
+
+  - type: input
+    id: line-number
+    attributes:
+      label: 行号
+      description: TODO 所在的行号
+      placeholder: "123"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: TODO 描述
+      description: 详细描述需要完成的工作
+      placeholder: "实现会话存储的 L2/L3 缓存逻辑"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 优先级
+      description: 此 TODO 的优先级
+      options:
+        - 高 - 阻塞性问题，需要立即处理
+        - 中 - 重要但不紧急
+        - 低 - 改进性工作，可以延后
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation-notes
+    attributes:
+      label: 实现说明
+      description: 实现的详细说明或参考文档
+      placeholder: "参考 docs/specs/10-testing-guide.md 的集成测试部分"
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依赖项
+      description: 此 TODO 依赖的其他 Issues 或功能
+      placeholder: "- 依赖 Issue #123"
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: 验收标准
+      description: 如何判断此 TODO 已完成
+      placeholder: |
+        - [ ] 实现功能
+        - [ ] 添加单元测试
+        - [ ] 更新文档

@@ -5,6 +5,8 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 
 namespace CKY.MultiAgentFramework.Core.Agents
 {
@@ -34,6 +36,20 @@ namespace CKY.MultiAgentFramework.Core.Agents
 
         /// <summary>会话管理器（可选）</summary>
         protected readonly IMafAiSessionStore? SessionStore;
+
+        #region 监控指标
+
+        private static readonly Meter MafMeter = new Meter("CKY.MultiAgentFramework");
+        private static readonly Counter<long> InvocationsCounter =
+            MafMeter.CreateCounter<long>("maf_agent_invocations_total", "invocations", "Total agent invocations");
+        private static readonly Histogram<double> DurationHistogram =
+            MafMeter.CreateHistogram<double>("maf_agent_duration_seconds", "s", "Agent duration");
+        private static readonly Counter<long> LlmApiCallsCounter =
+            MafMeter.CreateCounter<long>("maf_llm_api_calls_total", "calls", "Total LLM API calls");
+        private static readonly Histogram<double> LlmLatencyHistogram =
+            MafMeter.CreateHistogram<double>("maf_llm_api_latency_seconds", "s", "LLM API latency");
+
+        #endregion
 
         /// <summary>
         /// 构造函数
@@ -167,70 +183,107 @@ namespace CKY.MultiAgentFramework.Core.Agents
             AgentRunOptions? options = null,
             CancellationToken cancellationToken = default)
         {
-            // 提取用户消息
-            var userMessage = messages.FirstOrDefault(m => m.Role == ChatRole.User);
-            if (userMessage == null)
+            var stopwatch = Stopwatch.StartNew();
+            var agentSuccess = false;
+
+            try
             {
-                throw new ArgumentException("No user message found", nameof(messages));
-            }
-
-            // 提取系统提示（如果有）
-            var systemMessage = messages.FirstOrDefault(m => m.Role == ChatRole.System);
-            var systemPrompt = systemMessage?.Text ?? "你是一个有用的AI助手。";
-
-            // 提取用户消息文本
-            var prompt = userMessage.Text ?? string.Empty;
-
-            // 会话状态管理（使用 MafAgentSession）
-            MafAgentSession? mafAgentSession = null;
-            if (session is MafAgentSession mafSession)
-            {
-                mafAgentSession = mafSession;
-
-                // 检查是否已有会话数据
-                if (!string.IsNullOrEmpty(mafAgentSession.MafSession.SessionId))
+                // 提取用户消息
+                var userMessage = messages.FirstOrDefault(m => m.Role == ChatRole.User);
+                if (userMessage == null)
                 {
-                    // 会话已存在，更新活动
-                    mafAgentSession.UpdateActivity();
-                    mafAgentSession.IncrementTurn();
+                    throw new ArgumentException("No user message found", nameof(messages));
                 }
-                else
+
+                // 提取系统提示（如果有）
+                var systemMessage = messages.FirstOrDefault(m => m.Role == ChatRole.System);
+                var systemPrompt = systemMessage?.Text ?? "你是一个有用的AI助手。";
+
+                // 提取用户消息文本
+                var prompt = userMessage.Text ?? string.Empty;
+
+                // 会话状态管理（使用 MafAgentSession）
+                MafAgentSession? mafAgentSession = null;
+                if (session is MafAgentSession mafSession)
                 {
-                    // 新会话，生成会话 ID
-                    mafAgentSession.MafSession.SessionId = Guid.NewGuid().ToString();
+                    mafAgentSession = mafSession;
+
+                    // 检查是否已有会话数据
+                    if (!string.IsNullOrEmpty(mafAgentSession.MafSession.SessionId))
+                    {
+                        // 会话已存在，更新活动
+                        mafAgentSession.UpdateActivity();
+                        mafAgentSession.IncrementTurn();
+                    }
+                    else
+                    {
+                        // 新会话，生成会话 ID
+                        mafAgentSession.MafSession.SessionId = Guid.NewGuid().ToString();
+                    }
                 }
+
+                // LLM API 调用监控
+                var llmStopwatch = Stopwatch.StartNew();
+                string responseText;
+
+                try
+                {
+                    // 调用子类实现的 ExecuteAsync 方法
+                    responseText = await ExecuteAsync(
+                        Config.ModelId,
+                        prompt,
+                        systemPrompt,
+                        cancellationToken);
+
+                    llmStopwatch.Stop();
+
+                    // 记录 LLM API 调用指标
+                    RecordLlmApiCall(success: true, latency: llmStopwatch.Elapsed);
+                }
+                catch (Exception ex)
+                {
+                    llmStopwatch.Stop();
+                    RecordLlmApiCall(success: false, latency: llmStopwatch.Elapsed);
+                    Logger.LogError(ex, "[MafAiAgent] LLM API call failed");
+                    throw;
+                }
+
+                // 更新会话状态（如果启用）
+                if (mafAgentSession != null)
+                {
+                    var estimatedTokens = EstimateTokenCount(prompt) + EstimateTokenCount(responseText);
+                    mafAgentSession.UpdateActivity(estimatedTokens);
+
+                    // 保存会话状态
+                    await mafAgentSession.SaveAsync(cancellationToken);
+
+                    // 保存聊天历史
+                    var chatHistory = new List<ChatMessage> { userMessage, new ChatMessage(ChatRole.Assistant, responseText) };
+                    await mafAgentSession.SaveChatHistoryAsync(chatHistory, cancellationToken);
+
+                    Logger.LogDebug("[MafAiAgent] Session updated: {SessionId}, Turns: {TurnCount}, Tokens: {TokenCount}",
+                        mafAgentSession.MafSession.SessionId,
+                        mafAgentSession.MafSession.TurnCount,
+                        mafAgentSession.MafSession.TotalTokensUsed);
+                }
+
+                // 构建响应消息列表
+                var responseMessages = new List<ChatMessage>
+                {
+                    new ChatMessage(ChatRole.Assistant, responseText)
+                };
+
+                agentSuccess = true;
+                stopwatch.Stop();
+
+                // 返回 AgentResponse
+                return new AgentResponse(responseMessages);
             }
-
-            // 调用子类实现的 ExecuteAsync 方法
-            var responseText = await ExecuteAsync(
-                Config.ModelId,
-                prompt,
-                systemPrompt,
-                cancellationToken);
-
-            // 更新会话状态（如果启用）
-            if (mafAgentSession != null)
+            finally
             {
-                var estimatedTokens = EstimateTokenCount(prompt) + EstimateTokenCount(responseText);
-                mafAgentSession.UpdateActivity(estimatedTokens);
-
-                // 保存会话状态
-                await mafAgentSession.SaveAsync(cancellationToken);
-
-                Logger.LogDebug("[MafAiAgent] Session updated: {SessionId}, Turns: {TurnCount}, Tokens: {TokenCount}",
-                    mafAgentSession.MafSession.SessionId,
-                    mafAgentSession.MafSession.TurnCount,
-                    mafAgentSession.MafSession.TotalTokensUsed);
+                // 记录 Agent 执行指标
+                RecordAgentExecution(success: agentSuccess, duration: stopwatch.Elapsed);
             }
-
-            // 构建响应消息列表
-            var responseMessages = new List<ChatMessage>
-            {
-                new ChatMessage(ChatRole.Assistant, responseText)
-            };
-
-            // 返回 AgentResponse
-            return new AgentResponse(responseMessages);
         }
 
         /// <summary>
@@ -426,6 +479,45 @@ namespace CKY.MultiAgentFramework.Core.Agents
             var estimatedTokens = (int)(chineseCharCount / 1.5) + wordCount;
 
             return Math.Max(1, estimatedTokens); // 至少 1 个 token
+        }
+
+        /// <summary>
+        /// 记录 Agent 执行指标
+        /// </summary>
+        private void RecordAgentExecution(bool success, TimeSpan duration)
+        {
+            var tags = new TagList
+            {
+                { "agent", AgentId },
+                { "provider", Config.ProviderName },
+                { "model", Config.ModelId },
+                { "success", success }
+            };
+
+            InvocationsCounter.Add(1, tags);
+            DurationHistogram.Record(duration.TotalSeconds, tags);
+
+            Logger.LogDebug("[MafMonitoring] Agent: {AgentId}, Success: {Success}, Duration: {Duration}s",
+                AgentId, success, duration.TotalSeconds);
+        }
+
+        /// <summary>
+        /// 记录 LLM API 调用指标
+        /// </summary>
+        private void RecordLlmApiCall(bool success, TimeSpan latency)
+        {
+            var tags = new TagList
+            {
+                { "provider", Config.ProviderName },
+                { "model", Config.ModelId },
+                { "success", success }
+            };
+
+            LlmApiCallsCounter.Add(1, tags);
+            LlmLatencyHistogram.Record(latency.TotalSeconds, tags);
+
+            Logger.LogDebug("[MafMonitoring] LLM API: {Provider}/{Model}, Success: {Success}, Latency: {Latency}s",
+                Config.ProviderName, Config.ModelId, success, latency.TotalSeconds);
         }
 
         #endregion
