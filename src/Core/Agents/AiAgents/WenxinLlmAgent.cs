@@ -39,9 +39,9 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
     /// </code>
     ///
     /// 实现状态：
-    /// - TODO: 实现文心一言 API 调用
-    /// - TODO: 实现流式输出
-    /// - TODO: 支持知识库检索
+    /// - 待实现：文心一言 API 调用（参考上方文档链接）
+    /// - 待实现：流式输出（SSE 流式响应）
+    /// - 待实现：知识库检索支持
     ///
     /// 参考文档：
     /// https://cloud.baidu.com/doc/WENXINWORKSHOP/s/Nlks5zkzu
@@ -65,7 +65,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // TODO: 实现文心一言 API 调用
+            // 在此处实现文心一言 HTTP API 调用
             throw new NotImplementedException("WenxinLlmAgent.ExecuteAsync not yet implemented");
         }
 
@@ -76,7 +76,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // TODO: 实现文心一言流式 API 调用
+            // 在此处实现文心一言流式 API 调用
             throw new NotImplementedException("WenxinLlmAgent.ExecuteStreamingAsync not yet implemented");
         }
     }

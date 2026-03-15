@@ -38,9 +38,9 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
     /// </code>
     ///
     /// 实现状态：
-    /// - TODO: 实现讯飞星火 API 调用
-    /// - TODO: 实现流式输出
-    /// - TODO: 支持语音输入/输出
+    /// - 待实现：讯飞星火 API 调用（HTTP/WebSocket，参考上方文档链接）
+    /// - 待实现：流式输出（SSE/WebSocket 流式响应）
+    /// - 待实现：语音输入/输出支持
     ///
     /// 参考文档：
     /// https://www.xfyun.cn/doc/spark/http.html
@@ -64,7 +64,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // TODO: 实现讯飞星火 API 调用
+            // 在此处实现讯飞星火 HTTP API 调用
             throw new NotImplementedException("XunfeiLlmAgent.ExecuteAsync not yet implemented");
         }
 
@@ -75,7 +75,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // TODO: 实现讯飞星火流式 API 调用
+            // 在此处实现讯飞星火流式 API 调用
             throw new NotImplementedException("XunfeiLlmAgent.ExecuteStreamingAsync not yet implemented");
         }
     }

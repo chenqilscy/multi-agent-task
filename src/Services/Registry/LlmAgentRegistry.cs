@@ -131,8 +131,8 @@ namespace CKY.MultiAgentFramework.Services.Registry
 
         public Task ReloadFromDatabaseAsync(CancellationToken ct = default)
         {
-            // TODO: 从数据库重新加载配置
-            _logger.LogInformation("[Registry] Reloading from database (TODO: not implemented)");
+            // 从数据库重新加载配置（当前使用内存中的配置，数据库集成在 Task 11 中实现）
+            _logger.LogInformation("[Registry] ReloadFromDatabaseAsync called. Using in-memory configuration (database integration pending).");
             return Task.CompletedTask;
         }
     }

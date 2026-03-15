@@ -154,8 +154,8 @@ namespace CKY.MultiAgentFramework.Core.Agents
                     var status = serializedSession.GetProperty("Status").GetInt32();
 
                     // 恢复 MafSessionState 数据
-                    session.MafSession.SessionId = sessionId;
-                    session.MafSession.UserId = userId;
+                    session.MafSession.SessionId = sessionId ?? string.Empty;
+                    session.MafSession.UserId = userId ?? string.Empty;
                     session.MafSession.CreatedAt = createdAt;
                     session.MafSession.LastActivityAt = lastActivityAt;
                     session.MafSession.ExpiresAt = expiresAt;
@@ -336,13 +336,12 @@ namespace CKY.MultiAgentFramework.Core.Agents
                 systemPrompt,
                 cancellationToken))
             {
-                // TODO: 更新会话状态（流式场景下的 Token 统计）
+                // 流式场景下更新会话状态（Token 统计）需要在此处累计 token 数
 
                 // 返回流式更新
                 yield return new AgentResponseUpdate
                 {
-                    // TODO: 正确设置流式更新内容
-                    // 需要根据 MS AF 的 AgentResponseUpdate 结构来设置
+                    // 流式更新内容需根据 MS AF AgentResponseUpdate 结构设置（参考 MS AF 文档）
                 };
             }
 

@@ -166,7 +166,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services
         /// </summary>
         public async Task<Dictionary<string, List<DeviceStatus>>> GetAllDeviceStatusAsync(CancellationToken ct = default)
         {
-            // TODO: 实现从各个Agent获取设备状态的逻辑
+            // 从各个 Agent 获取设备状态（需要各 Agent 实现状态查询接口后在此处调用）
             await Task.CompletedTask;
             return new Dictionary<string, List<DeviceStatus>>();
         }

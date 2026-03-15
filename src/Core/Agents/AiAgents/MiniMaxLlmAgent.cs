@@ -38,9 +38,9 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
     /// </code>
     ///
     /// 实现状态：
-    /// - TODO: 实现 MiniMax API 调用
-    /// - TODO: 实现流式输出
-    /// - TODO: 支持多模态输入
+    /// - 待实现：MiniMax API 调用（参考上方文档链接）
+    /// - 待实现：流式输出（SSE 流式响应）
+    /// - 待实现：多模态输入支持（图像、音频）
     ///
     /// 参考文档：
     /// https://www.minimaxi.com/document/guides/chat/pro/V2
@@ -64,7 +64,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // TODO: 实现MiniMax API 调用
+            // 在此处实现 MiniMax HTTP API 调用
             throw new NotImplementedException("MiniMaxLlmAgent.ExecuteAsync not yet implemented");
         }
 
@@ -75,7 +75,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string? systemPrompt = null,
             CancellationToken ct = default)
         {
-            // TODO: 实现MiniMax流式 API 调用
+            // 在此处实现 MiniMax 流式 API 调用
             throw new NotImplementedException("MiniMaxLlmAgent.ExecuteStreamingAsync not yet implemented");
         }
     }

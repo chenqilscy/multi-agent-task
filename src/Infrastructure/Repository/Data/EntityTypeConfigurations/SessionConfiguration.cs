@@ -33,17 +33,17 @@ namespace CKY.MultiAgentFramework.Infrastructure.Repository.Data.EntityTypeConfi
             // 配置复杂类型的 JSON 序列化
             builder.Property(x => x.Metadata)
                 .HasConversion(
-                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions)null),
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                     v => string.IsNullOrEmpty(v)
                         ? new Dictionary<string, object>()
-                        : JsonSerializer.Deserialize<Dictionary<string, object>>(v, (JsonSerializerOptions)null) ?? new Dictionary<string, object>()
+                        : JsonSerializer.Deserialize<Dictionary<string, object>>(v, (JsonSerializerOptions?)null) ?? new Dictionary<string, object>()
                 )
                 .HasMaxLength(4000);
 
             builder.Property(x => x.Items)
                 .HasConversion(
-                    v => v != null ? JsonSerializer.Serialize(v, (JsonSerializerOptions)null) : null,
-                    v => v != null ? JsonSerializer.Deserialize<IDictionary<string, object>>(v, (JsonSerializerOptions)null) : null
+                    v => v != null ? JsonSerializer.Serialize(v, (JsonSerializerOptions?)null) : null,
+                    v => v != null ? JsonSerializer.Deserialize<IDictionary<string, object>>(v, (JsonSerializerOptions?)null) : null
                 )
                 .HasMaxLength(8000);
 

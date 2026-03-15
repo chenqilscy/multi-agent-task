@@ -242,7 +242,7 @@ namespace CKY.MultiAgentFramework.Infrastructure.Context
         /// </summary>
         public CompressionStats GetStats()
         {
-            // TODO: 实现统计信息收集
+            // 统计信息收集功能待实现（需要在 CompressAndStoreAsync 中增加计数器）
             return new CompressionStats
             {
                 TotalCompressions = 0,

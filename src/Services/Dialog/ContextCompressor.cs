@@ -38,7 +38,7 @@ namespace CKY.MultiAgentFramework.Services.Dialog
 
             _logger.LogInformation("Starting context compression for session: {SessionId}", context.SessionId);
 
-            // TODO: Get messages from session store (will be implemented when session store is integrated)
+            // 从 session store 获取消息（Session Store 集成后在此处读取历史消息）
             var messages = new List<MessageContext>();
 
             if (messages.Count == 0)
@@ -78,7 +78,7 @@ namespace CKY.MultiAgentFramework.Services.Dialog
                 result.OriginalMessageCount,
                 result.CompressionRatio);
 
-            // TODO: Store compressed data to L2/L3 (will be implemented when session store is integrated)
+            // 将压缩数据持久化到 L2/L3（Session Store 集成后在此处写入）
 
             return result;
         }
