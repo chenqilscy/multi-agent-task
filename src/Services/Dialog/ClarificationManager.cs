@@ -192,9 +192,19 @@ namespace CKY.MultiAgentFramework.Services.Dialog
 
                 return response.Trim();
             }
+            catch (System.Text.Json.JsonException ex)
+            {
+                _logger.LogError(ex, "JSON parsing failed during LLM question generation");
+                return await GenerateTemplateQuestionAsync(context, ct);
+            }
+            catch (System.InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation during LLM question generation");
+                return await GenerateTemplateQuestionAsync(context, ct);
+            }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "LLM question generation failed, falling back to template");
+                _logger.LogWarning(ex, "Unexpected error in LLM question generation, falling back to template");
                 return await GenerateTemplateQuestionAsync(context, ct);
             }
         }
@@ -235,7 +245,11 @@ namespace CKY.MultiAgentFramework.Services.Dialog
 
             // Extract entities from user input
             // This is simplified - in production, use entity extractor
-            foreach (var slot in clarificationContext.MissingSlots.ToList())
+            // Fix: Create a copy to avoid modifying collection during iteration
+            var slotsToProcess = clarificationContext.MissingSlots.ToList();
+            clarificationContext.MissingSlots.Clear();
+
+            foreach (var slot in slotsToProcess)
             {
                 if (userInput.Contains(slot.Description) ||
                     (slot.Synonyms.Count > 0 && slot.Synonyms.Any(s => userInput.Contains(s))))
@@ -245,9 +259,18 @@ namespace CKY.MultiAgentFramework.Services.Dialog
                     if (value != null)
                     {
                         response.UpdatedSlots[slot.SlotName] = value;
-                        clarificationContext.MissingSlots.Remove(slot);
                         clarificationContext.FilledSlots[slot.SlotName] = value;
                     }
+                    else
+                    {
+                        // Slot still missing, add back to list
+                        clarificationContext.MissingSlots.Add(slot);
+                    }
+                }
+                else
+                {
+                    // Slot not found in input, still missing
+                    clarificationContext.MissingSlots.Add(slot);
                 }
             }
 
@@ -284,6 +307,12 @@ namespace CKY.MultiAgentFramework.Services.Dialog
 
             if (slot.Type == SlotType.Integer && int.TryParse(input, out var intValue))
             {
+                // Add range validation for integer values
+                if (intValue < 0)
+                {
+                    _logger.LogWarning("Negative integer value provided: {Value}", intValue);
+                    return null;
+                }
                 return intValue;
             }
 

@@ -12,7 +12,7 @@ namespace CKY.MultiAgentFramework.Services.Dialog
     {
         private readonly Stack<DialogState> _stateStack;
         private readonly ILogger<DialogStateManager> _logger;
-        private readonly object _lock = new object();
+        private readonly object _lock = new();  // Fixed: Use target-typed new
 
         public DialogStateManager(ILogger<DialogStateManager> logger)
         {
@@ -48,6 +48,14 @@ namespace CKY.MultiAgentFramework.Services.Dialog
 
             lock (_lock)
             {
+                // Fixed: Add max stack depth to prevent memory leak
+                const int maxStackDepth = 50;
+                if (_stateStack.Count >= maxStackDepth)
+                {
+                    _logger.LogWarning("Stack depth exceeds {MaxDepth}, removing oldest state", maxStackDepth);
+                    _stateStack.Pop(); // Remove oldest
+                }
+
                 _stateStack.Push(state);
                 _logger.LogDebug("Pushed dialog state. Intent: {Intent}, Stack depth: {Depth}",
                     state.CurrentIntent, _stateStack.Count);
