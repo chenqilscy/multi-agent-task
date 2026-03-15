@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Memory;
@@ -94,5 +95,122 @@ public class MafServiceRegistrationExtensionsTests
         descriptor.Should().NotBeNull();
         descriptor?.ImplementationType.Should().Be(typeof(MemoryCacheStore));
         descriptor?.Lifetime.Should().Be(ServiceLifetime.Singleton);
+    }
+
+    [Fact]
+    public void AddMafBuiltinServices_ShouldRegisterAllBuiltinServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MafStorage:UseBuiltinImplementations"] = "true",
+                ["MafStorage:RelationalDatabase:Provider"] = "SQLite"
+            })
+            .Build();
+
+        // Act
+        services.AddMafBuiltinServices(configuration);
+
+        // Assert - 验证所有核心服务都已注册
+        var cacheStoreDescriptor = services.FirstOrDefault(
+            sd => sd.ServiceType == typeof(ICacheStore));
+        cacheStoreDescriptor.Should().NotBeNull("ICacheStore should be registered");
+        cacheStoreDescriptor?.ImplementationType.Should().Be(typeof(RedisCacheStore));
+        cacheStoreDescriptor?.Lifetime.Should().Be(ServiceLifetime.Singleton);
+
+        var vectorStoreDescriptor = services.FirstOrDefault(
+            sd => sd.ServiceType == typeof(IVectorStore));
+        vectorStoreDescriptor.Should().NotBeNull("IVectorStore should be registered");
+        vectorStoreDescriptor?.ImplementationType.Should().Be(typeof(MemoryVectorStore));
+        vectorStoreDescriptor?.Lifetime.Should().Be(ServiceLifetime.Singleton);
+
+        var databaseDescriptor = services.FirstOrDefault(
+            sd => sd.ServiceType == typeof(IRelationalDatabase));
+        databaseDescriptor.Should().NotBeNull("IRelationalDatabase should be registered");
+        databaseDescriptor?.ImplementationType.Should().Be(typeof(EfCoreRelationalDatabase));
+        databaseDescriptor?.Lifetime.Should().Be(ServiceLifetime.Scoped);
+
+        // 验证 IConfigureOptions<RedisCacheStoreOptions> 已注册
+        var configureOptionsDescriptor = services.FirstOrDefault(
+            sd => sd.ServiceType == typeof(IConfigureOptions<RedisCacheStoreOptions>));
+        configureOptionsDescriptor.Should().NotBeNull("IConfigureOptions<RedisCacheStoreOptions> should be registered");
+    }
+
+    [Fact]
+    public void AddMafBuiltinServices_WithUseBuiltinFalse_ShouldUseConfigDrivenRegistration()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MafStorage:UseBuiltinImplementations"] = "false"
+            })
+            .Build();
+
+        // Act
+        services.AddMafBuiltinServices(configuration);
+
+        // Assert - 应该使用默认配置驱动注册（内存实现）
+        var cacheStoreDescriptor = services.FirstOrDefault(
+            sd => sd.ServiceType == typeof(ICacheStore));
+        cacheStoreDescriptor.Should().NotBeNull();
+        cacheStoreDescriptor?.ImplementationType.Should().Be(typeof(MemoryCacheStore));
+    }
+
+    [Fact]
+    public void AddMafBuiltinServices_WithPostgreSQLConfig_ShouldRegisterPostgreSQL()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MafStorage:UseBuiltinImplementations"] = "true",
+                ["MafStorage:RelationalDatabase:Provider"] = "PostgreSQL",
+                ["ConnectionStrings:PostgreSQL"] = "Host=localhost;Port=5432;Database=test"
+            })
+            .Build();
+
+        // Act
+        services.AddMafBuiltinServices(configuration);
+
+        // Assert
+        var databaseDescriptor = services.FirstOrDefault(
+            sd => sd.ServiceType == typeof(IRelationalDatabase));
+        databaseDescriptor.Should().NotBeNull();
+        databaseDescriptor?.ImplementationType.Should().Be(typeof(EfCoreRelationalDatabase));
+    }
+
+    [Fact]
+    public void AddMafBuiltinServices_ShouldRegisterRedisCacheStoreWithOptions()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MafStorage:UseBuiltinImplementations"] = "true",
+                ["MafStorage:RelationalDatabase:Provider"] = "SQLite",
+                ["RedisCache:DatabaseId"] = "1",
+                ["RedisCache:EnableVerboseLogging"] = "true"
+            })
+            .Build();
+
+        // Act
+        services.AddMafBuiltinServices(configuration);
+
+        // Assert - 验证 RedisCacheStore 已注册
+        var cacheStoreDescriptor = services.FirstOrDefault(
+            sd => sd.ServiceType == typeof(ICacheStore) &&
+                  sd.ImplementationType == typeof(RedisCacheStore));
+        cacheStoreDescriptor.Should().NotBeNull("RedisCacheStore should be registered");
+
+        // 验证 RedisCacheStoreOptions 已正确配置
+        var optionsDescriptor = services.FirstOrDefault(
+            sd => sd.ServiceType == typeof(IConfigureOptions<RedisCacheStoreOptions>));
+        optionsDescriptor.Should().NotBeNull("RedisCacheStoreOptions configuration should be registered");
     }
 }

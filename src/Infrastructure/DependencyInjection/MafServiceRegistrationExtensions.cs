@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using Microsoft.EntityFrameworkCore;
 
@@ -207,6 +208,10 @@ public static class MafServiceRegistrationExtensions
                 throw;
             }
         });
+
+        // 注册配置选项（必须在使用 RedisCacheStore 之前注册）
+        services.Configure<RedisCacheStoreOptions>(options =>
+            configuration.GetSection("RedisCache").Bind(options));
 
         services.AddSingleton<ICacheStore, RedisCacheStore>();
     }
