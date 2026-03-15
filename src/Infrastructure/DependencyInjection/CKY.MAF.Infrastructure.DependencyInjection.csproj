@@ -30,7 +30,7 @@
     <ProjectReference Include="..\..\Core\CKY.MAF.Core.csproj" />
     <ProjectReference Include="..\Caching\CKY.MAF.Infrastructure.Caching.csproj" />
     <ProjectReference Include="..\Vectorization\CKY.MAF.Infrastructure.Vectorization.csproj" />
-    <ProjectReference Include="..\Repository\CKY.MAF.Repository.csproj" />
+    <ProjectReference Include="..\Repository\CKY.MAF.Infrastructure.Repository.csproj" />
   </ItemGroup>
 
 </Project>

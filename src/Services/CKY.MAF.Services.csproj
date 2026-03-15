@@ -2,7 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Core\CKY.MAF.Core.csproj" />
-    <ProjectReference Include="..\Infrastructure\Repository\CKY.MAF.Repository.csproj" />
+    <ProjectReference Include="..\Infrastructure\Repository\CKY.MAF.Infrastructure.Repository.csproj" />
   </ItemGroup>
 
   <ItemGroup>
