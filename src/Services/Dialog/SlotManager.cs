@@ -256,9 +256,116 @@ namespace CKY.MultiAgentFramework.Services.Dialog
             string intent,
             CancellationToken ct = default)
         {
-            // TODO: Task 1.6 实现
-            // TODO: Implement in Task 1.6
-            return Task.FromResult("请提供更多信息");
+            _logger.LogDebug("Generating clarification for intent: {Intent}, missing slots: {Count}", intent, missingSlots.Count);
+
+            if (missingSlots.Count == 0)
+            {
+                return Task.FromResult(string.Empty);
+            }
+
+            // 策略1: 检查是否有必填槽位
+            // Strategy 1: Check if there are required slots
+            var requiredSlots = missingSlots.Where(s => s.Required).ToList();
+
+            if (requiredSlots.Count > 0)
+            {
+                // 策略1a: 单个必填槽位缺失 - 直接询问
+                // Strategy 1a: Single required slot missing - direct question
+                if (requiredSlots.Count == 1 && missingSlots.Count == 1)
+                {
+                    var singleQuestion = GenerateSingleSlotQuestion(requiredSlots[0]);
+                    return Task.FromResult(singleQuestion);
+                }
+
+                // 策略1b: 多个必填槽位缺失 - 列表询问或组合询问
+                // Strategy 1b: Multiple required slots missing - list or combined question
+                var multipleQuestion = GenerateMultipleSlotsQuestion(requiredSlots);
+                return Task.FromResult(multipleQuestion);
+            }
+
+            // 策略2: 只有可选槽位缺失 - 询问是否需要
+            // Strategy 2: Only optional slots missing - ask if needed
+            var optionalQuestion = GenerateOptionalSlotsQuestion(missingSlots);
+            return Task.FromResult(optionalQuestion);
+        }
+
+        private string GenerateSingleSlotQuestion(SlotDefinition slot)
+        {
+            // 优先级1: 有有效值列表 - 提供选项
+            // Priority 1: Has valid values list - show options
+            if (slot.ValidValues != null && slot.ValidValues.Length > 0)
+            {
+                var options = string.Join("、", slot.ValidValues);
+                return $"请选择{slot.Description}：{options}";
+            }
+
+            // 优先级2: 有同义词 - 提供示例
+            // Priority 2: Has synonyms - show examples
+            if (slot.Synonyms.Count > 0)
+            {
+                var examples = string.Join("、", slot.Synonyms.Take(2));
+                return $"请问您想要{slot.Description}？例如：{examples}";
+            }
+
+            // 默认: 简单询问
+            // Default: simple question
+            return $"请问{slot.Description}是什么？";
+        }
+
+        private string GenerateMultipleSlotsQuestion(List<SlotDefinition> slots)
+        {
+            // 检查是否可以通过一个自然语言问题覆盖多个槽位
+            // Check if we can cover multiple slots with one natural language question
+            if (TryGenerateCombinedQuestion(slots, out var combinedQuestion))
+            {
+                return combinedQuestion!;
+            }
+
+            // 默认: 列出所有槽位
+            // Default: list all slots
+            var slotDescriptions = string.Join("、", slots.Select(s => s.Description));
+            return $"请提供以下信息：{slotDescriptions}";
+        }
+
+        private bool TryGenerateCombinedQuestion(List<SlotDefinition> slots, out string? question)
+        {
+            question = null;
+
+            // 常见组合模式识别
+            // Common combination pattern recognition
+            var slotNames = slots.Select(s => s.SlotName).ToHashSet();
+
+            // 模式1: Location + Date → "请问您想查询哪个城市哪天的天气？"
+            // Pattern 1: Location + Date → "Which city and which day's weather?"
+            if (slotNames.Contains("Location") && slotNames.Contains("Date"))
+            {
+                question = "请问您想查询哪个城市哪天的天气？";
+                return true;
+            }
+
+            // 模式2: Device + Location + Action → "请问您想在哪个房间控制什么设备？"
+            // Pattern 2: Device + Location + Action → "Which room and which device?"
+            if (slotNames.Contains("Device") && slotNames.Contains("Location") && slotNames.Contains("Action"))
+            {
+                question = "请问您想在哪个房间控制什么设备？";
+                return true;
+            }
+
+            // 模式3: Device + Location → "请问您想控制哪个房间的什么设备？"
+            // Pattern 3: Device + Location → "Which room's which device?"
+            if (slotNames.Contains("Device") && slotNames.Contains("Location"))
+            {
+                question = "请问您想控制哪个房间的什么设备？";
+                return true;
+            }
+
+            return false;
+        }
+
+        private string GenerateOptionalSlotsQuestion(List<SlotDefinition> slots)
+        {
+            var slotDescriptions = string.Join("、", slots.Select(s => s.Description));
+            return $"是否需要指定{slotDescriptions}？（可选）";
         }
     }
 }

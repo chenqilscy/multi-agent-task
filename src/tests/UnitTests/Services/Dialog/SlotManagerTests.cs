@@ -433,6 +433,190 @@ namespace CKY.MultiAgentFramework.Tests.UnitTests.Services.Dialog
             Assert.Equal("空调", result["Device"]);
             Assert.Equal("卧室", result["Location"]);
         }
+
+        [Fact]
+        public async Task GenerateClarification_SingleMissingSlot_ReturnsDirectQuestion()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var missingSlots = new List<SlotDefinition>
+            {
+                new SlotDefinition
+                {
+                    SlotName = "Location",
+                    Description = "位置",
+                    Type = SlotType.String,
+                    Required = true
+                }
+            };
+
+            // Act
+            var result = await manager.GenerateClarificationAsync(missingSlots, "control_device");
+
+            // Assert
+            Assert.Contains("位置", result);
+            Assert.Contains("请问", result);
+        }
+
+        [Fact]
+        public async Task GenerateClarification_SingleSlotWithValidValues_ShowsOptions()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var missingSlots = new List<SlotDefinition>
+            {
+                new SlotDefinition
+                {
+                    SlotName = "Action",
+                    Description = "操作",
+                    Type = SlotType.Enumeration,
+                    Required = true,
+                    ValidValues = new[] { "打开", "关闭", "调节" }
+                }
+            };
+
+            // Act
+            var result = await manager.GenerateClarificationAsync(missingSlots, "control_device");
+
+            // Assert
+            Assert.Contains("操作", result);
+            Assert.Contains("打开", result);
+            Assert.Contains("关闭", result);
+            Assert.Contains("选择", result);
+        }
+
+        [Fact]
+        public async Task GenerateClarification_MultipleMissingSlots_ListsAllSlots()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var missingSlots = new List<SlotDefinition>
+            {
+                new SlotDefinition { SlotName = "Device", Description = "设备", Required = true },
+                new SlotDefinition { SlotName = "Action", Description = "操作", Required = true }
+            };
+
+            // Act
+            var result = await manager.GenerateClarificationAsync(missingSlots, "control_device");
+
+            // Assert
+            Assert.Contains("设备", result);
+            Assert.Contains("操作", result);
+            Assert.Contains("请提供", result);
+        }
+
+        [Fact]
+        public async Task GenerateClarification_LocationAndDateCombination_ReturnsCombinedQuestion()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var missingSlots = new List<SlotDefinition>
+            {
+                new SlotDefinition { SlotName = "Location", Description = "城市", Required = true },
+                new SlotDefinition { SlotName = "Date", Description = "日期", Required = true }
+            };
+
+            // Act
+            var result = await manager.GenerateClarificationAsync(missingSlots, "query_weather");
+
+            // Assert
+            Assert.Contains("城市", result);
+            Assert.Contains("天气", result);
+            Assert.Contains("哪个城市", result);
+        }
+
+        [Fact]
+        public async Task GenerateClarification_DeviceLocationActionCombination_ReturnsCombinedQuestion()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var missingSlots = new List<SlotDefinition>
+            {
+                new SlotDefinition { SlotName = "Device", Description = "设备", Required = true },
+                new SlotDefinition { SlotName = "Location", Description = "位置", Required = true },
+                new SlotDefinition { SlotName = "Action", Description = "操作", Required = true }
+            };
+
+            // Act
+            var result = await manager.GenerateClarificationAsync(missingSlots, "control_device");
+
+            // Assert
+            Assert.Contains("房间", result);
+            Assert.Contains("设备", result);
+        }
+
+        [Fact]
+        public async Task GenerateClarification_OptionalSlotsOnly_PromptsWithOptional()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var missingSlots = new List<SlotDefinition>
+            {
+                new SlotDefinition
+                {
+                    SlotName = "Mode",
+                    Description = "模式",
+                    Required = false,
+                    ValidValues = new[] { "制冷", "制热", "除湿", "送风" }
+                }
+            };
+
+            // Act
+            var result = await manager.GenerateClarificationAsync(missingSlots, "control_device");
+
+            // Assert
+            Assert.Contains("模式", result);
+            Assert.Contains("可选", result);
+        }
+
+        [Fact]
+        public async Task GenerateClarification_EmptyList_ReturnsEmptyString()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var missingSlots = new List<SlotDefinition>();
+
+            // Act
+            var result = await manager.GenerateClarificationAsync(missingSlots, "control_device");
+
+            // Assert
+            Assert.Empty(result);
+        }
     }
 
     /// <summary>
