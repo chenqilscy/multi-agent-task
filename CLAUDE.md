@@ -251,6 +251,99 @@ public class MafTaskSchedulerTests
 - ❌ Never use SemanticKernel API or other LLM orchestration frameworks - use MS AF only
 - ❌ Never directly depend on LLM provider SDKs (OpenAI, Azure OpenAI, etc.) in Core or Services layers - use abstractions
 
+## 内置存储实现
+
+CKY.MAF 提供以下**内置推荐实现**：
+
+### 快速参考表
+
+| 接口 | 默认实现 | 生产环境推荐 | 部署要求 |
+|------|---------|-------------|---------|
+| ICacheStore | RedisCacheStore | RedisCacheStore | ✅ 需要 Redis 服务 |
+| IVectorStore | MemoryVectorStore | ⭐ QdrantVectorStore | ✅ 零配置（Demo）<br>🐳 Docker（生产） |
+| IRelationalDatabase | EfCoreRelationalDatabase | ⭐ PostgreSQL | ✅ SQLite（零配置）<br>⭐ PostgreSQL（生产） |
+
+### 快速启动
+
+Demo 应用使用 `AddMafBuiltinServices()` 一行注册所有服务：
+
+```csharp
+// Program.cs
+var builder = WebApplication.CreateBuilder(args);
+
+// 🚀 一行注册所有内置服务
+builder.Services.AddMafBuiltinServices(builder.Configuration);
+
+var app = builder.Build();
+app.Run();
+```
+
+这将自动使用内置推荐实现：
+- ICacheStore → RedisCacheStore
+- IVectorStore → MemoryVectorStore（Demo）/ QdrantVectorStore（生产）
+- IRelationalDatabase → EfCoreRelationalDatabase (SQLite)
+
+### 配置文件示例
+
+**appsettings.json（Demo 零配置）**：
+```json
+{
+  "ConnectionStrings": {
+    "Redis": "localhost:6379"
+  },
+  "MafStorage": {
+    "UseBuiltinImplementations": true,
+    "RelationalDatabase": {
+      "Provider": "SQLite"
+    }
+  }
+}
+```
+
+**appsettings.Production.json（生产环境）**：
+```json
+{
+  "ConnectionStrings": {
+    "Redis": "redis-server:6379",
+    "PostgreSQL": "Host=postgres-server;Database=mafdb;Username=maf;Password=***"
+  },
+  "MafStorage": {
+    "UseBuiltinImplementations": false,
+    "RelationalDatabase": {
+      "Provider": "PostgreSQL"
+    }
+  },
+  "Qdrant": {
+    "Host": "http://qdrant-server:6333"
+  }
+}
+```
+
+### 部署建议
+
+**Demo/开发环境**：
+- MemoryVectorStore（零配置）
+- SQLite（零配置，文件数据库）
+- Redis（可选，降级可用）
+
+**生产环境**：
+- QdrantVectorStore（Docker 部署）
+- PostgreSQL（企业级数据库）
+- RedisCacheStore（高可用集群）
+
+### 手动覆盖（高级用法）
+
+如果需要覆盖特定实现：
+
+```csharp
+builder.Services.AddMafBuiltinServices(builder.Configuration);
+
+// 手动覆盖特定实现
+builder.Services.AddSingleton<IVectorStore, QdrantVectorStore>();
+```
+
+---
+
 ## Common Tasks
 
 ### 注册 Infrastructure 服务
