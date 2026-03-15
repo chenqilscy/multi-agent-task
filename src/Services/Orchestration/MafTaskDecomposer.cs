@@ -14,6 +14,9 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
         private readonly ILogger<MafTaskDecomposer> _logger;
         private readonly IIntentCapabilityProvider _capabilityProvider;
 
+        // Fixed: Move magic strings to static readonly field
+        private static readonly string[] TaskConjunctions = { "并且", "然后", "接着" };
+
         public MafTaskDecomposer(
             IIntentCapabilityProvider capabilityProvider,
             ILogger<MafTaskDecomposer> logger)
@@ -121,9 +124,23 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
 
                 _logger.LogInformation("LLM decomposed task into {Count} subtasks", subtasks.Count);
             }
+            catch (System.Text.Json.JsonException ex)
+            {
+                _logger.LogError(ex, "JSON parsing failed during task decomposition");
+                var subtasks = await RuleBasedDecomposition(complexTask);
+                decomposition.SubTasks.AddRange(subtasks);
+                decomposition.Metadata.Strategy = "RuleBased";
+            }
+            catch (System.InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation during task decomposition");
+                var subtasks = await RuleBasedDecomposition(complexTask);
+                decomposition.SubTasks.AddRange(subtasks);
+                decomposition.Metadata.Strategy = "RuleBased";
+            }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "LLM-based task decomposition failed, falling back to rule-based");
+                _logger.LogWarning(ex, "Unexpected error in LLM-based task decomposition, falling back to rule-based");
                 var subtasks = await RuleBasedDecomposition(complexTask);
                 decomposition.SubTasks.AddRange(subtasks);
                 decomposition.Metadata.Strategy = "RuleBased";
@@ -167,10 +184,10 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
             var subtasks = new List<DecomposedTask>();
 
             // 简单的关键词匹配分解策略
-            if (task.Contains("并且") || task.Contains("然后") || task.Contains("接着"))
+            if (TaskConjunctions.Any(conjunction => task.Contains(conjunction)))
             {
                 // 包含连接词，尝试分割
-                var parts = task.Split(new[] { "并且", "然后", "接着" }, StringSplitOptions.RemoveEmptyEntries);
+                var parts = task.Split(TaskConjunctions, StringSplitOptions.RemoveEmptyEntries);
                 for (int i = 0; i < parts.Length; i++)
                 {
                     var part = parts[i].Trim();
