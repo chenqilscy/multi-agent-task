@@ -6,6 +6,20 @@ namespace CKY.MultiAgentFramework.Core.Abstractions
     /// 关系数据库抽象接口
     /// 支持结构化数据持久化和事务管理
     /// </summary>
+    /// <remarks>
+    /// <para><b>默认推荐实现：</b>EfCoreRelationalDatabase</para>
+    /// <para><b>支持的数据库：</b></para>
+    /// <list type="bullet">
+    ///   <item><b>SQLite</b>（默认）：零配置，文件数据库。适合 Demo 和单机部署。</item>
+    ///   <item><b>PostgreSQL</b>（生产）：企业级数据库。支持高并发、事务、复制。</item>
+    /// </list>
+    /// <para><b>配置方式：</b></para>
+    /// <list type="bullet">
+    ///   <item>SQLite：无需配置（自动使用文件数据库）</item>
+    ///   <item>PostgreSQL：在 appsettings.json 中配置 Provider: "PostgreSQL"</item>
+    /// </list>
+    /// <para><b>替代方案：</b>DapperPostgreSqlDatabase（轻量级 Dapper 实现）</para>
+    /// </remarks>
     public interface IRelationalDatabase
     {
         /// <summary>

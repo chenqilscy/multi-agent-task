@@ -34,6 +34,25 @@ namespace CKY.MultiAgentFramework.Core.Abstractions
     /// 向量存储抽象接口
     /// 支持语义检索和RAG（检索增强生成）
     /// </summary>
+    /// <remarks>
+    /// <para><b>默认推荐实现：</b>MemoryVectorStore（Demo/开发环境）</para>
+    /// <para><b>生产环境推荐：</b>QdrantVectorStore</para>
+    /// <para><b>实现对比：</b></para>
+    /// <list type="table">
+    ///   <listheader>
+    ///     <term>实现</term>
+    ///     <description>适用场景</description>
+    ///   </listheader>
+    ///   <item>
+    ///     <term>MemoryVectorStore</term>
+    ///     <description>Demo、开发测试、小规模场景（&lt; 1万向量）。零配置但不持久化。</description>
+    ///   </item>
+    ///   <item>
+    ///     <term>QdrantVectorStore</term>
+    ///     <description>生产环境、大规模场景（&gt; 10万向量）。需要 Docker 部署。</description>
+    ///   </item>
+    /// </list>
+    /// </remarks>
     public interface IVectorStore
     {
         /// <summary>
