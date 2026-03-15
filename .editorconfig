@@ -165,3 +165,30 @@ dotnet_diagnostic.CA1031.severity = suggestion
 # Recommended: < 300 lines per file
 # Warning: 300-400 lines
 # Error: > 400 lines (should be split)
+
+# Blazor files - Razor pages and components
+[*.razor]
+indent_size = 4
+
+# Blazor component imports - organize and format
+[*.razor]
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# HTML files
+[*.htm]
+indent_size = 2
+
+# HTML files - formatting preferences
+[*.html]
+indent_size = 2
+
+# CSS files
+[*.css]
+indent_size = 2
+
+# JavaScript/TypeScript files (if any frontend code)
+[*.{ts,tsx,js,jsx}]
+indent_size = 2
+quote_style = double
+insert_final_newline = true
