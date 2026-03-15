@@ -190,13 +190,65 @@ namespace CKY.MultiAgentFramework.Services.Dialog
         public Task<Dictionary<string, object>> FillSlotsAsync(
             string intent,
             Dictionary<string, object> providedSlots,
-            object context,
+            DialogContext context,
             CancellationToken ct = default)
         {
-            // TODO: Task 1.5 实现
-            // TODO: Implement in Task 1.5
-            // TODO: Task 1.5 - Pass ct to LLM calls when implementing FillSlotsAsync
-            return Task.FromResult(providedSlots);
+            _logger.LogDebug("Filling slots for intent: {Intent}", intent);
+
+            var filledSlots = new Dictionary<string, object>(providedSlots);
+            var slotDef = _slotDefinitionProvider.GetDefinition(intent);
+
+            if (slotDef == null)
+            {
+                _logger.LogWarning("No slot definition found for intent: {Intent}", intent);
+                return Task.FromResult(filledSlots);
+            }
+
+            // Get all slots (required + optional)
+            var allSlots = slotDef.GetAllSlots();
+
+            foreach (var slot in allSlots)
+            {
+                var slotKey = slot.SlotName;
+
+                // Skip if already provided
+                if (filledSlots.ContainsKey(slotKey))
+                    continue;
+
+                // Strategy 1: Try historical preference
+                if (context?.HistoricalSlots != null)
+                {
+                    var historyKey = $"{intent}.{slotKey}";
+                    if (context.HistoricalSlots.TryGetValue(historyKey, out var historicalValue))
+                    {
+                        filledSlots[slotKey] = historicalValue;
+                        _logger.LogDebug("Filled slot {Slot} from historical preference: {Value}", slotKey, historicalValue);
+                        continue;
+                    }
+                }
+
+                // Strategy 2: Try previous intent's slot value (coreference resolution)
+                if (context?.PreviousSlots != null &&
+                    context.PreviousIntent != null &&
+                    context.PreviousIntent == intent)
+                {
+                    if (context.PreviousSlots.TryGetValue(slotKey, out var previousValue))
+                    {
+                        filledSlots[slotKey] = previousValue;
+                        _logger.LogDebug("Filled slot {Slot} from previous turn: {Value}", slotKey, previousValue);
+                        continue;
+                    }
+                }
+
+                // Strategy 3: Use default value
+                if (slot.HasDefaultValue && slot.DefaultValue != null)
+                {
+                    filledSlots[slotKey] = slot.DefaultValue;
+                    _logger.LogDebug("Filled slot {Slot} with default value: {Value}", slotKey, slot.DefaultValue);
+                }
+            }
+
+            return Task.FromResult(filledSlots);
         }
 
         public Task<string> GenerateClarificationAsync(

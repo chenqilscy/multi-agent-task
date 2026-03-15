@@ -262,6 +262,177 @@ namespace CKY.MultiAgentFramework.Tests.UnitTests.Services.Dialog
             Assert.Equal("unknown_intent", result.Intent);
             Assert.Equal(0.5, result.Confidence);
         }
+
+        [Fact]
+        public async Task FillSlots_WithDefaultValues_FillsMissingSlots()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "control_device",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition
+                    {
+                        SlotName = "Device",
+                        Description = "设备",
+                        Type = SlotType.String,
+                        Required = true
+                    }
+                },
+                OptionalSlots = new()
+                {
+                    new SlotDefinition
+                    {
+                        SlotName = "Mode",
+                        Description = "模式",
+                        Type = SlotType.Enumeration,
+                        HasDefaultValue = true,
+                        DefaultValue = "自动"
+                    },
+                    new SlotDefinition
+                    {
+                        SlotName = "Temperature",
+                        Description = "温度",
+                        Type = SlotType.Integer,
+                        HasDefaultValue = true,
+                        DefaultValue = 26
+                    }
+                }
+            };
+            mockProvider.Setup(p => p.GetDefinition("control_device")).Returns(slotDef);
+
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var providedSlots = new Dictionary<string, object>
+            {
+                ["Device"] = "空调"
+            };
+            var context = new DialogContext();
+
+            // Act
+            var result = await manager.FillSlotsAsync("control_device", providedSlots, context);
+
+            // Assert
+            Assert.Equal(3, result.Count);
+            Assert.Equal("空调", result["Device"]);
+            Assert.Equal("自动", result["Mode"]);
+            Assert.Equal(26, result["Temperature"]);
+        }
+
+        [Fact]
+        public async Task FillSlots_WithHistoricalPreference_UsesHistoricalValue()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "control_device",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition
+                    {
+                        SlotName = "Device",
+                        Description = "设备",
+                        Type = SlotType.String,
+                        Required = true
+                    },
+                    new SlotDefinition
+                    {
+                        SlotName = "Location",
+                        Description = "位置",
+                        Type = SlotType.String,
+                        Required = true
+                    }
+                }
+            };
+            mockProvider.Setup(p => p.GetDefinition("control_device")).Returns(slotDef);
+
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var providedSlots = new Dictionary<string, object>
+            {
+                ["Device"] = "空调"
+            };
+            var context = new DialogContext
+            {
+                HistoricalSlots = new Dictionary<string, object>
+                {
+                    ["control_device.Location"] = "客厅"
+                }
+            };
+
+            // Act
+            var result = await manager.FillSlotsAsync("control_device", providedSlots, context);
+
+            // Assert
+            Assert.Equal(2, result.Count);
+            Assert.Equal("空调", result["Device"]);
+            Assert.Equal("客厅", result["Location"]);
+        }
+
+        [Fact]
+        public async Task FillSlots_WithPreviousTurn_UsesPreviousSlotValue()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "control_device",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition
+                    {
+                        SlotName = "Device",
+                        Description = "设备",
+                        Type = SlotType.String,
+                        Required = true
+                    },
+                    new SlotDefinition
+                    {
+                        SlotName = "Location",
+                        Description = "位置",
+                        Type = SlotType.String,
+                        Required = true
+                    }
+                }
+            };
+            mockProvider.Setup(p => p.GetDefinition("control_device")).Returns(slotDef);
+
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var providedSlots = new Dictionary<string, object>
+            {
+                ["Device"] = "空调"
+            };
+            var context = new DialogContext
+            {
+                PreviousIntent = "control_device",
+                PreviousSlots = new Dictionary<string, object>
+                {
+                    ["Device"] = "空调",
+                    ["Location"] = "卧室"
+                }
+            };
+
+            // Act
+            var result = await manager.FillSlotsAsync("control_device", providedSlots, context);
+
+            // Assert
+            Assert.Equal(2, result.Count);
+            Assert.Equal("空调", result["Device"]);
+            Assert.Equal("卧室", result["Location"]);
+        }
     }
 
     /// <summary>

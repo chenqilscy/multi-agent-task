@@ -35,7 +35,7 @@ public interface ISlotManager
     Task<Dictionary<string, object>> FillSlotsAsync(
         string intent,
         Dictionary<string, object> providedSlots,
-        object context,
+        DialogContext context,
         CancellationToken ct = default);
 
     /// <summary>
