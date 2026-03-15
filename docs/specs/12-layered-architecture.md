@@ -398,6 +398,8 @@ public class ZhipuAIlmAgent : AIAgent, IMafAiAgent
 
 **定义位置**：`CKY.MAF.Core/Abstractions/Interfaces/ICacheStore.cs`
 
+**默认推荐实现**：✅ RedisCacheStore
+
 **实现位置**：`CKY.MAF.Infrastructure/Caching/`
 
 ```csharp
@@ -428,6 +430,9 @@ namespace CKY.MultiAgentFramework.Core.Abstractions.Interfaces
 
 **定义位置**：`CKY.MAF.Core/Abstractions/Interfaces/IVectorStore.cs`
 
+**默认推荐实现**：✅ MemoryVectorStore（Demo/开发）
+**生产环境推荐**：⭐ QdrantVectorStore
+
 **实现位置**：`CKY.MAF.Infrastructure/Vectorization/`
 
 ```csharp
@@ -455,6 +460,9 @@ namespace CKY.MultiAgentFramework.Core.Abstractions.Interfaces
 #### 3. IRelationalDatabase - 关系数据库接口
 
 **定义位置**：`CKY.MAF.Core/Abstractions/Interfaces/IRelationalDatabase.cs`
+
+**默认推荐实现**：✅ EfCoreRelationalDatabase (SQLite)
+**生产环境推荐**：⭐ PostgreSQL
 
 **实现位置**：`CKY.MAF.Infrastructure/Relational/`
 
@@ -648,7 +656,41 @@ app.Run();
 
 ---
 
-### 示例3：单元测试（使用 Moq）
+### 示例3：快速注册内置实现（推荐）
+
+使用 `AddMafBuiltinServices()` 一行注册所有内置服务：
+
+```csharp
+// Program.cs (Demo 应用)
+var builder = WebApplication.CreateBuilder(args);
+
+// 🚀 一行注册所有内置服务
+builder.Services.AddMafBuiltinServices(builder.Configuration);
+
+var app = builder.Build();
+app.Run();
+```
+
+**配置文件**：
+```json
+{
+  "MafStorage": {
+    "UseBuiltinImplementations": true,
+    "RelationalDatabase": {
+      "Provider": "SQLite"
+    }
+  }
+}
+```
+
+**优势**：
+- ✅ 零配置启动（MemoryVectorStore + SQLite）
+- ✅ 明确推荐实现，减少选择困难
+- ✅ 生产环境可按需切换
+
+---
+
+### 示例4：单元测试（使用 Moq）
 
 ```csharp
 public class MafTaskSchedulerTests
