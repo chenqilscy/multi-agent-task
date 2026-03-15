@@ -825,6 +825,324 @@ namespace CKY.MultiAgentFramework.Tests.UnitTests.Services.Dialog
             Assert.Equal(0.5, result.Confidence);  // Default confidence when regex doesn't match
             Assert.Empty(result.MissingSlots);  // No slots parsed from empty JSON
         }
+
+        [Fact]
+        public async Task DetectMissingSlots_WithContext_AutoFillsFromHistoricalSlots()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "control_device",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition { SlotName = "Device", Description = "设备" },
+                    new SlotDefinition { SlotName = "Location", Description = "位置" }
+                }
+            };
+            mockProvider.Setup(x => x.GetDefinition("control_device")).Returns(slotDef);
+
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockLlmRegistry.Object, mockLogger.Object);
+
+            var intent = new IntentRecognitionResult { PrimaryIntent = "control_device" };
+            var entities = new EntityExtractionResult
+            {
+                Entities = new Dictionary<string, object>
+                {
+                    ["Device"] = "空调"
+                    // Location 缺失，但应该从历史偏好中自动填充
+                }
+            };
+
+            var context = new DialogContext
+            {
+                HistoricalSlots = new Dictionary<string, object>
+                {
+                    ["control_device.Location"] = "客厅"
+                }
+            };
+
+            // Act
+            var result = await manager.DetectMissingSlotsAsync("打开空调", intent, entities, context);
+
+            // Assert
+            Assert.Empty(result.MissingSlots);  // Location 应该从历史偏好中自动填充
+            Assert.Equal(2, result.DetectedSlots.Count);
+            Assert.Equal("空调", result.DetectedSlots["Device"]);
+            Assert.Equal("客厅", result.DetectedSlots["Location"]);
+            Assert.Equal(1.0, result.Confidence);  // 所有槽位都已填充
+        }
+
+        [Fact]
+        public async Task DetectMissingSlots_WithContext_AutoFillsFromPreviousTurn()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "control_device",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition { SlotName = "Device", Description = "设备" },
+                    new SlotDefinition { SlotName = "Location", Description = "位置" }
+                }
+            };
+            mockProvider.Setup(x => x.GetDefinition("control_device")).Returns(slotDef);
+
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockLlmRegistry.Object, mockLogger.Object);
+
+            var intent = new IntentRecognitionResult { PrimaryIntent = "control_device" };
+            var entities = new EntityExtractionResult
+            {
+                Entities = new Dictionary<string, object>
+                {
+                    ["Device"] = "空调"
+                    // Location 缺失，但应该从上一轮自动填充
+                }
+            };
+
+            var context = new DialogContext
+            {
+                PreviousIntent = "control_device",
+                PreviousSlots = new Dictionary<string, object>
+                {
+                    ["Device"] = "空调",
+                    ["Location"] = "卧室"
+                }
+            };
+
+            // Act
+            var result = await manager.DetectMissingSlotsAsync("打开空调", intent, entities, context);
+
+            // Assert
+            Assert.Empty(result.MissingSlots);  // Location 应该从上一轮自动填充
+            Assert.Equal(2, result.DetectedSlots.Count);
+            Assert.Equal("空调", result.DetectedSlots["Device"]);
+            Assert.Equal("卧室", result.DetectedSlots["Location"]);
+            Assert.Equal(1.0, result.Confidence);
+        }
+
+        [Fact]
+        public async Task DetectMissingSlots_WithContext_AutoFillsFromDefaultValue()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "control_device",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition
+                    {
+                        SlotName = "Device",
+                        Description = "设备",
+                        HasDefaultValue = true,
+                        DefaultValue = "空调"
+                    }
+                }
+            };
+            mockProvider.Setup(x => x.GetDefinition("control_device")).Returns(slotDef);
+
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockLlmRegistry.Object, mockLogger.Object);
+
+            var intent = new IntentRecognitionResult { PrimaryIntent = "control_device" };
+            var entities = new EntityExtractionResult
+            {
+                Entities = new Dictionary<string, object>()  // 没有提供任何实体
+            };
+
+            var context = new DialogContext();  // 空上下文，没有历史或上一轮数据
+
+            // Act
+            var result = await manager.DetectMissingSlotsAsync("控制设备", intent, entities, context);
+
+            // Assert
+            Assert.Empty(result.MissingSlots);  // Device 应该从默认值自动填充
+            Assert.Single(result.DetectedSlots);
+            Assert.Equal("空调", result.DetectedSlots["Device"]);
+            Assert.Equal(1.0, result.Confidence);
+        }
+
+        [Fact]
+        public async Task DetectMissingSlots_WithContext_HistoricalTakesPriorityOverPrevious()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "control_device",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition { SlotName = "Device", Description = "设备" },
+                    new SlotDefinition { SlotName = "Location", Description = "位置" }
+                }
+            };
+            mockProvider.Setup(x => x.GetDefinition("control_device")).Returns(slotDef);
+
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockLlmRegistry.Object, mockLogger.Object);
+
+            var intent = new IntentRecognitionResult { PrimaryIntent = "control_device" };
+            var entities = new EntityExtractionResult
+            {
+                Entities = new Dictionary<string, object>
+                {
+                    ["Device"] = "空调"
+                }
+            };
+
+            var context = new DialogContext
+            {
+                HistoricalSlots = new Dictionary<string, object>
+                {
+                    ["control_device.Location"] = "客厅"  // 历史偏好
+                },
+                PreviousIntent = "control_device",
+                PreviousSlots = new Dictionary<string, object>
+                {
+                    ["Device"] = "空调",
+                    ["Location"] = "卧室"  // 上一轮值（应该被历史偏好覆盖）
+                }
+            };
+
+            // Act
+            var result = await manager.DetectMissingSlotsAsync("打开空调", intent, entities, context);
+
+            // Assert
+            Assert.Equal("客厅", result.DetectedSlots["Location"]);  // 历史偏好优先
+            Assert.Equal(1.0, result.Confidence);
+        }
+
+        [Fact]
+        public async Task DetectMissingSlots_WithContext_PreviousIntentDifferent_DoesNotReuse()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "query_weather",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition { SlotName = "Location", Description = "城市" }
+                }
+            };
+            mockProvider.Setup(x => x.GetDefinition("query_weather")).Returns(slotDef);
+
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockLlmRegistry.Object, mockLogger.Object);
+
+            var intent = new IntentRecognitionResult { PrimaryIntent = "query_weather" };
+            var entities = new EntityExtractionResult
+            {
+                Entities = new Dictionary<string, object>()  // 没有提供 Location
+            };
+
+            var context = new DialogContext
+            {
+                PreviousIntent = "control_device",  // 不同的意图
+                PreviousSlots = new Dictionary<string, object>
+                {
+                    ["Location"] = "卧室"
+                }
+            };
+
+            // Act
+            var result = await manager.DetectMissingSlotsAsync("查询天气", intent, entities, context);
+
+            // Assert
+            Assert.Single(result.MissingSlots);  // Location 不应该从上一轮自动填充（意图不同）
+            Assert.False(result.DetectedSlots.ContainsKey("Location"));
+        }
+
+        [Fact]
+        public async Task DetectMissingSlots_WithNullContext_WorksCorrectly()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            var slotDef = new IntentSlotDefinition
+            {
+                Intent = "control_device",
+                RequiredSlots = new()
+                {
+                    new SlotDefinition { SlotName = "Device", Description = "设备" },
+                    new SlotDefinition { SlotName = "Location", Description = "位置" }
+                }
+            };
+            mockProvider.Setup(x => x.GetDefinition("control_device")).Returns(slotDef);
+
+            var mockLlmRegistry = new Mock<IMafAiAgentRegistry>();
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+
+            var manager = new SlotManager(mockProvider.Object, mockLlmRegistry.Object, mockLogger.Object);
+
+            var intent = new IntentRecognitionResult { PrimaryIntent = "control_device" };
+            var entities = new EntityExtractionResult
+            {
+                Entities = new Dictionary<string, object>
+                {
+                    ["Device"] = "空调"
+                    // Location 缺失
+                }
+            };
+
+            // Act - 传入 null context
+            var result = await manager.DetectMissingSlotsAsync("打开空调", intent, entities, null!);
+
+            // Assert
+            Assert.Single(result.MissingSlots);  // Location 仍然缺失（没有上下文可以自动填充）
+            Assert.Equal("Location", result.MissingSlots[0].SlotName);
+            Assert.Single(result.DetectedSlots);
+            Assert.Equal("空调", result.DetectedSlots["Device"]);
+        }
+
+        [Fact]
+        public async Task DetectMissingSlots_UnknownIntentWithContext_AutoFillsFromHistorical()
+        {
+            // Arrange
+            var mockProvider = new Mock<ISlotDefinitionProvider>();
+            mockProvider.Setup(x => x.GetDefinition("unknown_intent")).Returns((IntentSlotDefinition?)null);
+
+            var testAgent = new TestMafAiAgent();
+
+            var mockRegistry = new Mock<IMafAiAgentRegistry>();
+            mockRegistry.Setup(r => r.GetBestAgentAsync(LlmScenario.Intent, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(testAgent);
+
+            var mockLogger = new Mock<ILogger<SlotManager>>();
+            var manager = new SlotManager(mockProvider.Object, mockRegistry.Object, mockLogger.Object);
+
+            var intent = new IntentRecognitionResult { PrimaryIntent = "unknown_intent" };
+            var entities = new EntityExtractionResult { Entities = new Dictionary<string, object>() };
+
+            var context = new DialogContext
+            {
+                HistoricalSlots = new Dictionary<string, object>
+                {
+                    ["unknown_intent.Location"] = "北京"
+                }
+            };
+
+            // Act
+            var result = await manager.DetectMissingSlotsAsync("unknown request", intent, entities, context);
+
+            // Assert
+            mockRegistry.Verify(r => r.GetBestAgentAsync(LlmScenario.Intent, It.IsAny<CancellationToken>()), Times.Once);
+            Assert.Equal("unknown_intent", result.Intent);
+            Assert.Equal("北京", result.DetectedSlots.GetValueOrDefault("Location"));  // 应该从历史自动填充
+        }
     }
 
     /// <summary>

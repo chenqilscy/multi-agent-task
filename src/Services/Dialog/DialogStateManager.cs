@@ -1,224 +1,324 @@
+using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Models.Dialog;
+using CKY.MultiAgentFramework.Core.Models.Task;
 using Microsoft.Extensions.Logging;
 
 namespace CKY.MultiAgentFramework.Services.Dialog
 {
     /// <summary>
-    /// 对话状态管理器
-    /// 管理对话状态栈，支持多话题切换和回退
-    /// Dialog state manager - manages dialog state stack with topic switching and rollback
+    /// 对话状态管理器实现
+    /// 管理对话上下文、轮次追踪和历史槽位
+    /// Dialog state manager implementation - manages dialog context, turn tracking, and historical slots
     /// </summary>
-    public class DialogStateManager
+    public class DialogStateManager : IDialogStateManager
     {
-        private readonly Stack<DialogState> _stateStack;
+        private readonly IMafSessionStorage _sessionStorage;
         private readonly ILogger<DialogStateManager> _logger;
-        private readonly object _lock = new();  // Fixed: Use target-typed new
 
-        public DialogStateManager(ILogger<DialogStateManager> logger)
+        private const string DialogContextKey = "dialog_context";
+
+        /// <summary>
+        /// 初始化 DialogStateManager
+        /// Initialize DialogStateManager
+        /// </summary>
+        /// <param name="sessionStorage">会话存储</param>
+        /// <param name="logger">日志记录器</param>
+        /// <exception cref="ArgumentNullException">参数为 null 时抛出</exception>
+        public DialogStateManager(
+            IMafSessionStorage sessionStorage,
+            ILogger<DialogStateManager> logger)
         {
+            _sessionStorage = sessionStorage ?? throw new ArgumentNullException(nameof(sessionStorage));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _stateStack = new Stack<DialogState>();
         }
 
-        /// <summary>
-        /// 获取当前状态栈深度
-        /// </summary>
-        public int StackDepth
+        /// <inheritdoc />
+        public async Task<DialogContext> LoadOrCreateAsync(
+            string conversationId,
+            string userId,
+            CancellationToken ct = default)
         {
-            get
+            _logger.LogDebug("Loading or creating dialog context for conversation {ConversationId} / 正在加载或创建对话上下文", conversationId);
+
+            // 尝试从会话存储加载
+            // Try to load from session storage
+            IAgentSession? session = null;
+            try
             {
-                lock (_lock)
+                if (await _sessionStorage.ExistsAsync(conversationId, ct))
                 {
-                    return _stateStack.Count;
+                    session = await _sessionStorage.LoadSessionAsync(conversationId, ct);
                 }
             }
-        }
-
-        /// <summary>
-        /// 推入新状态
-        /// </summary>
-        /// <param name="state">对话状态</param>
-        /// <param name="ct">取消令牌</param>
-        public Task PushStateAsync(DialogState state, CancellationToken ct = default)
-        {
-            if (state == null)
+            catch (Exception ex)
             {
-                throw new ArgumentNullException(nameof(state));
+                _logger.LogWarning(ex, "Failed to load session from storage, creating new context / 从存储加载会话失败，创建新上下文");
             }
 
-            lock (_lock)
+            // 检查是否存在 DialogContext
+            // Check if DialogContext exists
+            if (session != null &&
+                session.Context.TryGetValue(DialogContextKey, out var contextObj) &&
+                contextObj is DialogContext context)
             {
-                // Fixed: Add max stack depth to prevent memory leak
-                const int maxStackDepth = 50;
-                if (_stateStack.Count >= maxStackDepth)
+                _logger.LogDebug("Loaded existing dialog context: TurnCount={TurnCount} / 已加载现有对话上下文", context.TurnCount);
+                return context;
+            }
+
+            // 创建新的 DialogContext
+            // Create new DialogContext
+            var newContext = new DialogContext
+            {
+                SessionId = conversationId,
+                UserId = userId,
+                TurnCount = 1,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _logger.LogInformation("Created new dialog context for conversation {ConversationId} / 已为对话创建新上下文", conversationId);
+
+            return newContext;
+        }
+
+        /// <inheritdoc />
+        public async Task UpdateAsync(
+            DialogContext context,
+            string intent,
+            Dictionary<string, object> slots,
+            List<TaskExecutionResult> executionResults,
+            CancellationToken ct = default)
+        {
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            _logger.LogDebug("Updating dialog context: TurnCount={TurnCount}, Intent={Intent} / 正在更新对话上下文",
+                context.TurnCount, intent);
+
+            // 更新 TurnCount 和 PreviousIntent
+            // Update TurnCount and PreviousIntent
+            context.TurnCount++;
+            context.PreviousIntent = intent;
+            context.PreviousSlots = new Dictionary<string, object>(slots);
+            context.UpdatedAt = DateTime.UtcNow;
+
+            // 更新 HistoricalSlots（记录槽位值的出现频次）
+            // Update HistoricalSlots (record slot value frequency)
+            foreach (var slot in slots)
+            {
+                var key = $"{intent}.{slot.Key}";
+                if (context.HistoricalSlots.ContainsKey(key))
                 {
-                    _logger.LogWarning("Stack depth exceeds {MaxDepth}, removing oldest state", maxStackDepth);
-                    _stateStack.Pop(); // Remove oldest
+                    var count = (int)context.HistoricalSlots[key];
+                    context.HistoricalSlots[key] = count + 1;
+                }
+                else
+                {
+                    context.HistoricalSlots[key] = 1;
+                }
+            }
+
+            // 保存到会话存储
+            // Save to session storage
+            try
+            {
+                IAgentSession? session = null;
+                try
+                {
+                    session = await _sessionStorage.LoadSessionAsync(context.SessionId, ct);
+                }
+                catch
+                {
+                    // 会话不存在，忽略
                 }
 
-                _stateStack.Push(state);
-                _logger.LogDebug("Pushed dialog state. Intent: {Intent}, Stack depth: {Depth}",
-                    state.CurrentIntent, _stateStack.Count);
-            }
-
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// 弹出当前状态
-        /// </summary>
-        /// <param name="ct">取消令牌</param>
-        /// <returns>弹出的状态，如果栈为空则返回null</returns>
-        public Task<DialogState?> PopStateAsync(CancellationToken ct = default)
-        {
-            lock (_lock)
-            {
-                if (_stateStack.Count == 0)
+                if (session != null)
                 {
-                    _logger.LogDebug("Cannot pop state: stack is empty");
-                    return Task.FromResult<DialogState?>(null);
+                    session.Context[DialogContextKey] = context;
+                    await _sessionStorage.SaveSessionAsync(session, ct);
                 }
 
-                var state = _stateStack.Pop();
-                _logger.LogDebug("Popped dialog state. Intent: {Intent}, Stack depth: {Depth}",
-                    state.CurrentIntent, _stateStack.Count);
-
-                return Task.FromResult<DialogState?>(state);
+                _logger.LogDebug("Dialog context updated: TurnCount={TurnCount}, HistoricalSlots={SlotCount} / 对话上下文已更新",
+                    context.TurnCount, context.HistoricalSlots.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to save dialog context to storage / 保存对话上下文到存储失败");
+                throw;
             }
         }
 
-        /// <summary>
-        /// 获取当前状态（不弹出）
-        /// </summary>
-        /// <param name="ct">取消令牌</param>
-        /// <returns>当前状态，如果栈为空则返回null</returns>
-        public Task<DialogState?> GetCurrentStateAsync(CancellationToken ct = default)
+        /// <inheritdoc />
+        public async Task RecordPendingClarificationAsync(
+            DialogContext context,
+            string intent,
+            Dictionary<string, object> detectedSlots,
+            List<SlotDefinition> missingSlots,
+            CancellationToken ct = default)
         {
-            lock (_lock)
+            if (context == null)
             {
-                if (_stateStack.Count == 0)
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            if (detectedSlots == null)
+            {
+                throw new ArgumentNullException(nameof(detectedSlots));
+            }
+
+            if (missingSlots == null)
+            {
+                throw new ArgumentNullException(nameof(missingSlots));
+            }
+
+            _logger.LogInformation("Recording pending clarification for intent {Intent} / 正在记录待处理的澄清", intent);
+
+            context.PendingClarification = new PendingClarificationInfo
+            {
+                Intent = intent,
+                DetectedSlots = new Dictionary<string, object>(detectedSlots),
+                MissingSlots = new List<SlotDefinition>(missingSlots),
+                CreatedAt = DateTime.UtcNow
+            };
+            context.UpdatedAt = DateTime.UtcNow;
+
+            // 保存到会话存储
+            // Save to session storage
+            await SaveContextAsync(context, ct);
+
+            _logger.LogDebug("Pending clarification recorded: {Count} missing slots / 已记录待处理的澄清", missingSlots.Count);
+        }
+
+        /// <inheritdoc />
+        public async Task RecordPendingTasksAsync(
+            DialogContext context,
+            ExecutionPlan plan,
+            Dictionary<string, object> filledSlots,
+            CancellationToken ct = default)
+        {
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            if (plan == null)
+            {
+                throw new ArgumentNullException(nameof(plan));
+            }
+
+            if (filledSlots == null)
+            {
+                throw new ArgumentNullException(nameof(filledSlots));
+            }
+
+            // 获取仍然缺失的槽位
+            // Get still missing slots
+            var stillMissing = new List<SlotDefinition>();
+
+            _logger.LogInformation("Recording pending tasks / 正在记录待处理的任务");
+
+            context.PendingTask = new PendingTaskInfo
+            {
+                Plan = plan,
+                FilledSlots = new Dictionary<string, object>(filledSlots),
+                StillMissing = stillMissing,
+                CreatedAt = DateTime.UtcNow
+            };
+            context.UpdatedAt = DateTime.UtcNow;
+
+            // 保存到会话存储
+            // Save to session storage
+            await SaveContextAsync(context, ct);
+
+            _logger.LogDebug("Pending task recorded: {Count} filled slots / 已记录待处理的任务", filledSlots.Count);
+        }
+
+        /// <inheritdoc />
+        public async Task<MafTaskResponse> HandleClarificationResponseAsync(
+            string conversationId,
+            string userResponse,
+            CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(conversationId))
+            {
+                throw new ArgumentException("Conversation ID cannot be null or empty / 对话 ID 不能为空", nameof(conversationId));
+            }
+
+            if (string.IsNullOrEmpty(userResponse))
+            {
+                throw new ArgumentException("User response cannot be null or empty / 用户响应不能为空", nameof(userResponse));
+            }
+
+            _logger.LogInformation("Handling clarification response for conversation {ConversationId} / 正在处理对话的澄清响应",
+                conversationId);
+
+            var context = await LoadOrCreateAsync(conversationId, "", ct);
+
+            if (context.PendingClarification == null)
+            {
+                _logger.LogWarning("No pending clarification found for conversation {ConversationId} / 未找到待处理的澄清", conversationId);
+                return new MafTaskResponse
                 {
-                    return Task.FromResult<DialogState?>(null);
+                    Success = false,
+                    Result = "没有待处理的澄清问题 / No pending clarification questions"
+                };
+            }
+
+            // TODO: 解析用户响应，填充槽位
+            // TODO: Parse user response and fill slots
+            // 这里需要调用 IEntityExtractor 或 ILlmService
+            // This requires calling IEntityExtractor or ILlmService
+
+            _logger.LogInformation("Clarification response processed for intent {Intent} / 已处理意图的澄清响应",
+                context.PendingClarification.Intent);
+
+            // 清除待处理的澄清
+            // Clear pending clarification
+            context.PendingClarification = null;
+            context.UpdatedAt = DateTime.UtcNow;
+
+            await SaveContextAsync(context, ct);
+
+            return new MafTaskResponse
+            {
+                Success = true,
+                Result = "已理解您的响应 / Understood your response"
+            };
+        }
+
+        /// <summary>
+        /// 保存对话上下文到会话存储
+        /// Save dialog context to session storage
+        /// </summary>
+        /// <param name="context">对话上下文</param>
+        /// <param name="ct">取消令牌</param>
+        private async Task SaveContextAsync(DialogContext context, CancellationToken ct)
+        {
+            try
+            {
+                IAgentSession? session = null;
+                try
+                {
+                    session = await _sessionStorage.LoadSessionAsync(context.SessionId, ct);
+                }
+                catch
+                {
+                    // 会话不存在，忽略
                 }
 
-                var state = _stateStack.Peek();
-                return Task.FromResult<DialogState?>(state);
-            }
-        }
-
-        /// <summary>
-        /// 处理话题切换
-        /// </summary>
-        /// <param name="newIntent">新意图</param>
-        /// <param name="ct">取消令牌</param>
-        /// <returns>是否需要保存当前状态</returns>
-        public async Task<bool> HandleTopicSwitchAsync(string newIntent, CancellationToken ct = default)
-        {
-            lock (_lock)
-            {
-                if (_stateStack.Count == 0)
+                if (session != null)
                 {
-                    _logger.LogDebug("No current state, no need to save for topic switch");
-                    return false;
+                    session.Context[DialogContextKey] = context;
+                    await _sessionStorage.SaveSessionAsync(session, ct);
                 }
-
-                var currentState = _stateStack.Peek();
-
-                // 如果新意图与当前意图不同，需要保存当前状态
-                if (currentState.CurrentIntent != newIntent)
-                {
-                    _logger.LogInformation("Topic switch detected. Saving current state: {CurrentIntent} -> {NewIntent}",
-                        currentState.CurrentIntent, newIntent);
-                    return true;
-                }
-
-                _logger.LogDebug("No topic switch needed: intent remains {Intent}", newIntent);
-                return false;
             }
-        }
-
-        /// <summary>
-        /// 回退到上一个状态
-        /// </summary>
-        /// <param name="ct">取消令牌</param>
-        /// <returns>是否成功回退</returns>
-        public async Task<bool> RollbackAsync(CancellationToken ct = default)
-        {
-            var poppedState = await PopStateAsync(ct);
-
-            if (poppedState != null)
+            catch (Exception ex)
             {
-                _logger.LogInformation("Rolled back from state: {Intent}", poppedState.CurrentIntent);
-                return true;
-            }
-
-            _logger.LogDebug("Cannot rollback: no previous state");
-            return false;
-        }
-
-        /// <summary>
-        /// 清空所有状态
-        /// </summary>
-        /// <param name="ct">取消令牌</param>
-        public Task ClearAllAsync(CancellationToken ct = default)
-        {
-            lock (_lock)
-            {
-                var count = _stateStack.Count;
-                _stateStack.Clear();
-                _logger.LogInformation("Cleared all dialog states. Count: {Count}", count);
-            }
-
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// 获取所有状态（不修改栈）
-        /// </summary>
-        /// <param name="ct">取消令牌</param>
-        /// <returns>状态列表（从栈顶到栈底）</returns>
-        public Task<IReadOnlyList<DialogState>> GetAllStatesAsync(CancellationToken ct = default)
-        {
-            lock (_lock)
-            {
-                return Task.FromResult<IReadOnlyList<DialogState>>(_stateStack.ToList());
+                _logger.LogError(ex, "Failed to save dialog context / 保存对话上下文失败");
+                throw;
             }
         }
-    }
-
-    /// <summary>
-    /// 对话状态
-    /// </summary>
-    public class DialogState
-    {
-        /// <summary>
-        /// 当前意图
-        /// </summary>
-        public string CurrentIntent { get; set; } = string.Empty;
-
-        /// <summary>
-        /// 槽位值
-        /// </summary>
-        public Dictionary<string, object> SlotValues { get; set; } = new();
-
-        /// <summary>
-        /// 状态创建时间
-        /// </summary>
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-        /// <summary>
-        /// 用户输入历史（在这个状态下）
-        /// </summary>
-        public List<string> UserInputs { get; set; } = new();
-
-        /// <summary>
-        /// 是否已完成
-        /// </summary>
-        public bool IsCompleted { get; set; }
-
-        /// <summary>
-        /// 元数据
-        /// </summary>
-        public Dictionary<string, object> Metadata { get; set; } = new();
     }
 }

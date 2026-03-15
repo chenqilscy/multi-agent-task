@@ -31,6 +31,16 @@ namespace CKY.MultiAgentFramework.Services.Dialog
             EntityExtractionResult entities,
             CancellationToken ct = default)
         {
+            return await DetectMissingSlotsAsync(userInput, intent, entities, null!, ct);
+        }
+
+        public async Task<SlotDetectionResult> DetectMissingSlotsAsync(
+            string userInput,
+            IntentRecognitionResult intent,
+            EntityExtractionResult entities,
+            DialogContext context,
+            CancellationToken ct = default)
+        {
             if (string.IsNullOrWhiteSpace(userInput))
                 throw new ArgumentException("User input cannot be empty", nameof(userInput));
 
@@ -40,18 +50,26 @@ namespace CKY.MultiAgentFramework.Services.Dialog
             if (entities == null)
                 throw new ArgumentNullException(nameof(entities));
 
-            _logger.LogDebug("Detecting missing slots for intent: {Intent}", intent.PrimaryIntent);
+            _logger.LogDebug("Detecting missing slots for intent: {Intent} with context", intent.PrimaryIntent);
 
             var slotDef = _slotDefinitionProvider.GetDefinition(intent.PrimaryIntent);
 
             if (slotDef != null)
             {
                 // 预定义意图 → 使用模板检测
-                return await DetectWithTemplateAsync(slotDef, entities, ct);
+                var result = await DetectWithTemplateAsync(slotDef, entities, ct);
+
+                // 如果提供了上下文，尝试自动填充槽位
+                if (context != null && result.MissingSlots.Count > 0)
+                {
+                    result = await AutoFillSlotsFromContextAsync(result, slotDef, context, intent.PrimaryIntent);
+                }
+
+                return result;
             }
 
             // 未知意图 → 使用LLM动态识别
-            return await DetectWithLlmAsync(userInput, intent.PrimaryIntent, entities, ct);
+            return await DetectWithLlmAsync(userInput, intent.PrimaryIntent, entities, context, ct);
         }
 
         private async Task<SlotDetectionResult> DetectWithTemplateAsync(
@@ -89,10 +107,175 @@ namespace CKY.MultiAgentFramework.Services.Dialog
             };
         }
 
+        /// <summary>
+        /// 从对话上下文自动填充槽位
+        /// Auto-fill slots from dialog context
+        /// </summary>
+        private async Task<SlotDetectionResult> AutoFillSlotsFromContextAsync(
+            SlotDetectionResult originalResult,
+            IntentSlotDefinition slotDef,
+            DialogContext context,
+            string intent)
+        {
+            var filledResult = new SlotDetectionResult
+            {
+                Intent = originalResult.Intent,
+                DetectedSlots = new Dictionary<string, object>(originalResult.DetectedSlots),
+                MissingSlots = new List<SlotDefinition>(),
+                Confidence = originalResult.Confidence
+            };
+
+            var allSlots = slotDef.GetAllSlots();
+            var autoFilledCount = 0;
+
+            foreach (var slot in allSlots)
+            {
+                var slotKey = slot.SlotName;
+
+                // 如果槽位已经被检测到，跳过
+                if (filledResult.DetectedSlots.ContainsKey(slotKey))
+                    continue;
+
+                // 策略1: 从历史偏好中填充
+                if (context.HistoricalSlots != null)
+                {
+                    var historyKey = $"{intent}.{slotKey}";
+                    if (context.HistoricalSlots.TryGetValue(historyKey, out var historicalValue))
+                    {
+                        filledResult.DetectedSlots[slotKey] = historicalValue;
+                        autoFilledCount++;
+                        _logger.LogDebug("Auto-filled slot {Slot} from historical preference: {Value}", slotKey, historicalValue);
+                        continue;
+                    }
+                }
+
+                // 策略2: 从上一轮对话中填充（仅当意图相同时）
+                if (context.PreviousSlots != null &&
+                    context.PreviousIntent != null &&
+                    context.PreviousIntent == intent)
+                {
+                    if (context.PreviousSlots.TryGetValue(slotKey, out var previousValue))
+                    {
+                        filledResult.DetectedSlots[slotKey] = previousValue;
+                        autoFilledCount++;
+                        _logger.LogDebug("Auto-filled slot {Slot} from previous turn: {Value}", slotKey, previousValue);
+                        continue;
+                    }
+                }
+
+                // 策略3: 使用默认值
+                if (slot.HasDefaultValue && slot.DefaultValue != null)
+                {
+                    filledResult.DetectedSlots[slotKey] = slot.DefaultValue;
+                    autoFilledCount++;
+                    _logger.LogDebug("Auto-filled slot {Slot} with default value: {Value}", slotKey, slot.DefaultValue);
+                    continue;
+                }
+
+                // 无法自动填充，添加到缺失列表
+                var missingSlot = originalResult.MissingSlots.FirstOrDefault(s => s.SlotName == slotKey);
+                if (missingSlot != null)
+                {
+                    filledResult.MissingSlots.Add(missingSlot);
+                }
+            }
+
+            // 重新计算置信度（包含自动填充的槽位）
+            if (allSlots.Count > 0)
+            {
+                filledResult.Confidence = (double)filledResult.DetectedSlots.Count / allSlots.Count;
+            }
+
+            if (autoFilledCount > 0)
+            {
+                _logger.LogInformation("Auto-filled {Count} slots from context for intent: {Intent}", autoFilledCount, intent);
+            }
+
+            return await Task.FromResult(filledResult);
+        }
+
+        /// <summary>
+        /// 从对话上下文自动填充LLM检测的槽位
+        /// Auto-fill LLM-detected slots from dialog context
+        /// </summary>
+        private async Task<SlotDetectionResult> AutoFillSlotsFromLlmContextAsync(
+            SlotDetectionResult originalResult,
+            DialogContext context,
+            string intent)
+        {
+            var filledResult = new SlotDetectionResult
+            {
+                Intent = originalResult.Intent,
+                DetectedSlots = new Dictionary<string, object>(originalResult.DetectedSlots),
+                MissingSlots = new List<SlotDefinition>(),
+                Confidence = originalResult.Confidence
+            };
+
+            var autoFilledCount = 0;
+
+            foreach (var slot in originalResult.MissingSlots)
+            {
+                var slotKey = slot.SlotName;
+
+                // 策略1: 从历史偏好中填充
+                if (context.HistoricalSlots != null)
+                {
+                    var historyKey = $"{intent}.{slotKey}";
+                    if (context.HistoricalSlots.TryGetValue(historyKey, out var historicalValue))
+                    {
+                        filledResult.DetectedSlots[slotKey] = historicalValue;
+                        autoFilledCount++;
+                        _logger.LogDebug("Auto-filled LLM-detected slot {Slot} from historical preference: {Value}", slotKey, historicalValue);
+                        continue;
+                    }
+                }
+
+                // 策略2: 从上一轮对话中填充（仅当意图相同时）
+                if (context.PreviousSlots != null &&
+                    context.PreviousIntent != null &&
+                    context.PreviousIntent == intent)
+                {
+                    if (context.PreviousSlots.TryGetValue(slotKey, out var previousValue))
+                    {
+                        filledResult.DetectedSlots[slotKey] = previousValue;
+                        autoFilledCount++;
+                        _logger.LogDebug("Auto-filled LLM-detected slot {Slot} from previous turn: {Value}", slotKey, previousValue);
+                        continue;
+                    }
+                }
+
+                // 策略3: 使用默认值
+                if (slot.HasDefaultValue && slot.DefaultValue != null)
+                {
+                    filledResult.DetectedSlots[slotKey] = slot.DefaultValue;
+                    autoFilledCount++;
+                    _logger.LogDebug("Auto-filled LLM-detected slot {Slot} with default value: {Value}", slotKey, slot.DefaultValue);
+                    continue;
+                }
+
+                // 无法自动填充，保留在缺失列表中
+                filledResult.MissingSlots.Add(slot);
+            }
+
+            // 重新计算置信度
+            if (filledResult.DetectedSlots.Count > 0)
+            {
+                filledResult.Confidence = Math.Min(1.0, filledResult.Confidence + (autoFilledCount * 0.1));
+            }
+
+            if (autoFilledCount > 0)
+            {
+                _logger.LogInformation("Auto-filled {Count} LLM-detected slots from context for intent: {Intent}", autoFilledCount, intent);
+            }
+
+            return await Task.FromResult(filledResult);
+        }
+
         private async Task<SlotDetectionResult> DetectWithLlmAsync(
             string userInput,
             string intent,
             EntityExtractionResult entities,
+            DialogContext? context,
             CancellationToken ct)
         {
             _logger.LogInformation("Using LLM to detect slots for unknown intent: {Intent}", intent);
@@ -127,7 +310,15 @@ namespace CKY.MultiAgentFramework.Services.Dialog
                 var modelId = llmAgent.GetCurrentModelId();
                 var response = await llmAgent.ExecuteAsync(modelId, prompt, null, ct);
 
-                return ParseLlmSlotDetection(response, intent, entities);
+                var result = ParseLlmSlotDetection(response, intent, entities);
+
+                // 如果提供了上下文且有缺失槽位，尝试自动填充
+                if (context != null && result.MissingSlots.Count > 0)
+                {
+                    result = await AutoFillSlotsFromLlmContextAsync(result, context, intent);
+                }
+
+                return result;
             }
             catch (System.Text.Json.JsonException ex)
             {
