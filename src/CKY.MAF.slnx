@@ -7,12 +7,9 @@
   </Folder>
 
   <!-- Layer 3: Infrastructure -->
-  <Folder Name="/src/Infrastructure/">
+    <Folder Name="/src/Infrastructure/"></Folder>
     <Folder Name="/src/Infrastructure/Caching/">
       <Project Path="Infrastructure/Caching/CKY.MAF.Infrastructure.Caching.csproj" />
-    </Folder>
-    <Folder Name="/src/Infrastructure/Context/">
-      <Project Path="Infrastructure/Context/CKY.MAF.Infrastructure.Context.csproj" />
     </Folder>
     <Folder Name="/src/Infrastructure/DependencyInjection/">
       <Project Path="Infrastructure/DependencyInjection/CKY.MAF.Infrastructure.DependencyInjection.csproj" />
@@ -23,7 +20,6 @@
     <Folder Name="/src/Infrastructure/Vectorization/">
       <Project Path="Infrastructure/Vectorization/CKY.MAF.Infrastructure.Vectorization.csproj" />
     </Folder>
-  </Folder>
 
   <!-- Layer 4: Services -->
   <Folder Name="/src/Services/">
