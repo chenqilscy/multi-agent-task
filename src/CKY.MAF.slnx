@@ -11,17 +11,18 @@
     <Folder Name="/src/Infrastructure/Caching/">
       <Project Path="Infrastructure/Caching/CKY.MAF.Infrastructure.Caching.csproj" />
     </Folder>
+    <Folder Name="/src/Infrastructure/Context/">
+      <Project Path="Infrastructure/Context/CKY.MAF.Infrastructure.Context.csproj" />
+    </Folder>
     <Folder Name="/src/Infrastructure/DependencyInjection/">
       <Project Path="Infrastructure/DependencyInjection/CKY.MAF.Infrastructure.DependencyInjection.csproj" />
     </Folder>
     <Folder Name="/src/Infrastructure/Repository/">
-      <Project Path="Infrastructure/Repository/CKY.MAF.Repository.csproj" />
+      <Project Path="Infrastructure/Repository/CKY.MAF.Infrastructure.Repository.csproj" />
     </Folder>
     <Folder Name="/src/Infrastructure/Vectorization/">
       <Project Path="Infrastructure/Vectorization/CKY.MAF.Infrastructure.Vectorization.csproj" />
     </Folder>
-    <Project Path="Infrastructure/Caching/CKY.MAF.Infrastructure.Caching.csproj" />
-    <Project Path="Infrastructure/DependencyInjection/CKY.MAF.Infrastructure.DependencyInjection.csproj" />
   </Folder>
 
   <!-- Layer 4: Services -->

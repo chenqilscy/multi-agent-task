@@ -2,6 +2,7 @@ using CKY.MultiAgentFramework.Infrastructure.Context.Compression;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using Microsoft.Extensions.AI;
 
 namespace CKY.MultiAgentFramework.Infrastructure.Context
 {
