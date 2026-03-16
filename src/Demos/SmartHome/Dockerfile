@@ -10,7 +10,7 @@ WORKDIR /src
 COPY CKY.MAF.slnx .
 COPY Core/CKY.MAF.Core.csproj Core/
 COPY Services/CKY.MAF.Services.csproj Services/
-COPY Infrastructure/Repository/CKY.MAF.Repository.csproj Infrastructure/Repository/
+COPY Infrastructure/Repository/CKY.MAF.Infrastructure.Repository.csproj Infrastructure/Repository/
 COPY Infrastructure/Caching/CKY.MAF.Infrastructure.Caching.csproj Infrastructure/Caching/
 COPY Infrastructure/Vectorization/CKY.MAF.Infrastructure.Vectorization.csproj Infrastructure/Vectorization/
 COPY Infrastructure/DependencyInjection/CKY.MAF.Infrastructure.DependencyInjection.csproj Infrastructure/DependencyInjection/
@@ -22,6 +22,12 @@ RUN dotnet restore Demos/SmartHome/CKY.MAF.Demos.SmartHome.csproj
 
 # 复制全部源码并构建
 COPY . .
+
+# 清理可能的本地 NuGet 配置，设置干净的构建环境
+ENV NUGET_FALLBACK_PACKAGES=""
+ENV DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=true
+
 RUN dotnet publish Demos/SmartHome/CKY.MAF.Demos.SmartHome.csproj \
     -c Release -o /app/publish --no-restore
 

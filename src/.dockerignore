@@ -1,0 +1,48 @@
+# Ignore Visual Studio files
+**/*.suo
+**/*.user
+**/*.userosscache
+**/*.sln.docstates
+
+# Ignore build results
+**/bin/
+**/obj/
+**/out/
+
+# Ignore NuGet packages (they will be restored in Docker)
+**/packages/
+**/*.nupkg
+**/*.snupkg
+
+# Ignore NuGet config files that may have Windows-specific paths
+**/NuGet.config
+.nuget/
+
+# Ignore test results
+**/TestResults/
+**/*.trx
+
+# Ignore .NET Core specific
+**/project.lock.json
+**/project.fragment.lock.json
+
+# Ignore IDE files
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.DotSettings.user
+
+# Ignore OMC-specific files
+**/.omc/
+
+# Ignore git
+**/.git/
+**/.gitignore
+**/.gitattributes
+
+# Ignore documentation
+**/docs/
+**/*.md
+
+# Ignore node_modules (if any)
+**/node_modules/
