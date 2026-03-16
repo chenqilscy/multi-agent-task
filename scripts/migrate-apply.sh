@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-REPOSITORY_PROJECT="$PROJECT_ROOT/src/Infrastructure/Repository/CKY.MAF.Repository.csproj"
+REPOSITORY_PROJECT="$PROJECT_ROOT/src/Infrastructure/Repository/CKY.MAF.Infrastructure.Repository.csproj"
 SERVICES_PROJECT="$PROJECT_ROOT/src/Services/CKY.MAF.Services.csproj"
 
 # Default connection string (can be overridden via environment variable)
@@ -34,12 +34,12 @@ fi
 
 # Show pending migrations
 echo -e "${YELLOW}Checking for pending migrations...${NC}"
-dotnet ef migrations list --project "$REPOSITORY_PROJECT" --startup-project "$SERVICES_PROJECT" --output-dir "$MIGRATION_OUTPUT_DIR" --connection "$CONNECTION_STRING" || true
+dotnet ef migrations list --project "$REPOSITORY_PROJECT" --startup-project "$SERVICES_PROJECT" || true
 echo ""
 
 # Apply migrations
 echo -e "${GREEN}Applying migrations...${NC}"
-dotnet ef database update --project "$REPOSITORY_PROJECT" --startup-project "$SERVICES_PROJECT" --output-dir "$MIGRATION_OUTPUT_DIR" --connection "$CONNECTION_STRING"
+dotnet ef database update --project "$REPOSITORY_PROJECT" --startup-project "$SERVICES_PROJECT"
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}=== Migrations applied successfully ===${NC}"

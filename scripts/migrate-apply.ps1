@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 # Configuration
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
-$RepositoryProject = "$ProjectRoot\src\Infrastructure\Repository\CKY.MAF.Repository.csproj"
+$RepositoryProject = "$ProjectRoot\src\Infrastructure\Repository\CKY.MAF.Infrastructure.Repository.csproj"
 $ServicesProject = "$ProjectRoot\src\Services\CKY.MAF.Services.csproj"
 
 # Default connection string (can be overridden via environment variable)
@@ -28,7 +28,7 @@ if (-not (Get-Command "dotnet-ef" -ErrorAction SilentlyContinue)) {
 # Show pending migrations
 Write-Host "Checking for pending migrations..." -ForegroundColor Yellow
 try {
-    dotnet ef migrations list --project "$RepositoryProject" --startup-project "$ServicesProject" --output-dir "$MigrationOutputDir" --connection "$ConnectionString" 2>$null
+    dotnet ef migrations list --project "$RepositoryProject" --startup-project "$ServicesProject" 2>$null
 } catch {
     Write-Host "Note: Could not list migrations (this is okay for new databases)"
 }
@@ -36,7 +36,7 @@ Write-Host ""
 
 # Apply migrations
 Write-Host "Applying migrations..." -ForegroundColor Green
-dotnet ef database update --project "$RepositoryProject" --startup-project "$ServicesProject" --output-dir "$MigrationOutputDir" --connection "$ConnectionString"
+dotnet ef database update --project "$RepositoryProject" --startup-project "$ServicesProject"
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "=== Migrations applied successfully ===" -ForegroundColor Green

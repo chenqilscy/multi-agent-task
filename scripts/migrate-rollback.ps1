@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 # Configuration
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
-$RepositoryProject = "$ProjectRoot\src\Infrastructure\Repository\CKY.MAF.Repository.csproj"
+$RepositoryProject = "$ProjectRoot\src\Infrastructure\Repository\CKY.MAF.Infrastructure.Repository.csproj"
 $ServicesProject = "$ProjectRoot\src\Services\CKY.MAF.Services.csproj"
 
 # Default connection string (can be overridden via environment variable)
@@ -31,7 +31,7 @@ if (-not (Get-Command "dotnet-ef" -ErrorAction SilentlyContinue)) {
 
 # Rollback migration
 Write-Host "Rolling back migration..." -ForegroundColor Green
-dotnet ef database update $TargetMigration --project "$RepositoryProject" --startup-project "$ServicesProject" --output-dir "$MigrationOutputDir" --connection "$ConnectionString"
+dotnet ef database update $TargetMigration --project "$RepositoryProject" --startup-project "$ServicesProject"
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "=== Migration rolled back successfully ===" -ForegroundColor Green
