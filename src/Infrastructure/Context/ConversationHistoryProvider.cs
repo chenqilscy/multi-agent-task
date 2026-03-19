@@ -1,6 +1,7 @@
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.AI;
 
 namespace CKY.MultiAgentFramework.Infrastructure.Context
 {
@@ -20,7 +21,7 @@ namespace CKY.MultiAgentFramework.Infrastructure.Context
     /// - 个人助理应用
     /// - 教学辅导系统
     /// </remarks>
-    public class ConversationHistoryProvider : IAIContextProvider
+    public class ConversationHistoryProvider : AIContextProvider
     {
         private readonly ILogger<ConversationHistoryProvider> _logger;
         private readonly ConcurrentDictionary<string, Queue<ConversationMessage>> _sessions;

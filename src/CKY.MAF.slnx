@@ -9,16 +9,19 @@
   <!-- Layer 3: Infrastructure -->
     <Folder Name="/src/Infrastructure/"></Folder>
     <Folder Name="/src/Infrastructure/Caching/">
-      <Project Path="Infrastructure/Caching/CKY.MAF.Infrastructure.Caching.csproj" />
+        <Project Path="Infrastructure/Caching/CKY.MAF.Infrastructure.Caching.csproj" />
+    </Folder>
+    <Folder Name="/src/Infrastructure/Dapper/">
+        <Project Path="Infrastructure/Dapper/CKY.MAF.Infrastructure.Dapper.csproj" />
     </Folder>
     <Folder Name="/src/Infrastructure/DependencyInjection/">
-      <Project Path="Infrastructure/DependencyInjection/CKY.MAF.Infrastructure.DependencyInjection.csproj" />
+        <Project Path="Infrastructure/DependencyInjection/CKY.MAF.Infrastructure.DependencyInjection.csproj" />
     </Folder>
     <Folder Name="/src/Infrastructure/Repository/">
-      <Project Path="Infrastructure/Repository/CKY.MAF.Infrastructure.Repository.csproj" />
+        <Project Path="Infrastructure/Repository/CKY.MAF.Infrastructure.Repository.csproj" />
     </Folder>
     <Folder Name="/src/Infrastructure/Vectorization/">
-      <Project Path="Infrastructure/Vectorization/CKY.MAF.Infrastructure.Vectorization.csproj" />
+        <Project Path="Infrastructure/Vectorization/CKY.MAF.Infrastructure.Vectorization.csproj" />
     </Folder>
 
   <!-- Layer 4: Services -->

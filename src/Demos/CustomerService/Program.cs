@@ -10,24 +10,13 @@ using CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 using CKY.MultiAgentFramework.Services.NLP;
 using CKY.MultiAgentFramework.Services.Resilience;
 using CKY.MultiAgentFramework.Demos.CustomerService.Components;
-using Microsoft.EntityFrameworkCore;
-using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
-using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 配置 EF Core SQLite
-builder.Services.AddDbContext<MafDbContext>(options =>
-    options.UseSqlite("Data Source=customer_service.db"));
-
-// 自动注册 Infrastructure 服务
-builder.Services.AddMafInfrastructureServices(builder.Configuration);
-
-// 注册工作单元和仓储
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-builder.Services.AddScoped<IMainTaskRepository, MainTaskRepository>();
+// 使用 MAF Dapper 服务（高性能 + 业务层完全解耦）
+builder.Services.AddMafDapperServices(builder.Configuration);
 
 // ========================================
 // LLM Agent 注册
@@ -126,7 +115,7 @@ var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found");

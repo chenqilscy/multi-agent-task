@@ -13,6 +13,7 @@ using CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Relational;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
+using CKY.MultiAgentFramework.Infrastructure.Dapper;
 
 namespace CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 
@@ -170,14 +171,44 @@ public static class MafServiceRegistrationExtensions
             return;
         }
 
-        // 注册 ICacheStore → RedisCacheStore（增强版：带连接管理）
-        services.AddRedisCacheStore(configuration);
+        // 注册 ASP.NET Core 基础服务（必需）
+        services.AddMemoryCache();  // 注册 IMemoryCache
+        services.AddLogging();       // 确保 ILogger 可用
+
+        // 注册 ICacheStore → 优先 Redis，失败时降级到 MemoryCache
+        var redisConnectionString = configuration.GetConnectionString("Redis");
+        if (!string.IsNullOrEmpty(redisConnectionString))
+        {
+            try
+            {
+                services.AddRedisCacheStore(configuration);
+            }
+            catch
+            {
+                // Redis 连接失败，降级到内存缓存
+                services.AddSingleton<ICacheStore, MemoryCacheStore>();
+            }
+        }
+        else
+        {
+            // 没有配置 Redis，直接使用内存缓存
+            services.AddSingleton<ICacheStore, MemoryCacheStore>();
+        }
 
         // 注册 IVectorStore → MemoryVectorStore
         services.AddSingleton<IVectorStore, MemoryVectorStore>();
 
         // 注册 IRelationalDatabase → EfCoreRelationalDatabase（增强版：支持 PostgreSQL）
         services.AddEfCoreRelationalDatabase(configuration);
+
+        // 注册 IMafAiSessionStore → DatabaseMafAiSessionStore（带工厂方法）
+        services.AddScoped<IMafAiSessionStore>(sp =>
+        {
+            var dbContext = sp.GetRequiredService<MafDbContext>();
+            var logger = sp.GetRequiredService<ILogger<DatabaseMafAiSessionStore>>();
+            var options = sp.GetService<IOptions<DatabaseSessionOptions>>()?.Value;
+            return new DatabaseMafAiSessionStore(() => dbContext, logger, options);
+        });
     }
 
     /// <summary>
@@ -254,6 +285,12 @@ public static class MafServiceRegistrationExtensions
             }
         });
 
-        services.AddScoped<IRelationalDatabase, EfCoreRelationalDatabase>();
+        // 注册 IRelationalDatabase，使用工厂方法确保 DbContext 正确注入
+        services.AddScoped<IRelationalDatabase>(sp =>
+        {
+            var dbContext = sp.GetRequiredService<MafDbContext>();
+            var logger = sp.GetRequiredService<ILogger<EfCoreRelationalDatabase>>();
+            return new EfCoreRelationalDatabase(dbContext, logger);
+        });
     }
 }

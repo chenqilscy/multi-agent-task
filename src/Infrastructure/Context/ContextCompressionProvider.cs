@@ -29,7 +29,7 @@ namespace CKY.MultiAgentFramework.Infrastructure.Context
     /// - 代码审查助手
     /// - 知识库问答
     /// </remarks>
-    public class ContextCompressionProvider : IAIContextProvider
+    public class ContextCompressionProvider : AIContextProvider
     {
         private readonly ILogger<ContextCompressionProvider> _logger;
         private readonly ContextCompressionOptions _options;
