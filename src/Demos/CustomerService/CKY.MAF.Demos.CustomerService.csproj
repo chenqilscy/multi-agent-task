@@ -29,6 +29,8 @@
     <AssemblyName>CKY.MAF.Demos.CustomerService</AssemblyName>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <UserSecretsId>cky-maf-customerservice-dev</UserSecretsId>
+    <!-- ReconnectModal 是 .NET 9+ 内置 Blazor 组件，RZ10012 为 Razor 编译器误报 -->
+    <NoWarn>RZ10012</NoWarn>
   </PropertyGroup>
 
 </Project>

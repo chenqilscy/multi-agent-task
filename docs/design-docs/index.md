@@ -11,6 +11,7 @@
 | [task-scheduling.md](task-scheduling.md) | 任务优先级系统、依赖关系管理、DAG拓扑排序 | 已完成 |
 | [error-handling.md](error-handling.md) | 重试策略、熔断器、5级降级机制 | 已完成 |
 | [ms-af-integration.md](ms-af-integration.md) | Microsoft Agent Framework 集成报告 | 已完成 |
+| [builtin-agents-design.md](builtin-agents-design.md) | 内置通用 Agent 设计讨论（差距分析+实施路径） | 讨论稿 |
 
 ## 阅读顺序建议
 

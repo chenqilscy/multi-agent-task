@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Qdrant.Client;
 
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Agents.Specialized;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Memory;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Redis;
 using CKY.MultiAgentFramework.Infrastructure.Vectorization.Memory;
@@ -397,6 +398,45 @@ public static class MafServiceRegistrationExtensions
             var logger = sp.GetRequiredService<ILogger<ZhipuAIEmbeddingService>>();
             return new ZhipuAIEmbeddingService(httpClient, logger, model, dimension);
         });
+
+        return services;
+    }
+
+    /// <summary>
+    /// 注册 MAF 内置专业 Agent（一键注册所有 Core/Agents/Specialized 中的 Agent）
+    /// </summary>
+    /// <remarks>
+    /// 注册的 Agent 列表：
+    /// <list type="bullet">
+    ///   <item>MafLeaderAgent — 通用主控编排 Agent</item>
+    ///   <item>RagKnowledgeAgent — 通用 RAG 知识库 Agent</item>
+    ///   <item>DialogueAgent — 多轮对话 Agent</item>
+    ///   <item>IntentRecognitionAgent — 意图识别 Agent</item>
+    ///   <item>EmbeddingAgent — 文本嵌入 Agent</item>
+    ///   <item>SummarizationAgent — 文本摘要 Agent</item>
+    ///   <item>TranslationAgent — 翻译 Agent</item>
+    ///   <item>CodeAgent — 代码生成 Agent</item>
+    ///   <item>ImageAgent — 图像处理 Agent</item>
+    ///   <item>VideoAgent — 视频处理 Agent</item>
+    /// </list>
+    /// 所有 Agent 以 Singleton 注册。其依赖（如 IRagPipeline、IIntentKeywordProvider）
+    /// 需由调用方另行注册。
+    /// </remarks>
+    public static IServiceCollection AddMafBuiltinAgents(this IServiceCollection services)
+    {
+        // 编排类
+        services.AddSingleton<MafLeaderAgent>();
+        services.AddSingleton<RagKnowledgeAgent>();
+
+        // 功能类
+        services.AddSingleton<DialogueAgent>();
+        services.AddSingleton<IntentRecognitionAgent>();
+        services.AddSingleton<EmbeddingAgent>();
+        services.AddSingleton<SummarizationAgent>();
+        services.AddSingleton<TranslationAgent>();
+        services.AddSingleton<CodeAgent>();
+        services.AddSingleton<ImageAgent>();
+        services.AddSingleton<VideoAgent>();
 
         return services;
     }

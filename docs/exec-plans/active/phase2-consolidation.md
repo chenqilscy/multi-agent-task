@@ -15,7 +15,7 @@
 | 用例覆盖度 | ~75% (SH:~78%, CS:~72%) | ≥75% | ✅ 已达标 |
 | 单元测试 (含场景) | 893 通过 | ≥400 | ✅ 已超额 |
 | 集成测试 | 193 通过 (+ 7 容器) | ≥120 | ✅ 已超额 |
-| 编译警告 | 0 (核心), 2 (测试项目已知问题) | 0 全部 | ⚠️ 2个低优先级 |
+| 编译警告 | 0 全部 (TreatWarningsAsErrors) | 0 全部 | ✅ 已达标 |
 | 文档与代码同步率 | ~90% | ≥95% | ✅ 设计文档已同步v2.1 |
 
 ---
@@ -80,12 +80,13 @@
 - [ ] Services 层覆盖率 ≥ 90%
 - [ ] Core 层覆盖率 ≥ 95%
 - [ ] Infrastructure 层覆盖率 ≥ 80%
-- [ ] 零编译警告策略 (`<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`)
+- [x] 零编译警告策略 (`TreatWarningsAsErrors` via `Directory.Build.props`)
 
-### 2c-3. CI/CD 完善
-- [ ] GitHub Actions 或 Azure Pipeline 配置
-- [ ] 自动化测试 + 覆盖率报告
-- [ ] 发布流水线 (Docker build → push)
+### 2c-3. CI/CD 完善 ✅ 完成
+- [x] GitHub Actions 配置 (`.github/workflows/ci.yml`)
+- [x] 自动化测试 + 覆盖率报告 (Cobertura + reportgenerator)
+- [x] 覆盖率门禁 (CI 中 ≥60% 硬性要求)
+- [x] 发布流水线 (Docker build on main push)
 
 ---
 
@@ -94,7 +95,7 @@
 Phase 2 整体完成需满足以下全部条件:
 
 1. **E2E 链路**: MainAgent → Orchestrator → Agent 全链路在集成测试中通过 ✅ (7 个 Orchestrator callback 集成测试)
-2. **零编译错误**: `dotnet build CKY.MAF.slnx` 零错误零警告 ⚠️ (0 错误, 2 低优先级警告)
+2. **零编译错误**: `dotnet build CKY.MAF.slnx` 零错误零警告 ✅ (TreatWarningsAsErrors 已启用)
 3. **用例覆盖**: 总体覆盖度 ≥ 75% (SmartHome ≥ 75%, CustomerService ≥ 65%) ✅ (SH ~78%, CS ~72%)
 4. **测试数量**: 单元测试 ≥ 400, 集成测试 ≥ 120 ✅ (单元 893, 集成 193)
 5. **文档同步**: 所有 design-docs 文档与代码一致 ✅ (v2.1 已同步)

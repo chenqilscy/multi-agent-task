@@ -116,24 +116,5 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
 
             return $"{typeInstruction}，最多{maxLength}个字。\n\n{text}\n\n{languageInstruction}";
         }
-
-        /// <summary>
-        /// 从请求中提取参数
-        /// </summary>
-        private T GetParameter<T>(MafTaskRequest request, string key, T defaultValue)
-        {
-            if (request.Parameters.TryGetValue(key, out var value))
-            {
-                try
-                {
-                    return (T)Convert.ChangeType(value, typeof(T));
-                }
-                catch
-                {
-                    return defaultValue;
-                }
-            }
-            return defaultValue;
-        }
     }
 }

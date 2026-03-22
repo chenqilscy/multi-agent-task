@@ -219,25 +219,6 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
         }
 
         /// <summary>
-        /// 从请求中提取参数
-        /// </summary>
-        private T GetParameter<T>(MafTaskRequest request, string key, T defaultValue)
-        {
-            if (request.Parameters.TryGetValue(key, out var value))
-            {
-                try
-                {
-                    return (T)Convert.ChangeType(value, typeof(T));
-                }
-                catch
-                {
-                    return defaultValue;
-                }
-            }
-            return defaultValue;
-        }
-
-        /// <summary>
         /// 意图识别结果
         /// </summary>
         private class IntentRecognitionResult

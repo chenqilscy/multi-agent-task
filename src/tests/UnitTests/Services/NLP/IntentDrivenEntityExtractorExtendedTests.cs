@@ -77,7 +77,7 @@ public class IntentDrivenEntityExtractorExtendedTests
         _recognizerMock.Setup(x => x.RecognizeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new IntentRecognitionResult { PrimaryIntent = "light", Confidence = 0.9 });
         _mappingMock.Setup(x => x.GetProviderType("light")).Returns(typeof(IEntityPatternProvider));
-        _spMock.Setup(x => x.GetService(typeof(IEntityPatternProvider))).Returns(null);
+        _spMock.Setup(x => x.GetService(typeof(IEntityPatternProvider))).Returns(null!);
 
         var sut = CreateSut();
         var result = await sut.ExtractAsync("开灯");

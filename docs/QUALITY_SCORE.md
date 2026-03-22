@@ -45,13 +45,11 @@
 | Core 项目 | 0 | 0 | ✅ |
 | Services 项目 | 0 | 0 | ✅ |
 | Infrastructure 项目 | 0 | 0 | ✅ |
-| Demo 项目 | 0 | 1 (Razor预存) | ✅ |
-| 测试项目 | 0 | 2 (预存) | ✅ |
+| Demo 项目 | 0 | 0 | ✅ |
+| 测试项目 | 0 | 0 | ✅ |
 
-**已知编译警告** (非错误):
-- `CS8625` — null 字面量转换警告 (低优先级)
-- `xUnit1031` — 建议使用异步测试 (低优先级)
-- `RZ10012` — Razor ReconnectModal 组件提示 (不影响运行)
+**TreatWarningsAsErrors**: ✅ 已启用 (`src/Directory.Build.props`)  
+全解决方案 0 警告、0 错误通过编译。
 
 ---
 

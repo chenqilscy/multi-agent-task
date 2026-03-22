@@ -232,5 +232,28 @@ namespace CKY.MultiAgentFramework.Core.Agents
         }
 
         #endregion
+
+        #region 参数辅助方法
+
+        /// <summary>
+        /// 从请求中提取参数（带类型转换和默认值）
+        /// </summary>
+        protected T GetParameter<T>(MafTaskRequest request, string key, T defaultValue)
+        {
+            if (request.Parameters.TryGetValue(key, out var value))
+            {
+                try
+                {
+                    return (T)Convert.ChangeType(value, typeof(T));
+                }
+                catch
+                {
+                    return defaultValue;
+                }
+            }
+            return defaultValue;
+        }
+
+        #endregion
     }
 }

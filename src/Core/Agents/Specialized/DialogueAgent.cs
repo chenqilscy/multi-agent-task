@@ -169,24 +169,5 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
         {
             return "你是一个智能助手，擅长自然对话。请根据上下文提供友好、有帮助的回答。";
         }
-
-        /// <summary>
-        /// 从请求中提取参数
-        /// </summary>
-        private T GetParameter<T>(MafTaskRequest request, string key, T defaultValue)
-        {
-            if (request.Parameters.TryGetValue(key, out var value))
-            {
-                try
-                {
-                    return (T)Convert.ChangeType(value, typeof(T));
-                }
-                catch
-                {
-                    return defaultValue;
-                }
-            }
-            return defaultValue;
-        }
     }
 }

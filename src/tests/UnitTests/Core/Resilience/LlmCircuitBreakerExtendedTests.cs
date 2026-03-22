@@ -69,12 +69,12 @@ public class LlmCircuitBreakerExtendedTests
     }
 
     [Fact]
-    public void Reset_FromOpen_ShouldReturnToClosed()
+    public async Task Reset_FromOpen_ShouldReturnToClosed()
     {
         var breaker = CreateBreaker(threshold: 1);
 
         // 触发 Open
-        try { breaker.ExecuteAsync<string>("a", _ => throw new Exception("fail")).Wait(); }
+        try { await breaker.ExecuteAsync<string>("a", _ => throw new Exception("fail")); }
         catch { }
         breaker.State.Should().Be(LlmCircuitState.Open);
 

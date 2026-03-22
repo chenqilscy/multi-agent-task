@@ -194,15 +194,8 @@ builder.Services.AddSingleton<IRuleEngine, SmartHomeRuleEngine>();
 // 专业 Agent 注册
 // ========================================
 
-// 注册内置专业 Agent（可根据需要启用）
-builder.Services.AddSingleton<IntentRecognitionAgent>();
-builder.Services.AddSingleton<DialogueAgent>();
-builder.Services.AddSingleton<EmbeddingAgent>();
-builder.Services.AddSingleton<ImageAgent>();
-builder.Services.AddSingleton<VideoAgent>();
-builder.Services.AddSingleton<SummarizationAgent>();
-builder.Services.AddSingleton<TranslationAgent>();
-builder.Services.AddSingleton<CodeAgent>();
+// 一键注册所有内置专业 Agent（MafLeaderAgent, DialogueAgent, EmbeddingAgent 等）
+builder.Services.AddMafBuiltinAgents();
 
 // ========================================
 // SignalR 实时通信服务注册

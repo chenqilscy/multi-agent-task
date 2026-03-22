@@ -106,24 +106,5 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
         {
             return $"Generate a {style} style image: {prompt}. Size: {width}x{height}. High quality, detailed.";
         }
-
-        /// <summary>
-        /// 从请求中提取参数
-        /// </summary>
-        private T GetParameter<T>(MafTaskRequest request, string key, T defaultValue)
-        {
-            if (request.Parameters.TryGetValue(key, out var value))
-            {
-                try
-                {
-                    return (T)Convert.ChangeType(value, typeof(T));
-                }
-                catch
-                {
-                    return defaultValue;
-                }
-            }
-            return defaultValue;
-        }
     }
 }
