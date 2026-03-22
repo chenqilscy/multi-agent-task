@@ -11,6 +11,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
 
     <!-- EF Core 包（用于 DbContext 和 PostgreSQL 支持） -->
@@ -30,6 +31,8 @@
     <ProjectReference Include="..\..\Core\CKY.MAF.Core.csproj" />
     <ProjectReference Include="..\Caching\CKY.MAF.Infrastructure.Caching.csproj" />
     <ProjectReference Include="..\Dapper\CKY.MAF.Infrastructure.Dapper.csproj" />
+    <ProjectReference Include="..\Embedding\CKY.MAF.Infrastructure.Embedding.csproj" />
+    <ProjectReference Include="..\Parsing\CKY.MAF.Infrastructure.Parsing.csproj" />
     <ProjectReference Include="..\Vectorization\CKY.MAF.Infrastructure.Vectorization.csproj" />
     <ProjectReference Include="..\Repository\CKY.MAF.Infrastructure.Repository.csproj" />
   </ItemGroup>

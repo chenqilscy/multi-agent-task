@@ -41,13 +41,13 @@ namespace CKY.MultiAgentFramework.Services.Session.Strategies
         /// <param name="cancellationToken">取消令牌</param>
         public async Task WriteAsync(
             MafSessionState session,
-            IMafAiSessionStore l1Cache,
+            IL1SessionCache l1Cache,
             IMafAiSessionStore? l2Store,
             IMafAiSessionStore? l3Store,
             CancellationToken cancellationToken)
         {
             // 1. 保存到 L1（内存）- 同步，最高优先级
-            await l1Cache.SaveAsync(session, cancellationToken);
+            l1Cache.Add(session.SessionId, session);
 
             // 2. 保存到 L2（Redis）- 异步，用于分布式访问
             if (l2Store != null)

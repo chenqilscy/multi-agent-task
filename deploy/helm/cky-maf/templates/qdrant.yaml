@@ -1,0 +1,93 @@
+{{- if .Values.qdrant.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cky-maf.fullname" . }}-qdrant
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: qdrant
+    {{- include "cky-maf.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qdrant
+  template:
+    metadata:
+      labels:
+        app: qdrant
+    spec:
+      containers:
+        - name: qdrant
+          image: "{{ .Values.qdrant.image.repository }}:{{ .Values.qdrant.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.qdrant.service.restPort }}
+              name: rest
+            - containerPort: {{ .Values.qdrant.service.grpcPort }}
+              name: grpc
+          resources:
+            {{- toYaml .Values.qdrant.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: rest
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: rest
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          {{- if .Values.qdrant.persistence.enabled }}
+          volumeMounts:
+            - name: qdrant-data
+              mountPath: /qdrant/storage
+          {{- end }}
+      {{- if .Values.qdrant.persistence.enabled }}
+      volumes:
+        - name: qdrant-data
+          persistentVolumeClaim:
+            claimName: {{ include "cky-maf.fullname" . }}-qdrant
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: qdrant
+    {{- include "cky-maf.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.qdrant.service.restPort }}
+      targetPort: {{ .Values.qdrant.service.restPort }}
+      name: rest
+    - port: {{ .Values.qdrant.service.grpcPort }}
+      targetPort: {{ .Values.qdrant.service.grpcPort }}
+      name: grpc
+  selector:
+    app: qdrant
+{{- if .Values.qdrant.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "cky-maf.fullname" . }}-qdrant
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: qdrant
+    {{- include "cky-maf.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.qdrant.persistence.storageClass }}
+  storageClassName: {{ .Values.qdrant.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.qdrant.persistence.size }}
+{{- end }}
+{{- end }}

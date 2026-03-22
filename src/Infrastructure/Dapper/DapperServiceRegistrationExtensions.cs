@@ -73,6 +73,11 @@ public static class DapperServiceRegistrationExtensions
 
                 var connection = new NpgsqlConnection(connectionString);
                 connection.Open();
+
+                // 创建数据库初始化服务
+                var dbInitializer = new PostgreSqlDatabaseInitializer(connection, logger);
+                dbInitializer.Initialize();
+
                 return connection;
             });
         }

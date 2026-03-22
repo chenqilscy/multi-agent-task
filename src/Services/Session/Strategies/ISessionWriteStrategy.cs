@@ -31,7 +31,7 @@ namespace CKY.MultiAgentFramework.Services.Session.Strategies
         /// <param name="cancellationToken">取消令牌</param>
         Task WriteAsync(
             MafSessionState session,
-            IMafAiSessionStore l1Cache,
+            IL1SessionCache l1Cache,
             IMafAiSessionStore? l2Store,
             IMafAiSessionStore? l3Store,
             CancellationToken cancellationToken);

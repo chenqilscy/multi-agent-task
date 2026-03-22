@@ -14,7 +14,7 @@ namespace CKY.MultiAgentFramework.E2ETests.SmartHome
     /// </summary>
     public class LongDialogE2ETests
     {
-        private readonly SmartHomeMainAgent _mainAgent;
+        private readonly SmartHomeLeaderAgent _mainAgent;
         private readonly ITestOutputHelper _output;
 
         public LongDialogE2ETests(ITestOutputHelper output)

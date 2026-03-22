@@ -53,7 +53,13 @@ namespace CKY.MAF.Demos.SmartHome.Hubs
         /// </summary>
         public async Task SendMessage(string user, string message)
         {
-            _logger.LogInformation("收到消息: {User} - {Message}", user, message);
+            // 输入验证
+            if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(message))
+                return;
+            if (user.Length > 100) user = user[..100];
+            if (message.Length > 2000) message = message[..2000];
+
+            _logger.LogInformation("收到消息: {User} - {MessageLength}字符", user, message.Length);
 
             // 广播消息给所有客户端
             await Clients.All.SendAsync("ReceiveMessage", user, message);
@@ -64,12 +70,15 @@ namespace CKY.MAF.Demos.SmartHome.Hubs
         /// </summary>
         public async Task JoinRoom(string roomName)
         {
+            if (string.IsNullOrWhiteSpace(roomName) || roomName.Length > 100)
+                return;
+
             var connectionId = Context.ConnectionId;
             await Groups.AddToGroupAsync(connectionId, roomName);
             _logger.LogInformation("客户端 {ConnectionId} 加入房间: {RoomName}", connectionId, roomName);
 
             await Clients.Group(roomName).SendAsync("ReceiveMessage", "系统",
-                $"用户 {connectionId} 加入了房间 {roomName}");
+                $"新用户加入了房间");
         }
 
         /// <summary>
@@ -77,12 +86,15 @@ namespace CKY.MAF.Demos.SmartHome.Hubs
         /// </summary>
         public async Task LeaveRoom(string roomName)
         {
+            if (string.IsNullOrWhiteSpace(roomName) || roomName.Length > 100)
+                return;
+
             var connectionId = Context.ConnectionId;
             await Groups.RemoveFromGroupAsync(connectionId, roomName);
             _logger.LogInformation("客户端 {ConnectionId} 离开房间: {RoomName}", connectionId, roomName);
 
             await Clients.Group(roomName).SendAsync("ReceiveMessage", "系统",
-                $"用户 {connectionId} 离开了房间 {roomName}");
+                $"用户离开了房间");
         }
 
         /// <summary>

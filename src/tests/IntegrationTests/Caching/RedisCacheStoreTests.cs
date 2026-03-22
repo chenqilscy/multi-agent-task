@@ -197,7 +197,11 @@ namespace CKY.MultiAgentFramework.IntegrationTests.Caching
             // Assert
             result.Should().NotBeNull();
             result!.Tags.Should().BeEquivalentTo(value.Tags);
-            result.Metadata.Should().BeEquivalentTo(value.Metadata);
+            // JSON 反序列化 Dictionary<string, object> 后值类型变为 JsonElement
+            result.Metadata.Should().ContainKey("key1");
+            result.Metadata["key1"].ToString().Should().Be("value1");
+            result.Metadata["key2"].ToString().Should().Be("42");
+            result.Metadata["key3"].ToString().Should().Be("True");
             result.CreatedAt.Should().BeCloseTo(value.CreatedAt, TimeSpan.FromSeconds(1));
         }
 

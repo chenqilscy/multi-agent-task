@@ -23,6 +23,17 @@ namespace CKY.MultiAgentFramework.Core.Abstractions
             CancellationToken ct = default);
 
         /// <summary>
+        /// 执行计划（使用自定义任务执行器）
+        /// </summary>
+        /// <param name="plan">执行计划</param>
+        /// <param name="taskExecutor">任务执行回调，由调用方提供真实的Agent调用逻辑</param>
+        /// <param name="ct">取消令牌</param>
+        Task<List<TaskExecutionResult>> ExecutePlanAsync(
+            ExecutionPlan plan,
+            Func<DecomposedTask, CancellationToken, Task<TaskExecutionResult>> taskExecutor,
+            CancellationToken ct = default);
+
+        /// <summary>
         /// 取消执行
         /// </summary>
         Task CancelAsync(string planId, CancellationToken ct = default);

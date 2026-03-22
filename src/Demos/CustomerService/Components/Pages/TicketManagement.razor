@@ -1,0 +1,305 @@
+@page "/admin/tickets"
+@using CKY.MultiAgentFramework.Demos.CustomerService.Services
+@rendermode InteractiveServer
+@inject IServiceProvider ServiceProvider
+
+<PageTitle>工单管理 - 智能客服</PageTitle>
+
+<div class="admin-container">
+    <div class="admin-header">
+        <h2>📋 工单管理</h2>
+        <div class="header-actions">
+            <select @bind="filterStatus" @bind:after="LoadTickets">
+                <option value="">全部状态</option>
+                <option value="open">待处理</option>
+                <option value="in_progress">处理中</option>
+                <option value="resolved">已解决</option>
+                <option value="closed">已关闭</option>
+            </select>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading">加载中...</div>
+    }
+    else if (tickets.Count == 0)
+    {
+        <div class="empty-state">暂无工单</div>
+    }
+    else
+    {
+        <div class="ticket-list">
+            @foreach (var ticket in tickets)
+            {
+                <div class="ticket-card @GetStatusClass(ticket.Status)" @onclick="() => SelectTicket(ticket)">
+                    <div class="ticket-header">
+                        <span class="ticket-id">@ticket.TicketId</span>
+                        <span class="ticket-priority priority-@ticket.Priority">@GetPriorityText(ticket.Priority)</span>
+                    </div>
+                    <div class="ticket-title">@ticket.Title</div>
+                    <div class="ticket-meta">
+                        <span>@GetCategoryText(ticket.Category)</span>
+                        <span>@GetStatusText(ticket.Status)</span>
+                        <span>@ticket.CreatedAt.ToString("MM-dd HH:mm")</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (selectedTicket != null)
+    {
+        <div class="ticket-detail-overlay" @onclick="() => selectedTicket = null">
+            <div class="ticket-detail" @onclick:stopPropagation="true">
+                <div class="detail-header">
+                    <h3>@selectedTicket.Title</h3>
+                    <button class="btn-close" @onclick="() => selectedTicket = null">✕</button>
+                </div>
+                <div class="detail-body">
+                    <div class="detail-info">
+                        <p><strong>工单号：</strong>@selectedTicket.TicketId</p>
+                        <p><strong>用户：</strong>@selectedTicket.UserId</p>
+                        <p><strong>类别：</strong>@GetCategoryText(selectedTicket.Category)</p>
+                        <p><strong>优先级：</strong>@GetPriorityText(selectedTicket.Priority)</p>
+                        <p><strong>状态：</strong>@GetStatusText(selectedTicket.Status)</p>
+                        <p><strong>创建时间：</strong>@selectedTicket.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</p>
+                    </div>
+                    <div class="detail-description">
+                        <h4>描述</h4>
+                        <p>@selectedTicket.Description</p>
+                    </div>
+
+                    @if (selectedTicket.Comments.Count > 0)
+                    {
+                        <div class="detail-comments">
+                            <h4>处理记录</h4>
+                            @foreach (var comment in selectedTicket.Comments)
+                            {
+                                <div class="comment @(comment.IsStaff ? "staff-comment" : "user-comment")">
+                                    <div class="comment-author">@(comment.IsStaff ? "👨‍💼 客服" : "👤 用户") @comment.Author</div>
+                                    <div class="comment-content">@comment.Content</div>
+                                    <div class="comment-time">@comment.CreatedAt.ToString("MM-dd HH:mm")</div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <div class="detail-actions">
+                        <div class="reply-box">
+                            <textarea @bind="replyContent" placeholder="输入回复内容..." rows="3" maxlength="1000"></textarea>
+                            <div class="action-buttons">
+                                @if (selectedTicket.Status == "open")
+                                {
+                                    <button class="btn btn-primary" @onclick='() => UpdateTicketStatus("in_progress", replyContent)'>开始处理</button>
+                                }
+                                @if (selectedTicket.Status is "open" or "in_progress")
+                                {
+                                    <button class="btn btn-success" @onclick='() => UpdateTicketStatus("resolved", replyContent)'>标记解决</button>
+                                    <button class="btn btn-warning" @onclick="() => EscalateTicket()">升级优先级</button>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(replyContent))
+                                {
+                                    <button class="btn btn-secondary" @onclick="() => AddComment()">仅回复</button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .admin-container { max-width: 1000px; margin: 20px auto; padding: 0 16px; }
+    .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .admin-header h2 { margin: 0; color: #333; }
+    .admin-header select { padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; }
+    .loading, .empty-state { text-align: center; padding: 40px; color: #999; }
+    .ticket-list { display: flex; flex-direction: column; gap: 10px; }
+    .ticket-card { background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px 16px; cursor: pointer; transition: all 0.2s; border-left: 4px solid #ccc; }
+    .ticket-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .ticket-card.status-open { border-left-color: #f44336; }
+    .ticket-card.status-in_progress { border-left-color: #ff9800; }
+    .ticket-card.status-resolved { border-left-color: #4caf50; }
+    .ticket-card.status-closed { border-left-color: #9e9e9e; }
+    .ticket-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .ticket-id { font-size: 0.8rem; color: #999; font-family: monospace; }
+    .ticket-priority { font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; }
+    .priority-urgent { background: #ffebee; color: #c62828; }
+    .priority-high { background: #fff3e0; color: #e65100; }
+    .priority-normal { background: #e3f2fd; color: #1565c0; }
+    .priority-low { background: #f5f5f5; color: #757575; }
+    .ticket-title { font-weight: 500; margin-bottom: 6px; }
+    .ticket-meta { display: flex; gap: 12px; font-size: 0.8rem; color: #999; }
+    .ticket-detail-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+    .ticket-detail { background: white; border-radius: 12px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; }
+    .detail-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; }
+    .detail-header h3 { margin: 0; }
+    .btn-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #999; }
+    .detail-body { padding: 20px; }
+    .detail-info p { margin: 4px 0; font-size: 0.9rem; }
+    .detail-description { margin-top: 16px; padding: 12px; background: #f9f9f9; border-radius: 6px; }
+    .detail-description h4 { margin: 0 0 8px; font-size: 0.9rem; color: #666; }
+    .detail-comments { margin-top: 16px; }
+    .detail-comments h4 { margin: 0 0 10px; font-size: 0.9rem; color: #666; }
+    .comment { padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; }
+    .staff-comment { background: #e3f2fd; }
+    .user-comment { background: #f5f5f5; }
+    .comment-author { font-size: 0.8rem; font-weight: 500; margin-bottom: 4px; }
+    .comment-content { font-size: 0.9rem; }
+    .comment-time { font-size: 0.7rem; color: #999; margin-top: 4px; text-align: right; }
+    .reply-box { margin-top: 16px; }
+    .reply-box textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; resize: vertical; box-sizing: border-box; }
+    .action-buttons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+    .btn-primary { background: #1976d2; color: white; }
+    .btn-success { background: #4caf50; color: white; }
+    .btn-warning { background: #ff9800; color: white; }
+    .btn-secondary { background: #757575; color: white; }
+    .btn:hover { opacity: 0.9; }
+</style>
+
+@code {
+    private List<TicketInfo> tickets = new();
+    private TicketInfo? selectedTicket;
+    private string filterStatus = "";
+    private string replyContent = "";
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTickets();
+    }
+
+    private async Task LoadTickets()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            using var scope = ServiceProvider.CreateScope();
+            var ticketService = scope.ServiceProvider.GetRequiredService<ITicketService>();
+            // 使用 demo-user 获取所有工单（管理视角）
+            var allTickets = await ticketService.GetUserTicketsAsync("demo-user-001");
+            // 添加其他测试用户的工单
+            allTickets.AddRange(await ticketService.GetUserTicketsAsync("demo-user-002"));
+            allTickets.AddRange(await ticketService.GetUserTicketsAsync("demo-user-003"));
+
+            if (!string.IsNullOrEmpty(filterStatus))
+            {
+                allTickets = allTickets.Where(t => t.Status == filterStatus).ToList();
+            }
+
+            tickets = allTickets.OrderByDescending(t => t.CreatedAt).ToList();
+        }
+        catch
+        {
+            tickets = new();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SelectTicket(TicketInfo ticket)
+    {
+        selectedTicket = ticket;
+        replyContent = "";
+    }
+
+    private async Task UpdateTicketStatus(string newStatus, string? comment)
+    {
+        if (selectedTicket == null) return;
+        try
+        {
+            using var scope = ServiceProvider.CreateScope();
+            var ticketService = scope.ServiceProvider.GetRequiredService<ITicketService>();
+            await ticketService.UpdateTicketAsync(selectedTicket.TicketId, new TicketUpdateRequest
+            {
+                Status = newStatus,
+                Comment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim()
+            });
+            replyContent = "";
+            await LoadTickets();
+            // 重新加载选中工单
+            selectedTicket = tickets.FirstOrDefault(t => t.TicketId == selectedTicket?.TicketId);
+        }
+        catch { }
+    }
+
+    private async Task AddComment()
+    {
+        if (selectedTicket == null || string.IsNullOrWhiteSpace(replyContent)) return;
+        try
+        {
+            using var scope = ServiceProvider.CreateScope();
+            var ticketService = scope.ServiceProvider.GetRequiredService<ITicketService>();
+            await ticketService.UpdateTicketAsync(selectedTicket.TicketId, new TicketUpdateRequest
+            {
+                Comment = replyContent.Trim()
+            });
+            replyContent = "";
+            await LoadTickets();
+            selectedTicket = tickets.FirstOrDefault(t => t.TicketId == selectedTicket?.TicketId);
+        }
+        catch { }
+    }
+
+    private async Task EscalateTicket()
+    {
+        if (selectedTicket == null) return;
+        // 升级优先级: low→normal→high→urgent
+        var nextPriority = selectedTicket.Priority switch
+        {
+            "low" => "normal",
+            "normal" => "high",
+            "high" => "urgent",
+            _ => "urgent"
+        };
+
+        try
+        {
+            using var scope = ServiceProvider.CreateScope();
+            var ticketService = scope.ServiceProvider.GetRequiredService<ITicketService>();
+            await ticketService.UpdateTicketAsync(selectedTicket.TicketId, new TicketUpdateRequest
+            {
+                Comment = $"[系统] 优先级从 {GetPriorityText(selectedTicket.Priority)} 升级至 {GetPriorityText(nextPriority)}"
+            });
+            await LoadTickets();
+            selectedTicket = tickets.FirstOrDefault(t => t.TicketId == selectedTicket?.TicketId);
+        }
+        catch { }
+    }
+
+    private static string GetStatusClass(string status) => $"status-{status}";
+    private static string GetStatusText(string status) => status switch
+    {
+        "open" => "待处理",
+        "in_progress" => "处理中",
+        "resolved" => "已解决",
+        "closed" => "已关闭",
+        _ => status
+    };
+    private static string GetPriorityText(string priority) => priority switch
+    {
+        "low" => "低",
+        "normal" => "普通",
+        "high" => "高",
+        "urgent" => "紧急",
+        _ => priority
+    };
+    private static string GetCategoryText(string category) => category switch
+    {
+        "order" => "📦 订单",
+        "product" => "🏷️ 商品",
+        "payment" => "💳 支付",
+        "shipping" => "🚚 物流",
+        "other" => "❓ 其他",
+        _ => category
+    };
+}

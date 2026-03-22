@@ -1,3 +1,4 @@
+using CKY.MultiAgentFramework.Core.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace CKY.MultiAgentFramework.Services.Session.Utils
@@ -21,7 +22,7 @@ namespace CKY.MultiAgentFramework.Services.Session.Utils
     /// - 当前实现非线程安全
     /// - 应在单线程环境下使用（如单例 SessionManager 内部）
     /// </remarks>
-    public class L1CacheManager
+    public class L1CacheManager : IL1SessionCache
     {
         private readonly ILogger<L1CacheManager> _logger;
         private readonly Dictionary<string, Core.Models.Session.MafSessionState> _cache;
@@ -123,6 +124,16 @@ namespace CKY.MultiAgentFramework.Services.Session.Utils
         public bool Remove(string sessionId)
         {
             return _cache.Remove(sessionId);
+        }
+
+        /// <summary>
+        /// 按用户ID获取会话列表
+        /// </summary>
+        public List<Core.Models.Session.MafSessionState> GetByUserId(string userId)
+        {
+            return _cache.Values
+                .Where(s => string.Equals(s.UserId, userId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
         }
     }
 }

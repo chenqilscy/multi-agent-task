@@ -82,6 +82,37 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Services
 
         /// <summary>申请退款</summary>
         Task<RefundResult> RequestRefundAsync(string orderId, RefundRequest request, CancellationToken ct = default);
+
+        /// <summary>申请换货</summary>
+        Task<ExchangeResult> RequestExchangeAsync(string orderId, ExchangeRequest request, CancellationToken ct = default);
+
+        /// <summary>检查退货资格（是否在退货期限内、商品类别限制等）</summary>
+        Task<ReturnEligibility> CheckReturnEligibilityAsync(string orderId, CancellationToken ct = default);
+    }
+
+    /// <summary>换货请求</summary>
+    public class ExchangeRequest
+    {
+        public string Reason { get; set; } = string.Empty;
+        public string? NewProductId { get; set; }
+        public string? Description { get; set; }
+    }
+
+    /// <summary>换货结果</summary>
+    public class ExchangeResult
+    {
+        public bool Success { get; set; }
+        public string? ExchangeId { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+    /// <summary>退货资格校验结果</summary>
+    public class ReturnEligibility
+    {
+        public bool IsEligible { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public int? RemainingDays { get; set; }
+        public bool IsSpecialItem { get; set; }
     }
 
     // ============================
@@ -258,6 +289,12 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Services
         BirthdayGreeting,
         /// <summary>工单处理完成通知</summary>
         TicketResolved,
+        /// <summary>异常交易主动核实</summary>
+        AnomalousTransaction,
+        /// <summary>订单状态变更通知</summary>
+        OrderStatusChange,
+        /// <summary>服务满意度调查</summary>
+        SatisfactionSurvey,
     }
 
     /// <summary>主动服务事件</summary>
@@ -283,6 +320,48 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Services
 
         /// <summary>处理事件并生成通知消息</summary>
         Task<string> HandleEventAsync(ProactiveEvent proactiveEvent, CancellationToken ct = default);
+    }
+
+    /// <summary>
+    /// 问题升级服务接口
+    /// 负责人工客服升级、VIP识别和跨部门转接
+    /// </summary>
+    public interface IEscalationService
+    {
+        /// <summary>升级到人工客服</summary>
+        Task<EscalationResult> EscalateToHumanAsync(string userId, string reason, string priority = "normal", CancellationToken ct = default);
+
+        /// <summary>获取用户VIP等级</summary>
+        Task<VipLevel> GetVipLevelAsync(string userId, CancellationToken ct = default);
+
+        /// <summary>跨部门转接</summary>
+        Task<TransferResult> TransferToDepartmentAsync(string ticketId, string department, CancellationToken ct = default);
+    }
+
+    /// <summary>升级结果</summary>
+    public class EscalationResult
+    {
+        public bool Success { get; set; }
+        public string? AgentId { get; set; }
+        public int EstimatedWaitMinutes { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+    /// <summary>VIP等级</summary>
+    public enum VipLevel
+    {
+        Normal = 0,
+        Silver = 1,
+        Gold = 2,
+        Platinum = 3,
+    }
+
+    /// <summary>转接结果</summary>
+    public class TransferResult
+    {
+        public bool Success { get; set; }
+        public string Department { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
     }
 
     /// <summary>

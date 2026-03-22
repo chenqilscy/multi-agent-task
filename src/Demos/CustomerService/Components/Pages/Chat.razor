@@ -3,7 +3,9 @@
 @using CKY.MultiAgentFramework.Core.Models.Task
 @using CKY.MultiAgentFramework.Demos.CustomerService.Agents
 @using CKY.MultiAgentFramework.Demos.CustomerService.Models
-@inject CustomerServiceMainAgent MainAgent
+@using CKY.MultiAgentFramework.Demos.CustomerService.Services
+@inject CustomerServiceLeaderAgent LeaderAgent
+@inject IServiceProvider ServiceProvider
 @rendermode InteractiveServer
 
 <PageTitle>智能客服</PageTitle>
@@ -20,11 +22,12 @@
         <button class="quick-btn" @onclick="@(() => SendMessage("如何申请退款？"))">💰 申请退款</button>
         <button class="quick-btn" @onclick="@(() => SendMessage("我要提交工单"))">📝 提交工单</button>
         <button class="quick-btn" @onclick="@(() => SendMessage("快递到哪了？"))">🚚 物流查询</button>
+        <button class="quick-btn handoff-btn" @onclick="RequestHumanHandoff" disabled="@isHandoffRequested">👨‍💼 转人工客服</button>
     </div>
 
     <!-- 对话区域 -->
     <div class="chat-messages" id="chatMessages">
-        @foreach (var msg in messages)
+        @foreach (ChatMessage msg in messages)
         {
             <div class="message @(msg.IsUser ? "user-message" : "assistant-message")">
                 @if (!msg.IsUser)
@@ -32,7 +35,7 @@
                     <div class="avatar">🤖</div>
                 }
                 <div class="message-bubble">
-                    <div class="message-content">@((MarkupString)msg.Content.Replace("\n", "<br/>"))</div>
+                    <div class="message-content">@((MarkupString)SanitizeForHtml(msg.Content))</div>
                     <div class="message-time">@msg.Timestamp.ToString("HH:mm")</div>
                 </div>
                 @if (msg.IsUser)
@@ -70,6 +73,7 @@
         <input @bind="userInput"
                @bind:event="oninput"
                @onkeypress="HandleKeyPress"
+               maxlength="500"
                placeholder="请输入您的问题，例如：查询订单 ORD-2024-001"
                disabled="@isProcessing" />
         <button @onclick="() => SendMessage(userInput)"
@@ -118,6 +122,9 @@
         transition: all 0.2s;
     }
     .quick-btn:hover { background: #1976d2; color: white; }
+    .handoff-btn { border-color: #ff9800; color: #e65100; }
+    .handoff-btn:hover { background: #ff9800; color: white; border-color: #ff9800; }
+    .handoff-btn:disabled { opacity: 0.5; cursor: default; }
     .chat-messages {
         flex: 1;
         overflow-y: auto;
@@ -182,9 +189,13 @@
 @code {
     private string userInput = string.Empty;
     private bool isProcessing = false;
+    private bool isHandoffRequested = false;
     private List<string> clarificationOptions = new();
     // 每个用户会话使用独立 SessionId，生产环境应从认证系统获取
     private readonly string sessionId = Guid.NewGuid().ToString();
+    // 持久化会话 ID（通过 IChatHistoryService 创建）
+    private string? persistentSessionId;
+    private IChatHistoryService? chatHistoryService;
     private List<ChatMessage> messages = new()
     {
         new ChatMessage
@@ -202,6 +213,22 @@
         public DateTime Timestamp { get; set; } = DateTime.Now;
     }
 
+    protected override async Task OnInitializedAsync()
+    {
+        // 尝试获取对话历史服务并创建持久化会话
+        try
+        {
+            chatHistoryService = ServiceProvider.GetService(typeof(IChatHistoryService)) as IChatHistoryService;
+            if (chatHistoryService != null)
+            {
+                persistentSessionId = await chatHistoryService.CreateSessionAsync("demo-user-001");
+            }
+        }
+        catch
+        {
+            // 持久化服务不可用时静默降级
+        }
+    }
     private async Task HandleKeyPress(KeyboardEventArgs e)
     {
         if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(userInput) && !isProcessing)
@@ -214,6 +241,9 @@
             return;
 
         var input = message.Trim();
+        // 服务端输入长度限制（防止绕过客户端限制）
+        if (input.Length > 500)
+            input = input[..500];
         userInput = string.Empty;
         clarificationOptions.Clear();
         isProcessing = true;
@@ -221,6 +251,9 @@
         // 添加用户消息
         messages.Add(new ChatMessage { IsUser = true, Content = input, Timestamp = DateTime.Now });
         StateHasChanged();
+
+        // 持久化用户消息
+        await SaveMessageAsync("user", input);
 
         try
         {
@@ -233,7 +266,7 @@
                 UserId = "demo-user-001",
             };
 
-            var response = await MainAgent.ExecuteBusinessLogicAsync(request);
+            var response = await LeaderAgent.ExecuteBusinessLogicAsync(request);
 
             var assistantContent = response.Result ?? "抱歉，处理您的请求时出现问题。";
 
@@ -250,13 +283,17 @@
                 Content = assistantContent,
                 Timestamp = DateTime.Now,
             });
+
+            // 持久化助手回复
+            await SaveMessageAsync("assistant", assistantContent);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
+            var errorContent = "系统繁忙，请稍后重试。";
             messages.Add(new ChatMessage
             {
                 IsUser = false,
-                Content = $"系统错误：{ex.Message}，请稍后重试。",
+                Content = errorContent,
                 Timestamp = DateTime.Now,
             });
         }
@@ -265,5 +302,67 @@
             isProcessing = false;
             StateHasChanged();
         }
+    }
+
+    private async Task SaveMessageAsync(string role, string content)
+    {
+        if (string.IsNullOrEmpty(persistentSessionId) || chatHistoryService == null) return;
+        try
+        {
+            await chatHistoryService.SaveMessageAsync(
+                persistentSessionId, role, content);
+        }
+        catch
+        {
+            // 持久化失败不影响对话流程
+        }
+    }
+
+    /// <summary>
+    /// HTML 编码后保留换行符，防止 XSS 攻击
+    /// </summary>
+    private static string SanitizeForHtml(string content)
+    {
+        return System.Net.WebUtility.HtmlEncode(content).Replace("\n", newValue: "<br/>");
+    }
+
+    private async Task RequestHumanHandoff()
+    {
+        if (isHandoffRequested) return;
+
+        isHandoffRequested = true;
+
+        // 创建转人工工单
+        try
+        {
+            using var scope = ServiceProvider.CreateScope();
+            var ticketService = scope.ServiceProvider.GetRequiredService<ITicketService>();
+            var ticketId = await ticketService.CreateTicketAsync(new TicketCreateRequest
+            {
+                UserId = "demo-user-001",
+                Title = "客户请求转接人工客服",
+                Description = "客户在智能客服对话中请求转接人工坐席处理",
+                Category = "other",
+                Priority = "high"
+            });
+
+            messages.Add(new ChatMessage
+            {
+                IsUser = false,
+                Content = $"已为您创建人工服务工单（{ticketId}），客服人员将尽快与您联系。\n\n工作时间：周一至周五 9:00-18:00\n预计响应时间：30 分钟内\n\n在等待期间，您仍可继续使用智能客服。",
+                Timestamp = DateTime.Now,
+            });
+        }
+        catch
+        {
+            messages.Add(new ChatMessage
+            {
+                IsUser = false,
+                Content = "转接人工客服请求已记录，客服人员将尽快与您联系。",
+                Timestamp = DateTime.Now,
+            });
+        }
+
+        StateHasChanged();
     }
 }

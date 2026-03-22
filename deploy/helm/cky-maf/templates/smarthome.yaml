@@ -1,0 +1,101 @@
+{{- if .Values.smarthome.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cky-maf.fullname" . }}-smarthome
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: smarthome
+    {{- include "cky-maf.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.smarthome.autoscaling.enabled }}
+  replicas: {{ .Values.smarthome.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: smarthome
+      {{- include "cky-maf.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: smarthome
+        {{- include "cky-maf.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: smarthome
+          image: "{{ .Values.smarthome.image.repository }}:{{ .Values.smarthome.image.tag }}"
+          imagePullPolicy: {{ .Values.smarthome.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.smarthome.service.targetPort }}
+              protocol: TCP
+          env:
+            {{- range $key, $value := .Values.smarthome.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: ConnectionStrings__Redis
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cky-maf.fullname" . }}-secrets
+                  key: redis-connection
+            - name: LLM__ZhipuAI__ApiKey
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cky-maf.fullname" . }}-secrets
+                  key: llm-zhipu-apikey
+            - name: Qdrant__Host
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cky-maf.fullname" . }}-secrets
+                  key: qdrant-host
+            - name: Qdrant__Port
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cky-maf.fullname" . }}-secrets
+                  key: qdrant-port
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.smarthome.health.path }}
+              port: {{ .Values.smarthome.service.targetPort }}
+            initialDelaySeconds: {{ .Values.smarthome.health.initialDelaySeconds }}
+            periodSeconds: {{ .Values.smarthome.health.periodSeconds }}
+            failureThreshold: {{ .Values.smarthome.health.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.smarthome.health.path }}
+              port: {{ .Values.smarthome.service.targetPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          startupProbe:
+            httpGet:
+              path: {{ .Values.smarthome.health.path }}
+              port: {{ .Values.smarthome.service.targetPort }}
+            failureThreshold: 30
+            periodSeconds: 2
+          resources:
+            {{- toYaml .Values.smarthome.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cky-maf.fullname" . }}-smarthome
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: smarthome
+    {{- include "cky-maf.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.smarthome.service.type }}
+  ports:
+    - port: {{ .Values.smarthome.service.port }}
+      targetPort: {{ .Values.smarthome.service.targetPort }}
+      protocol: TCP
+  selector:
+    app: smarthome
+    {{- include "cky-maf.selectorLabels" . | nindent 4 }}
+{{- end }}

@@ -16,14 +16,32 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
     {
         private readonly ILogger<MafTaskOrchestrator> _logger;
         private readonly IPrometheusMetricsCollector? _metrics;
+        private readonly IAgentMatcher? _agentMatcher;
         private readonly Dictionary<string, CancellationTokenSource> _activePlans = new();
+
+        /// <summary>
+        /// 默认的任务执行回调（当未提供自定义执行器且未注入 IAgentMatcher 时使用）
+        /// </summary>
+        private Func<DecomposedTask, CancellationToken, Task<TaskExecutionResult>>? _defaultTaskExecutor;
 
         public MafTaskOrchestrator(
             ILogger<MafTaskOrchestrator> logger,
-            IPrometheusMetricsCollector? metrics = null)
+            IPrometheusMetricsCollector? metrics = null,
+            IAgentMatcher? agentMatcher = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _metrics = metrics;
+            _agentMatcher = agentMatcher;
+        }
+
+        /// <summary>
+        /// 设置默认的任务执行回调
+        /// 由 MainAgent 在初始化时注入，用于将子任务分发到具体的业务 Agent
+        /// </summary>
+        public void SetDefaultTaskExecutor(
+            Func<DecomposedTask, CancellationToken, Task<TaskExecutionResult>> executor)
+        {
+            _defaultTaskExecutor = executor ?? throw new ArgumentNullException(nameof(executor));
         }
 
         /// <inheritdoc />
@@ -74,6 +92,15 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
             ExecutionPlan plan,
             CancellationToken ct = default)
         {
+            return await ExecutePlanAsync(plan, _defaultTaskExecutor, ct);
+        }
+
+        /// <inheritdoc />
+        public async Task<List<TaskExecutionResult>> ExecutePlanAsync(
+            ExecutionPlan plan,
+            Func<DecomposedTask, CancellationToken, Task<TaskExecutionResult>>? taskExecutor,
+            CancellationToken ct = default)
+        {
             using var activity = MafActivitySource.Task.StartActivity("task.execute_plan");
             activity?.SetTag("plan.id", plan.PlanId);
             activity?.SetTag("plan.parallel_groups", plan.ParallelGroups.Count);
@@ -97,7 +124,7 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
                     group.Status = GroupStatus.Running;
                     group.StartTime = DateTime.UtcNow;
 
-                    var groupResults = await ExecuteGroupAsync(group, cts.Token);
+                    var groupResults = await ExecuteGroupAsync(group, taskExecutor, cts.Token);
                     results.AddRange(groupResults);
 
                     group.Status = groupResults.All(r => r.Success) ? GroupStatus.Completed : GroupStatus.Failed;
@@ -112,7 +139,7 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
                     group.Status = GroupStatus.Running;
                     group.StartTime = DateTime.UtcNow;
 
-                    var groupResults = await ExecuteGroupAsync(group, cts.Token);
+                    var groupResults = await ExecuteGroupAsync(group, taskExecutor, cts.Token);
                     results.AddRange(groupResults);
 
                     group.Status = groupResults.All(r => r.Success) ? GroupStatus.Completed : GroupStatus.Failed;
@@ -151,11 +178,12 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
 
         private async Task<List<TaskExecutionResult>> ExecuteGroupAsync(
             TaskGroup group,
+            Func<DecomposedTask, CancellationToken, Task<TaskExecutionResult>>? taskExecutor,
             CancellationToken ct)
         {
             if (group.Mode == GroupExecutionMode.Parallel)
             {
-                var tasks = group.Tasks.Select(t => ExecuteTaskAsync(t, ct));
+                var tasks = group.Tasks.Select(t => ExecuteTaskAsync(t, taskExecutor, ct));
                 return (await Task.WhenAll(tasks)).ToList();
             }
             else
@@ -163,7 +191,7 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
                 var results = new List<TaskExecutionResult>();
                 foreach (var task in group.Tasks)
                 {
-                    var result = await ExecuteTaskAsync(task, ct);
+                    var result = await ExecuteTaskAsync(task, taskExecutor, ct);
                     results.Add(result);
 
                     if (!result.Success && !group.Tasks.Last().Equals(task))
@@ -176,30 +204,65 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
             }
         }
 
-        private Task<TaskExecutionResult> ExecuteTaskAsync(DecomposedTask task, CancellationToken ct)
+        private async Task<TaskExecutionResult> ExecuteTaskAsync(
+            DecomposedTask task,
+            Func<DecomposedTask, CancellationToken, Task<TaskExecutionResult>>? taskExecutor,
+            CancellationToken ct)
         {
-            // 此处为骨架实现，实际执行由具体的Agent完成
-            // 在完整实现中，应通过IAgentMatcher找到Agent并调用其ExecuteAsync
-            _logger.LogDebug("Placeholder execution for task {TaskId}", task.TaskId);
-
             task.Status = MafTaskStatus.Running;
             task.StartedAt = DateTime.UtcNow;
 
-            var result = new TaskExecutionResult
+            try
             {
-                TaskId = task.TaskId,
-                Success = true,
-                Message = $"任务 '{task.TaskName}' 已调度执行",
-                StartedAt = task.StartedAt.Value,
-                CompletedAt = DateTime.UtcNow
-            };
-            result.Duration = result.CompletedAt - result.StartedAt;
+                TaskExecutionResult result;
 
-            task.Status = MafTaskStatus.Completed;
-            task.CompletedAt = result.CompletedAt;
-            task.Result = result;
+                if (taskExecutor != null)
+                {
+                    // 使用调用方提供的执行器（推荐：由 MainAgent 注入真实的 Agent 分发逻辑）
+                    _logger.LogDebug("Executing task {TaskId} via provided task executor", task.TaskId);
+                    result = await taskExecutor(task, ct);
+                }
+                else
+                {
+                    // 无执行器时返回占位结果（仅用于编排逻辑测试）
+                    _logger.LogWarning("No task executor provided for task {TaskId}, returning placeholder result", task.TaskId);
+                    result = new TaskExecutionResult
+                    {
+                        TaskId = task.TaskId,
+                        Success = true,
+                        Message = $"任务 '{task.TaskName}' 已调度执行（无执行器）",
+                        StartedAt = task.StartedAt.Value,
+                        CompletedAt = DateTime.UtcNow
+                    };
+                }
 
-            return Task.FromResult(result);
+                result.Duration = result.CompletedAt - result.StartedAt;
+                task.Status = result.Success ? MafTaskStatus.Completed : MafTaskStatus.Failed;
+                task.CompletedAt = result.CompletedAt;
+                task.Result = result;
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Task {TaskId} execution failed", task.TaskId);
+
+                var failResult = new TaskExecutionResult
+                {
+                    TaskId = task.TaskId,
+                    Success = false,
+                    Message = $"任务 '{task.TaskName}' 执行失败: {ex.Message}",
+                    StartedAt = task.StartedAt.Value,
+                    CompletedAt = DateTime.UtcNow
+                };
+                failResult.Duration = failResult.CompletedAt - failResult.StartedAt;
+
+                task.Status = MafTaskStatus.Failed;
+                task.CompletedAt = failResult.CompletedAt;
+                task.Result = failResult;
+
+                return failResult;
+            }
         }
 
         private List<List<DecomposedTask>> GroupByDependencies(List<DecomposedTask> tasks)

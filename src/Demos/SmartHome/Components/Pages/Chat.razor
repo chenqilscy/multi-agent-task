@@ -1,0 +1,400 @@
+@page "/chat"
+@using CKY.MultiAgentFramework.Demos.SmartHome.Models
+@using CKY.MultiAgentFramework.Demos.SmartHome.Services
+@rendermode InteractiveServer
+@inject SmartHomeControlService ControlService
+@inject IServiceProvider ServiceProvider
+
+<PageTitle>智能对话 - 智能家居</PageTitle>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h2>💬 智能家居对话助手</h2>
+        <div class="chat-actions">
+            <button class="btn-clear" @onclick="ClearHistory" disabled="@(!messages.Any())">🗑️ 清空对话</button>
+        </div>
+    </div>
+
+    <div class="chat-messages" @ref="messagesContainer">
+        @if (!messages.Any())
+        {
+            <div class="welcome-message">
+                <div class="welcome-icon">🏠</div>
+                <h3>欢迎使用智能家居对话助手</h3>
+                <p>您可以通过自然语言控制家居设备，试试以下命令：</p>
+                <div class="suggestion-chips">
+                    <button class="chip" @onclick="@(() => SendSuggestion("打开客厅的灯"))">💡 打开客厅的灯</button>
+                    <button class="chip" @onclick="@(() => SendSuggestion("把空调温度调到26度"))">🌡️ 设置空调温度</button>
+                    <button class="chip" @onclick="@(() => SendSuggestion("今天北京天气怎么样"))">🌤️ 查询天气</button>
+                    <button class="chip" @onclick="@(() => SendSuggestion("播放轻音乐"))">🎵 播放音乐</button>
+                    <button class="chip" @onclick="@(() => SendSuggestion("锁门"))">🔒 安防控制</button>
+                    <button class="chip" @onclick="@(() => SendSuggestion("客厅最近的温度变化"))">📊 温度历史</button>
+                </div>
+            </div>
+        }
+
+        @foreach (var msg in messages)
+        {
+            <div class="message @(msg.IsUser ? "user-message" : "assistant-message")">
+                <div class="message-avatar">@(msg.IsUser ? "👤" : "🤖")</div>
+                <div class="message-content">
+                    <div class="message-text">@msg.Text</div>
+                    @if (msg.ClarificationOptions.Count > 0)
+                    {
+                        <div class="clarification-options">
+                            @foreach (var option in msg.ClarificationOptions)
+                            {
+                                <button class="option-btn" @onclick="@(() => SendSuggestion(option))"
+                                        disabled="@isProcessing">@option</button>
+                            }
+                        </div>
+                    }
+                    <div class="message-time">@msg.Timestamp.ToString("HH:mm:ss")</div>
+                </div>
+            </div>
+        }
+
+        @if (isProcessing)
+        {
+            <div class="message assistant-message">
+                <div class="message-avatar">🤖</div>
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="chat-input">
+        <input @bind="userInput"
+               @bind:event="oninput"
+               @onkeydown="HandleKeyDown"
+               maxlength="500"
+               placeholder="输入命令，例如：打开客厅的灯、查询天气..."
+               disabled="@isProcessing" />
+        <button @onclick="SendMessage"
+                disabled="@(string.IsNullOrWhiteSpace(userInput) || isProcessing)">
+            @(isProcessing ? "⏳" : "📤")
+        </button>
+    </div>
+</div>
+
+<style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 4rem);
+        max-width: 800px;
+        margin: 0 auto;
+        background: #f7f8fa;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .chat-header h2 { margin: 0; font-size: 1.2rem; }
+
+    .btn-clear {
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.3);
+        color: white;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+
+    .btn-clear:hover:not(:disabled) { background: rgba(255,255,255,0.3); }
+    .btn-clear:disabled { opacity: 0.5; cursor: default; }
+
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+    }
+
+    .welcome-message {
+        text-align: center;
+        padding: 2rem;
+        color: #666;
+    }
+
+    .welcome-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+    .welcome-message h3 { color: #333; margin-bottom: 0.5rem; }
+    .welcome-message p { margin-bottom: 1rem; }
+
+    .suggestion-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+    }
+
+    .chip {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+    }
+
+    .chip:hover { background: #667eea; color: white; border-color: #667eea; }
+
+    .message {
+        display: flex;
+        gap: 0.6rem;
+        max-width: 85%;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .user-message { align-self: flex-end; flex-direction: row-reverse; }
+    .assistant-message { align-self: flex-start; }
+
+    .message-avatar {
+        font-size: 1.5rem;
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .message-content {
+        background: white;
+        padding: 0.8rem 1rem;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .user-message .message-content {
+        background: #667eea;
+        color: white;
+    }
+
+    .message-text { white-space: pre-wrap; line-height: 1.5; }
+    .message-time { font-size: 0.7rem; color: #999; margin-top: 0.3rem; text-align: right; }
+    .user-message .message-time { color: rgba(255,255,255,0.7); }
+
+    .clarification-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.6rem;
+    }
+
+    .option-btn {
+        background: #f0f0f0;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 0.3rem 0.7rem;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+    }
+
+    .option-btn:hover:not(:disabled) { background: #667eea; color: white; border-color: #667eea; }
+    .option-btn:disabled { opacity: 0.5; cursor: default; }
+
+    .typing-indicator {
+        display: flex;
+        gap: 4px;
+        padding: 4px 0;
+    }
+
+    .typing-indicator span {
+        width: 8px;
+        height: 8px;
+        background: #999;
+        border-radius: 50%;
+        animation: typing 1.4s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+    @@keyframes typing {
+        0%, 60%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-6px); }
+    }
+
+    .chat-input {
+        display: flex;
+        gap: 0.5rem;
+        padding: 1rem;
+        background: white;
+        border-top: 1px solid #eee;
+    }
+
+    .chat-input input {
+        flex: 1;
+        padding: 0.7rem 1rem;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        outline: none;
+    }
+
+    .chat-input input:focus { border-color: #667eea; }
+
+    .chat-input button {
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.7rem 1.2rem;
+        cursor: pointer;
+        font-size: 1.1rem;
+    }
+
+    .chat-input button:hover:not(:disabled) { background: #5a6fd6; }
+    .chat-input button:disabled { opacity: 0.5; cursor: default; }
+</style>
+
+@code {
+    private ElementReference messagesContainer;
+    private string userInput = string.Empty;
+    private bool isProcessing;
+    private List<ChatMessage> messages = new();
+    private string? sessionId;
+
+    private class ChatMessage
+    {
+        public string Text { get; set; } = string.Empty;
+        public bool IsUser { get; set; }
+        public DateTime Timestamp { get; set; } = DateTime.Now;
+        public List<string> ClarificationOptions { get; set; } = new();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            using var scope = ServiceProvider.CreateScope();
+            var chatHistory = scope.ServiceProvider.GetService<SmartHomeChatHistoryService>();
+            if (chatHistory is not null)
+            {
+                sessionId = await chatHistory.CreateSessionAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            // 持久化失败不阻塞对话功能
+            _ = ex;
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(userInput) && !isProcessing)
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task SendSuggestion(string suggestion)
+    {
+        userInput = suggestion;
+        await SendMessage();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(userInput) || isProcessing) return;
+
+        var command = userInput.Trim();
+        // 服务端输入长度限制
+        if (command.Length > 500)
+            command = command[..500];
+        userInput = string.Empty;
+
+        messages.Add(new ChatMessage { Text = command, IsUser = true });
+        isProcessing = true;
+        StateHasChanged();
+
+        await PersistMessageAsync(sessionId, "User", command);
+
+        try
+        {
+            var response = await ControlService.ProcessCommandAsync(command);
+
+            var reply = new ChatMessage { IsUser = false };
+
+            if (response.NeedsClarification && !string.IsNullOrEmpty(response.ClarificationQuestion))
+            {
+                reply.Text = response.ClarificationQuestion;
+                reply.ClarificationOptions = response.ClarificationOptions;
+            }
+            else if (response.Success)
+            {
+                reply.Text = response.Result;
+            }
+            else
+            {
+                reply.Text = !string.IsNullOrEmpty(response.Error)
+                    ? $"⚠️ {response.Result}\n错误: {response.Error}"
+                    : response.Result;
+            }
+
+            messages.Add(reply);
+            await PersistMessageAsync(sessionId, "Assistant", reply.Text);
+        }
+        catch (Exception ex)
+        {
+            messages.Add(new ChatMessage
+            {
+                Text = $"❌ 处理出错: {ex.Message}",
+                IsUser = false
+            });
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PersistMessageAsync(string? sid, string role, string content)
+    {
+        if (sid is null) return;
+        try
+        {
+            using var scope = ServiceProvider.CreateScope();
+            var chatHistory = scope.ServiceProvider.GetService<SmartHomeChatHistoryService>();
+            if (chatHistory is not null)
+            {
+                await chatHistory.SaveMessageAsync(sid, role, content);
+            }
+        }
+        catch
+        {
+            // 持久化失败不阻塞对话功能
+        }
+    }
+
+    private void ClearHistory()
+    {
+        messages.Clear();
+    }
+}

@@ -21,8 +21,11 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
         private readonly Counter<double> _cacheHitsTotal;
         private readonly Counter<double> _cacheMissesTotal;
         private readonly Counter<double> _llmRequestsTotal;
+        private readonly Counter<double> _llmCallsTotal;
         private readonly Counter<double> _llmErrorsTotal;
         private readonly Counter<double> _llmTokensUsed;
+        private readonly Counter<double> _llmPromptTokensTotal;
+        private readonly Counter<double> _llmResponseTokensTotal;
         private readonly Counter<double> _gcCount;
         private readonly Counter<double> _signalRConnections;
         private readonly Counter<double> _signalRMessagesSent;
@@ -32,6 +35,7 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
         private readonly Histogram<double> _httpRequestDuration;
         private readonly Histogram<double> _agentTaskDuration;
         private readonly Histogram<double> _llmRequestDuration;
+        private readonly Histogram<double> _llmLatencySeconds;
         private readonly Histogram<double> _cacheDuration;
         private readonly Histogram<double> _gcDuration;
 
@@ -43,6 +47,8 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
         private readonly ObservableGauge<double> _cacheSizeBytes;
         private readonly ObservableGauge<double> _memoryUsage;
         private readonly ObservableGauge<double> _cpuUsage;
+        private readonly ObservableGauge<double> _degradationLevel;
+        private readonly ObservableGauge<double> _taskConcurrentExecutions;
 
         private int _httpInProgress;
         private int _taskQueueDepthValue;
@@ -51,6 +57,8 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
         private long _cacheSizeBytesValue;
         private double _memoryUsageValue;
         private double _cpuUsageValue;
+        private int _degradationLevelValue;
+        private int _taskConcurrentExecutionsValue;
 
         public PrometheusMetricsCollector(
             ILogger<PrometheusMetricsCollector> logger,
@@ -117,6 +125,12 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
                 "Total LLM requests"
             );
 
+            _llmCallsTotal = _meter.CreateCounter<double>(
+                MafMetrics.LlmCallsTotal,
+                "{call}",
+                "Total LLM calls (with provider/status labels)"
+            );
+
             _llmErrorsTotal = _meter.CreateCounter<double>(
                 MafMetrics.LlmRequestErrors,
                 "{error}",
@@ -127,6 +141,18 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
                 MafMetrics.LlmTokensUsed,
                 "{token}",
                 "Total LLM tokens used"
+            );
+
+            _llmPromptTokensTotal = _meter.CreateCounter<double>(
+                MafMetrics.LlmPromptTokensTotal,
+                "{token}",
+                "Total LLM prompt tokens used"
+            );
+
+            _llmResponseTokensTotal = _meter.CreateCounter<double>(
+                MafMetrics.LlmResponseTokensTotal,
+                "{token}",
+                "Total LLM response tokens used"
             );
 
             _gcCount = _meter.CreateCounter<double>(
@@ -170,6 +196,12 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
                 MafMetrics.LlmRequestDuration,
                 "s",
                 "LLM request duration in seconds"
+            );
+
+            _llmLatencySeconds = _meter.CreateHistogram<double>(
+                MafMetrics.LlmLatencySeconds,
+                "s",
+                "LLM latency in seconds (with model labels, for dashboard)"
             );
 
             _cacheDuration = _meter.CreateHistogram<double>(
@@ -233,6 +265,20 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
                 "{percent}",
                 "CPU usage percentage"
             );
+
+            _degradationLevel = _meter.CreateObservableGauge<double>(
+                MafMetrics.DegradationLevel,
+                () => new Measurement<double>(_degradationLevelValue),
+                "{level}",
+                "Current degradation level (0=normal, 1-5=degraded)"
+            );
+
+            _taskConcurrentExecutions = _meter.CreateObservableGauge<double>(
+                MafMetrics.TaskConcurrentExecutions,
+                () => new Measurement<double>(_taskConcurrentExecutionsValue),
+                "{task}",
+                "Current number of concurrently executing tasks"
+            );
         }
 
         /// <inheritdoc />
@@ -251,8 +297,11 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
                     MafMetrics.CacheHitsTotal => _cacheHitsTotal,
                     MafMetrics.CacheMissesTotal => _cacheMissesTotal,
                     MafMetrics.LlmRequestsTotal => _llmRequestsTotal,
+                    MafMetrics.LlmCallsTotal => _llmCallsTotal,
                     MafMetrics.LlmRequestErrors => _llmErrorsTotal,
                     MafMetrics.LlmTokensUsed => _llmTokensUsed,
+                    MafMetrics.LlmPromptTokensTotal => _llmPromptTokensTotal,
+                    MafMetrics.LlmResponseTokensTotal => _llmResponseTokensTotal,
                     MafMetrics.GcCount => _gcCount,
                     MafMetrics.SignalRConnections => _signalRConnections,
                     MafMetrics.SignalRMessagesSent => _signalRMessagesSent,
@@ -294,6 +343,7 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
                     MafMetrics.HttpRequestDuration => _httpRequestDuration,
                     MafMetrics.AgentExecutionDuration => _agentTaskDuration,
                     MafMetrics.LlmRequestDuration => _llmRequestDuration,
+                    MafMetrics.LlmLatencySeconds => _llmLatencySeconds,
                     MafMetrics.CacheDuration => _cacheDuration,
                     MafMetrics.GcDuration => _gcDuration,
                     MafMetrics.TaskDuration => _agentTaskDuration,
@@ -351,6 +401,12 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
                         break;
                     case "maf_cache_size_bytes":
                         _cacheSizeBytesValue = (long)value;
+                        break;
+                    case MafMetrics.DegradationLevel:
+                        _degradationLevelValue = (int)value;
+                        break;
+                    case MafMetrics.TaskConcurrentExecutions:
+                        _taskConcurrentExecutionsValue = (int)value;
                         break;
                     default:
                         _logger.LogWarning("Unknown gauge metric: {Name}", name);

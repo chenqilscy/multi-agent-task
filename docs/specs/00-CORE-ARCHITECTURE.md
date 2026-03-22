@@ -482,8 +482,8 @@ var response = await agent.ExecuteAsync(new MafTaskRequest
 
 **相关文档**：
 - [实现指南](./01-IMPLEMENTATION-GUIDE.md) - 代码实现细节
-- [错误处理指南](./specs/14-error-handling-guide.md) - 完整错误处理策略
-- [接口设计规范](./specs/06-interface-design-spec.md) - 所有接口定义
+- [错误处理指南](./14-error-handling-guide.md) - 完整错误处理策略
+- [实现指南](./01-IMPLEMENTATION-GUIDE.md) - 接口定义与实现模式
 - [操作指南](../guides/) - 快速上手指南
 
 ---

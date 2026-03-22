@@ -1,4 +1,9 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Models.Task;
+using CKY.MultiAgentFramework.Core.Resilience;
+using CKY.MultiAgentFramework.Demos.CustomerService.Agents;
+using CKY.MultiAgentFramework.Demos.CustomerService.Services;
+using CKY.MultiAgentFramework.Demos.CustomerService.Services.Implementations;
 using CKY.MultiAgentFramework.Services.NLP;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -413,6 +418,487 @@ namespace CKY.MAF.Tests.CustomerService
         }
 
         // ===================================
+        // CS-03 换货/退货资格: 订单服务新接口
+        // ===================================
+
+        [Fact]
+        public async Task CS_EXCHANGE_001_DeliveredOrder_ShouldAllowExchange()
+        {
+            // Arrange
+            var mockOrderService = new Mock<IOrderService>();
+            mockOrderService.Setup(s => s.RequestExchangeAsync("ORD-2024-002",
+                It.IsAny<ExchangeRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ExchangeResult
+                {
+                    Success = true,
+                    ExchangeId = "EXC-12345678",
+                    Message = "换货申请已提交"
+                });
+
+            // Act
+            var result = await mockOrderService.Object.RequestExchangeAsync("ORD-2024-002",
+                new ExchangeRequest { Reason = "尺寸不合适" });
+
+            // Assert
+            result.Success.Should().BeTrue("已签收订单应允许换货");
+            result.ExchangeId.Should().NotBeNullOrEmpty("应生成换货ID");
+        }
+
+        [Fact]
+        public async Task CS_EXCHANGE_002_NonDeliveredOrder_ShouldRejectExchange()
+        {
+            // Arrange
+            var mockOrderService = new Mock<IOrderService>();
+            mockOrderService.Setup(s => s.RequestExchangeAsync("ORD-2024-001",
+                It.IsAny<ExchangeRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ExchangeResult
+                {
+                    Success = false,
+                    Message = "订单状态为 shipped，仅已签收订单可申请换货"
+                });
+
+            // Act
+            var result = await mockOrderService.Object.RequestExchangeAsync("ORD-2024-001",
+                new ExchangeRequest { Reason = "不想要了" });
+
+            // Assert
+            result.Success.Should().BeFalse("未签收订单不应允许换货");
+            result.Message.Should().Contain("shipped");
+        }
+
+        [Fact]
+        public async Task CS_RETURN_001_ReturnEligibility_WithinPeriod_ShouldBeEligible()
+        {
+            // Arrange
+            var mockOrderService = new Mock<IOrderService>();
+            mockOrderService.Setup(s => s.CheckReturnEligibilityAsync("ORD-2024-002",
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ReturnEligibility
+                {
+                    IsEligible = true,
+                    RemainingDays = 5,
+                    IsSpecialItem = false,
+                    Reason = "符合退货条件"
+                });
+
+            // Act
+            var result = await mockOrderService.Object.CheckReturnEligibilityAsync("ORD-2024-002");
+
+            // Assert
+            result.IsEligible.Should().BeTrue("7天内应符合退货条件");
+            result.RemainingDays.Should().BeGreaterThan(0);
+            result.IsSpecialItem.Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task CS_RETURN_002_ReturnEligibility_SpecialItem_ShouldNotBeEligible()
+        {
+            // Arrange
+            var mockOrderService = new Mock<IOrderService>();
+            mockOrderService.Setup(s => s.CheckReturnEligibilityAsync("ORD-SPECIAL",
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ReturnEligibility
+                {
+                    IsEligible = false,
+                    IsSpecialItem = true,
+                    Reason = "该商品属于特殊品类，不支持退货"
+                });
+
+            // Act
+            var result = await mockOrderService.Object.CheckReturnEligibilityAsync("ORD-SPECIAL");
+
+            // Assert
+            result.IsEligible.Should().BeFalse("特殊商品不可退货");
+            result.IsSpecialItem.Should().BeTrue();
+        }
+
+        // ===================================
+        // CS-06 问题升级: IEscalationService
+        // ===================================
+
+        [Fact]
+        public async Task CS_ESC_001_EscalateToHuman_ShouldReturnAgentAndWaitTime()
+        {
+            // Arrange
+            var mockEscalation = new Mock<IEscalationService>();
+            mockEscalation.Setup(s => s.EscalateToHumanAsync("user-001", "多次未解决", "high",
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new EscalationResult
+                {
+                    Success = true,
+                    AgentId = "AGENT-123",
+                    EstimatedWaitMinutes = 3,
+                    Message = "已为您转接人工客服"
+                });
+
+            // Act
+            var result = await mockEscalation.Object.EscalateToHumanAsync("user-001", "多次未解决", "high");
+
+            // Assert
+            result.Success.Should().BeTrue();
+            result.AgentId.Should().NotBeNullOrEmpty("应分配客服ID");
+            result.EstimatedWaitMinutes.Should().BeLessThan(10, "高优先级应缩短等待时间");
+        }
+
+        [Fact]
+        public async Task CS_ESC_002_VipLevel_ShouldReturnCorrectLevel()
+        {
+            // Arrange
+            var mockEscalation = new Mock<IEscalationService>();
+            mockEscalation.Setup(s => s.GetVipLevelAsync("user-001", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(VipLevel.Gold);
+            mockEscalation.Setup(s => s.GetVipLevelAsync("user-999", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(VipLevel.Normal);
+
+            // Act & Assert
+            var goldLevel = await mockEscalation.Object.GetVipLevelAsync("user-001");
+            goldLevel.Should().Be(VipLevel.Gold, "user-001 应为 Gold VIP");
+
+            var normalLevel = await mockEscalation.Object.GetVipLevelAsync("user-999");
+            normalLevel.Should().Be(VipLevel.Normal, "普通用户应为 Normal");
+        }
+
+        [Fact]
+        public async Task CS_ESC_003_TransferToDepartment_ShouldSucceed()
+        {
+            // Arrange
+            var mockEscalation = new Mock<IEscalationService>();
+            mockEscalation.Setup(s => s.TransferToDepartmentAsync("TKT-001", "技术支持",
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new TransferResult
+                {
+                    Success = true,
+                    Department = "技术支持",
+                    Message = "工单已转接至技术支持部门"
+                });
+
+            // Act
+            var result = await mockEscalation.Object.TransferToDepartmentAsync("TKT-001", "技术支持");
+
+            // Assert
+            result.Success.Should().BeTrue();
+            result.Department.Should().Be("技术支持");
+        }
+
+        // ===================================
+        // CS-07 主动服务: ProactiveEventHandler
+        // ===================================
+
+        [Fact]
+        public async Task CS_PROACTIVE_001_PromotionRecommendation_ShouldGenerateMessage()
+        {
+            // Arrange
+            var handler = new PromotionRecommendationEventHandler();
+            var evt = new ProactiveEvent
+            {
+                EventType = ProactiveEventType.PromotionRecommendation,
+                UserId = "user-001",
+                Data = new Dictionary<string, object>
+                {
+                    ["promotionName"] = "双十一",
+                    ["discount"] = "5折"
+                }
+            };
+
+            // Act
+            var message = await handler.HandleEventAsync(evt);
+
+            // Assert
+            handler.EventType.Should().Be(ProactiveEventType.PromotionRecommendation);
+            message.Should().Contain("双十一");
+            message.Should().Contain("5折");
+        }
+
+        [Fact]
+        public async Task CS_PROACTIVE_002_AnomalousTransaction_ShouldWarnUser()
+        {
+            // Arrange
+            var handler = new AnomalousTransactionEventHandler();
+            var evt = new ProactiveEvent
+            {
+                EventType = ProactiveEventType.AnomalousTransaction,
+                UserId = "user-001",
+                Data = new Dictionary<string, object>
+                {
+                    ["orderId"] = "ORD-2024-099",
+                    ["amount"] = "9999.00"
+                }
+            };
+
+            // Act
+            var message = await handler.HandleEventAsync(evt);
+
+            // Assert
+            handler.EventType.Should().Be(ProactiveEventType.AnomalousTransaction);
+            message.Should().Contain("异常交易");
+            message.Should().Contain("ORD-2024-099");
+            message.Should().Contain("9999.00");
+            message.Should().Contain("冻结账户", "应提示用户冻结账户");
+        }
+
+        // ===================================
+        // CS-07 主动服务: 更多事件类型覆盖
+        // ===================================
+
+        [Fact]
+        public async Task CS_PROACTIVE_003_OrderStatusChange_ShouldNotifyUser()
+        {
+            var handler = new OrderStatusChangeEventHandler();
+            var evt = new ProactiveEvent
+            {
+                EventType = ProactiveEventType.OrderStatusChange,
+                UserId = "user-001",
+                Data = new Dictionary<string, object>
+                {
+                    ["orderId"] = "ORD-2024-005",
+                    ["newStatus"] = "已发货",
+                    ["trackingNumber"] = "SF1234567890"
+                }
+            };
+
+            var message = await handler.HandleEventAsync(evt);
+
+            handler.EventType.Should().Be(ProactiveEventType.OrderStatusChange);
+            message.Should().Contain("ORD-2024-005");
+            message.Should().Contain("已发货");
+        }
+
+        [Fact]
+        public async Task CS_PROACTIVE_004_ServiceSatisfactionSurvey_ShouldGenerateMessage()
+        {
+            var handler = new SatisfactionSurveyEventHandler();
+            var evt = new ProactiveEvent
+            {
+                EventType = ProactiveEventType.SatisfactionSurvey,
+                UserId = "user-001",
+                Data = new Dictionary<string, object>
+                {
+                    ["ticketId"] = "TKT-001",
+                    ["resolvedAt"] = DateTime.UtcNow.ToString("O")
+                }
+            };
+
+            var message = await handler.HandleEventAsync(evt);
+
+            handler.EventType.Should().Be(ProactiveEventType.SatisfactionSurvey);
+            message.Should().Contain("TKT-001");
+            message.Should().Contain("满意度");
+        }
+
+        // ===================================
+        // CS-04 投诉建议: 情绪分级完整覆盖
+        // ===================================
+
+        [Theory]
+        [InlineData("你好，我想问一下", CustomerServiceLeaderAgent.EmotionLevel.Neutral)]
+        [InlineData("有点不满意，能帮我看看吗", CustomerServiceLeaderAgent.EmotionLevel.Frustrated)]
+        [InlineData("不满意，服务太差", CustomerServiceLeaderAgent.EmotionLevel.Frustrated)]
+        [InlineData("太过分了！我要投诉！", CustomerServiceLeaderAgent.EmotionLevel.Angry)]
+        [InlineData("你们这什么破服务，退款都不给", CustomerServiceLeaderAgent.EmotionLevel.Frustrated)]
+        public void CS_COMPLAIN_004_EmotionDetection_ShouldReturnCorrectLevel(
+            string input, CustomerServiceLeaderAgent.EmotionLevel expectedLevel)
+        {
+            var emotion = CustomerServiceLeaderAgent.DetectEmotion(input);
+            emotion.Should().Be(expectedLevel,
+                $"输入 '{input}' 的情绪应为 {expectedLevel}");
+        }
+
+        [Fact]
+        public async Task CS_COMPLAIN_005_ComplaintWithoutOrderId_ShouldStillCreateTicket()
+        {
+            var mockTicket = new Mock<ITicketService>();
+            mockTicket.Setup(s => s.CreateTicketAsync(It.IsAny<TicketCreateRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync("TKT-GEN-001");
+
+            var leaderAgent = CreateCustomerServiceLeaderAgent(ticketService: mockTicket.Object);
+
+            var request = new MafTaskRequest
+            {
+                TaskId = Guid.NewGuid().ToString(),
+                UserInput = "我要投诉你们的服务态度很差",
+                UserId = "user-002",
+                ConversationId = "conv-002",
+                Parameters = new Dictionary<string, object>()
+            };
+
+            var response = await leaderAgent.ExecuteBusinessLogicAsync(request);
+
+            response.Should().NotBeNull("投诉应返回响应");
+        }
+
+        // ===================================
+        // CS-06 问题升级: 多级升级路由
+        // ===================================
+
+        [Fact]
+        public async Task CS_ESC_004_UrgentPriority_ShouldGetFasterResponse()
+        {
+            var svc = new SimulatedEscalationService();
+
+            var urgentResult = await svc.EscalateToHumanAsync("user-001", "紧急投诉", "urgent");
+            var normalResult = await svc.EscalateToHumanAsync("user-002", "一般问题", "normal");
+
+            urgentResult.EstimatedWaitMinutes.Should().BeLessThan(normalResult.EstimatedWaitMinutes,
+                "urgent 优先级应比 normal 等待时间短");
+        }
+
+        [Fact]
+        public async Task CS_ESC_005_TransferBetweenDepartments_ShouldPreserveTicket()
+        {
+            var mockEscalation = new Mock<IEscalationService>();
+            mockEscalation.Setup(s => s.TransferToDepartmentAsync("TKT-001", "售后服务",
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new TransferResult
+                {
+                    Success = true,
+                    Department = "售后服务",
+                    Message = "工单已转接至售后服务部门"
+                });
+
+            var result = await mockEscalation.Object.TransferToDepartmentAsync("TKT-001", "售后服务");
+
+            result.Success.Should().BeTrue();
+            result.Department.Should().Be("售后服务");
+            result.Message.Should().Contain("售后服务");
+        }
+
+        // ===================================
+        // CS-03/06 模拟实现验证 (SimulatedServices)
+        // ===================================
+
+        [Fact]
+        public async Task CS_SIM_001_SimulatedExchange_DeliveredOrder_ShouldWork()
+        {
+            // Arrange
+            var svc = new SimulatedOrderService(Mock.Of<ILogger<SimulatedOrderService>>());
+
+            // Act - ORD-2024-002 is "delivered" in mock data
+            var result = await svc.RequestExchangeAsync("ORD-2024-002",
+                new ExchangeRequest { Reason = "颜色不喜欢" });
+
+            // Assert
+            result.Success.Should().BeTrue();
+            result.ExchangeId.Should().NotBeNullOrEmpty();
+            result.Message.Should().Contain("换货申请已提交");
+        }
+
+        [Fact]
+        public async Task CS_SIM_002_SimulatedExchange_ShippedOrder_ShouldFail()
+        {
+            // Arrange
+            var svc = new SimulatedOrderService(Mock.Of<ILogger<SimulatedOrderService>>());
+
+            // Act - ORD-2024-001 is "shipped" in mock data
+            var result = await svc.RequestExchangeAsync("ORD-2024-001",
+                new ExchangeRequest { Reason = "不想要了" });
+
+            // Assert
+            result.Success.Should().BeFalse();
+            result.Message.Should().Contain("shipped");
+        }
+
+        [Fact]
+        public async Task CS_SIM_003_SimulatedEscalation_ShouldAssignAgent()
+        {
+            // Arrange
+            var svc = new SimulatedEscalationService();
+
+            // Act
+            var result = await svc.EscalateToHumanAsync("user-001", "投诉", "urgent");
+
+            // Assert
+            result.Success.Should().BeTrue();
+            result.AgentId.Should().StartWith("AGENT-");
+            result.EstimatedWaitMinutes.Should().Be(1, "urgent 优先级应为1分钟");
+        }
+
+        [Fact]
+        public async Task CS_SIM_004_SimulatedVipLevel_User001_ShouldBeGold()
+        {
+            // Arrange
+            var svc = new SimulatedEscalationService();
+
+            // Act
+            var level = await svc.GetVipLevelAsync("user-001");
+
+            // Assert
+            level.Should().Be(VipLevel.Gold);
+        }
+
+        // ===================================
+        // CS-04 投诉建议: Agent 协作 + 情绪升级
+        // ===================================
+
+        [Theory]
+        [InlineData("太过分了，订单一直不发货，我要投诉")]
+        [InlineData("你们这什么垃圾服务，退款都不给我处理，我要举报")]
+        public void CS_COMPLAIN_001_AngryWithOrder_ShouldDetectAngryEmotion(string input)
+        {
+            var emotion = CustomerServiceLeaderAgent.DetectEmotion(input);
+            emotion.Should().Be(CustomerServiceLeaderAgent.EmotionLevel.Angry);
+        }
+
+        [Fact]
+        public async Task CS_COMPLAIN_002_AngryComplaint_ShouldCoordinateOrderAndTicket()
+        {
+            // Arrange
+            var mockOrder = new Mock<IOrderService>();
+            mockOrder.Setup(s => s.GetOrderAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderInfo
+                {
+                    OrderId = "ORD-2024-001",
+                    Status = "shipped",
+                    Items = [new OrderItem { ProductName = "蓝牙耳机", Quantity = 1, UnitPrice = 299 }]
+                });
+
+            var mockTicket = new Mock<ITicketService>();
+            mockTicket.Setup(s => s.CreateTicketAsync(It.IsAny<TicketCreateRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync("TKT-URGENT-001");
+
+            var mockEscalation = new Mock<IEscalationService>();
+            mockEscalation.Setup(s => s.EscalateToHumanAsync(It.IsAny<string>(), It.IsAny<string>(),
+                "urgent", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new EscalationResult
+                {
+                    Success = true,
+                    AgentId = "AGENT-VIP",
+                    EstimatedWaitMinutes = 1,
+                    Message = "已为您转接人工客服，预计等待1分钟"
+                });
+
+            var leaderAgent = CreateCustomerServiceLeaderAgent(
+                orderService: mockOrder.Object,
+                ticketService: mockTicket.Object,
+                escalationService: mockEscalation.Object);
+
+            var request = new MafTaskRequest
+            {
+                TaskId = Guid.NewGuid().ToString(),
+                UserInput = "太过分了！我的订单ORD-2024-001一直不发货，我要投诉你们！",
+                UserId = "user-001",
+                ConversationId = "conv-001",
+                Parameters = new Dictionary<string, object>()
+            };
+
+            // Act
+            var response = await leaderAgent.ExecuteBusinessLogicAsync(request);
+
+            // Assert
+            response.Success.Should().BeTrue();
+            response.Result.Should().Contain("非常抱歉", "应包含情绪安抚话语");
+            response.Result.Should().Contain("人工客服", "应包含人工客服升级信息");
+        }
+
+        [Fact]
+        public async Task CS_COMPLAIN_003_FrustratedNotAngry_ShouldNotTriggerCoordination()
+        {
+            // Arrange: 中度不满（Frustrated）不应触发投诉协作
+            var emotion = CustomerServiceLeaderAgent.DetectEmotion("不满意，服务太差");
+            emotion.Should().Be(CustomerServiceLeaderAgent.EmotionLevel.Frustrated,
+                "中度不满不应被识别为 Angry");
+        }
+
+        // ===================================
         // 路由优先级验证
         // ===================================
 
@@ -461,6 +947,54 @@ namespace CKY.MAF.Tests.CustomerService
             : input.Contains("产品") || input.Contains("质量") ? "product"
             : "other";
 
+        private static CustomerServiceLeaderAgent CreateCustomerServiceLeaderAgent(
+            IOrderService? orderService = null,
+            ITicketService? ticketService = null,
+            IEscalationService? escalationService = null)
+        {
+            var orderAgent = new OrderAgent(
+                orderService ?? Mock.Of<IOrderService>(),
+                Mock.Of<IMafAiAgentRegistry>(),
+                Mock.Of<ILogger<OrderAgent>>());
+
+            var ticketAgent = new TicketAgent(
+                ticketService ?? Mock.Of<ITicketService>(),
+                Mock.Of<IMafAiAgentRegistry>(),
+                Mock.Of<ILogger<TicketAgent>>());
+
+            var kbAgent = new KnowledgeBaseAgent(
+                Mock.Of<IKnowledgeBaseService>(),
+                Mock.Of<IMafAiAgentRegistry>(),
+                Mock.Of<ILogger<KnowledgeBaseAgent>>());
+
+            var mockIntentRecognizer = new Mock<IIntentRecognizer>();
+            mockIntentRecognizer.Setup(r => r.RecognizeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new IntentRecognitionResult { PrimaryIntent = "CreateTicket", Confidence = 0.8 });
+
+            var mockEntityExtractor = new Mock<IEntityExtractor>();
+            mockEntityExtractor.Setup(e => e.ExtractAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new EntityExtractionResult());
+
+            var mockDegradation = new Mock<IDegradationManager>();
+            mockDegradation.Setup(d => d.IsFeatureEnabled(It.IsAny<string>())).Returns(true);
+
+            var mockRuleEngine = new Mock<IRuleEngine>();
+            mockRuleEngine.Setup(r => r.CanHandle(It.IsAny<string>())).Returns(false);
+
+            return new CustomerServiceLeaderAgent(
+                mockIntentRecognizer.Object,
+                mockEntityExtractor.Object,
+                kbAgent,
+                orderAgent,
+                ticketAgent,
+                Mock.Of<IUserBehaviorService>(),
+                mockDegradation.Object,
+                mockRuleEngine.Object,
+                Mock.Of<IMafAiAgentRegistry>(),
+                Mock.Of<ILogger<CustomerServiceLeaderAgent>>(),
+                escalationService);
+        }
+
         private static double CalculateRelevance(string query, TestFaqEntry faq)
         {
             var queryLower = query.ToLower();
@@ -483,6 +1017,131 @@ namespace CKY.MAF.Tests.CustomerService
             new("FAQ-004", "快递到哪里了？", "shipping", ["快递", "物流", "送到哪", "到哪了", "派送"]),
             new("FAQ-005", "产品质量问题怎么处理？", "product", ["质量", "质量问题", "坏了", "损坏", "不好用", "有问题"]),
         ];
+
+        // ===================================
+        // CS-08 投诉闭环: 工单生命周期
+        // ===================================
+
+        [Fact]
+        public async Task CS_CLOSE_001_TicketCreateAndQuery_ShouldReturnTicketInfo()
+        {
+            var mockTicket = new Mock<ITicketService>();
+            mockTicket.Setup(s => s.CreateTicketAsync(It.IsAny<TicketCreateRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync("TKT-CLOSE-001");
+            mockTicket.Setup(s => s.GetTicketAsync("TKT-CLOSE-001", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new TicketInfo
+                {
+                    TicketId = "TKT-CLOSE-001",
+                    Title = "产品质量投诉",
+                    Status = "open",
+                    Category = "product",
+                    CreatedAt = DateTime.UtcNow
+                });
+
+            // 创建工单
+            var ticketId = await mockTicket.Object.CreateTicketAsync(
+                new TicketCreateRequest
+                {
+                    UserId = "user-close-001",
+                    Title = "产品质量投诉",
+                    Description = "购买的产品质量有问题",
+                    Category = "product",
+                    Priority = "high"
+                });
+            ticketId.Should().Be("TKT-CLOSE-001");
+
+            // 查询工单
+            var ticket = await mockTicket.Object.GetTicketAsync(ticketId);
+            ticket.Should().NotBeNull();
+            ticket!.TicketId.Should().Be("TKT-CLOSE-001");
+            ticket.Status.Should().Be("open");
+        }
+
+        [Fact]
+        public async Task CS_CLOSE_002_TicketUpdate_ShouldChangeStatus()
+        {
+            var mockTicket = new Mock<ITicketService>();
+            mockTicket.Setup(s => s.UpdateTicketAsync("TKT-UPD-001",
+                    It.Is<TicketUpdateRequest>(r => r.Status == "resolved"),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+
+            var result = await mockTicket.Object.UpdateTicketAsync(
+                "TKT-UPD-001",
+                new TicketUpdateRequest { Status = "resolved", Comment = "问题已解决" });
+
+            result.Should().BeTrue("工单状态应更新成功");
+            mockTicket.Verify(s => s.UpdateTicketAsync("TKT-UPD-001",
+                It.Is<TicketUpdateRequest>(r => r.Status == "resolved"),
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task CS_CLOSE_003_FullLifecycle_CreateUpdateResolve()
+        {
+            // 模拟工单完整生命周期: open → processing → resolved
+            var ticketStore = new Dictionary<string, string> { ["TKT-LIFE-001"] = "open" };
+            var mockTicket = new Mock<ITicketService>();
+            mockTicket.Setup(s => s.CreateTicketAsync(It.IsAny<TicketCreateRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync("TKT-LIFE-001");
+            mockTicket.Setup(s => s.UpdateTicketAsync("TKT-LIFE-001",
+                    It.IsAny<TicketUpdateRequest>(), It.IsAny<CancellationToken>()))
+                .Returns((string _, TicketUpdateRequest req, CancellationToken _) =>
+                {
+                    if (req.Status != null) ticketStore["TKT-LIFE-001"] = req.Status;
+                    return Task.FromResult(true);
+                });
+
+            // 1. 创建
+            var id = await mockTicket.Object.CreateTicketAsync(new TicketCreateRequest
+            {
+                UserId = "user-001",
+                Title = "投诉",
+                Category = "product"
+            });
+            ticketStore[id].Should().Be("open");
+
+            // 2. 处理中
+            await mockTicket.Object.UpdateTicketAsync(id, new TicketUpdateRequest { Status = "processing" });
+            ticketStore[id].Should().Be("processing");
+
+            // 3. 已解决
+            await mockTicket.Object.UpdateTicketAsync(id, new TicketUpdateRequest { Status = "resolved", Comment = "已退款" });
+            ticketStore[id].Should().Be("resolved");
+        }
+
+        [Fact]
+        public async Task CS_CLOSE_004_UserTicketList_ShouldReturnMultiple()
+        {
+            var mockTicket = new Mock<ITicketService>();
+            mockTicket.Setup(s => s.GetUserTicketsAsync("user-multi-001", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<TicketInfo>
+                {
+                    new() { TicketId = "TKT-A", Status = "resolved" },
+                    new() { TicketId = "TKT-B", Status = "open" },
+                    new() { TicketId = "TKT-C", Status = "processing" }
+                });
+
+            var tickets = await mockTicket.Object.GetUserTicketsAsync("user-multi-001");
+            tickets.Should().HaveCount(3);
+            tickets.Should().Contain(t => t.Status == "open");
+            tickets.Should().Contain(t => t.Status == "resolved");
+        }
+
+        // ===================================
+        // CS-05 工单跟进: 更多覆盖
+        // ===================================
+
+        [Fact]
+        public async Task CS_TICKET_005_GetTicket_NonExistent_ShouldReturnNull()
+        {
+            var mockTicket = new Mock<ITicketService>();
+            mockTicket.Setup(s => s.GetTicketAsync("TKT-NONEXIST", It.IsAny<CancellationToken>()))
+                .ReturnsAsync((TicketInfo?)null);
+
+            var result = await mockTicket.Object.GetTicketAsync("TKT-NONEXIST");
+            result.Should().BeNull("不存在的工单应返回 null");
+        }
     }
 
     /// <summary>

@@ -12,7 +12,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
     /// 智能家居主控Agent
     /// 负责任务分解、Agent编排和结果聚合
     /// </summary>
-    public class SmartHomeMainAgent : CKY.MultiAgentFramework.Core.Agents.MafBusinessAgentBase
+    public class SmartHomeLeaderAgent : CKY.MultiAgentFramework.Core.Agents.MafBusinessAgentBase
     {
         private readonly IIntentRecognizer _intentRecognizer;
         private readonly ITaskDecomposer _taskDecomposer;
@@ -24,8 +24,8 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
         private readonly IMemoryClassifier _memoryClassifier;
         private readonly IContextCompressor _contextCompressor;
 
-        public override string AgentId => "smarthome:main:agent:001";
-        public override string Name => "SmartHomeMainAgent";
+        public override string AgentId => "smarthome:leader:agent:001";
+        public override string Name => "SmartHomeLeaderAgent";
         public override string Description => "智能家居主控Agent，负责协调所有子Agent";
         public override IReadOnlyList<string> Capabilities => new[]
         {
@@ -34,7 +34,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
             "smarthome:agent_orchestration"
         };
 
-        public SmartHomeMainAgent(
+        public SmartHomeLeaderAgent(
             IIntentRecognizer intentRecognizer,
             ITaskDecomposer taskDecomposer,
             IAgentMatcher agentMatcher,
@@ -45,7 +45,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
             IMemoryClassifier memoryClassifier,
             IContextCompressor contextCompressor,
             IMafAiAgentRegistry llmRegistry,
-            ILogger<SmartHomeMainAgent> logger)
+            ILogger<SmartHomeLeaderAgent> logger)
             : base(llmRegistry, logger)
         {
             _intentRecognizer = intentRecognizer ?? throw new ArgumentNullException(nameof(intentRecognizer));
@@ -63,7 +63,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
             MafTaskRequest request,
             CancellationToken ct = default)
         {
-            Logger.LogInformation("MainAgent processing request: {UserInput}", request.UserInput);
+            Logger.LogInformation("LeaderAgent processing request: {UserInput}", request.UserInput);
 
             try
             {
@@ -230,7 +230,7 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "MainAgent failed to process request");
+                Logger.LogError(ex, "LeaderAgent failed to process request");
                 return new MafTaskResponse
                 {
                     TaskId = request.TaskId,

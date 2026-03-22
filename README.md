@@ -268,32 +268,41 @@ CKY.MAF/
 │   ├── Core/                          # Layer 1: 核心抽象
 │   │   ├── Abstractions/              # 核心接口定义
 │   │   ├── Models/                    # 数据模型
-│   │   └── Agents/                    # Agent基类
+│   │   ├── Agents/                    # Agent基类
+│   │   ├── Diagnostics/              # 分布式追踪
+│   │   └── Resilience/               # 弹性策略
 │   │
-│   ├── Services/                      # Layer 2: 业务服务
+│   ├── Services/                      # Layer 2-4: 业务服务
 │   │   ├── Dialog/                    # 对话管理服务
-│   │   │   ├── DialogStateManager.cs  # 对话状态管理
-│   │   │   ├── ContextCompressor.cs   # 上下文压缩
-│   │   │   └── MemoryClassifier.cs    # 记忆分类
 │   │   ├── Scheduling/                # 任务调度
 │   │   ├── Orchestration/             # 编排
-│   │   └── IntentRecognition/         # 意图识别
+│   │   ├── NLP/                       # 意图识别 & 实体提取
+│   │   └── Monitoring/               # Prometheus 指标
 │   │
 │   ├── Infrastructure/                # Layer 3: 基础设施
-│   │   ├── Caching/                   # 缓存实现
-│   │   ├── Relational/                # 关系数据库
-│   │   └── Vectorization/             # 向量存储
+│   │   ├── Caching/                   # Redis / Memory 缓存
+│   │   ├── Repository/               # EF Core 数据访问
+│   │   ├── Dapper/                    # Dapper 轻量 ORM
+│   │   ├── Vectorization/             # Qdrant 向量存储
+│   │   ├── Parsing/                   # 文档解析 (RAG)
+│   │   ├── Embedding/                 # 向量嵌入 (ZhipuAI)
+│   │   └── DependencyInjection/       # 服务注册
 │   │
-│   └── Demos/                         # Layer 5: Demo应用
-│       └── SmartHome/                 # 智能家居Demo
+│   ├── Demos/                         # Layer 5: Demo应用
+│   │   ├── SmartHome/                 # 智能家居 Demo
+│   │   └── CustomerService/           # 智能客服 Demo
+│   │
+│   └── tests/
+│       ├── UnitTests/                 # 单元测试 (385+)
+│       ├── IntegrationTests/          # 集成测试 (167+)
+│       └── Benchmarks/                # BenchmarkDotNet 基准测试
 │
 ├── tests/
-│   ├── UnitTests/                     # 单元测试 (70%)
-│   ├── IntegrationTests/              # 集成测试 (25%)
-│   └── E2ETests/                      # 端到端测试 (5%)
+│   └── E2ETests/                      # 端到端测试 (33)
 │
 └── docs/
-    ├── specs/                         # 设计文档 (15个文档)
+    ├── specs/                         # 设计规范 (10个文档)
+    ├── guides/                        # 开发指南
     └── examples/                      # 使用示例
 ```
 
@@ -380,20 +389,28 @@ CKY.MAF/
 
 4. **构建项目 / Build Project**
    ```bash
-   dotnet build CKY.MAF.sln
+   cd src
+   dotnet build CKY.MAF.slnx
    ```
 
 5. **运行测试 / Run Tests**
    ```bash
-   dotnet test
+   dotnet test src/tests/UnitTests/CKY.MAF.Tests.csproj
+   dotnet test src/tests/IntegrationTests/CKY.MAF.IntegrationTests.csproj
    ```
 
-6. **运行 Demo 应用 / Run Demo Application**
+6. **运行性能基准测试 / Run Benchmarks**
    ```bash
-   dotnet run --project src/Demos/SmartHome
+   dotnet run -c Release --project src/tests/Benchmarks/CKY.MAF.Benchmarks.csproj -- --filter "*" --job short
    ```
 
-   访问: `https://localhost:5001`
+7. **运行 Demo 应用 / Run Demo Application**
+   ```bash
+   # 智能家居 Demo
+   dotnet run --project src/Demos/SmartHome/CKY.MAF.Demos.SmartHome.csproj
+   # 智能客服 Demo
+   dotnet run --project src/Demos/CustomerService/CKY.MAF.Demos.CustomerService.csproj
+   ```
 
 ### 使用示例 / Usage Example
 
@@ -432,53 +449,71 @@ else
 
 ### 设计文档 / Design Documents
 
-所有设计文档位于 `docs/specs/` 目录（15个文档，约384KB）
+所有设计文档位于 `docs/specs/` 目录
 
 **必读文档**（从这里开始）:
-1. [架构概览](docs/specs/01-architecture-overview.md) - 核心概念和设计原则
-2. [5层DIP架构](docs/specs/12-layered-architecture.md) - **关键架构文档**
-3. [实现指南](docs/specs/09-implementation-guide.md) - 实现模式和目录结构
+1. [核心架构](docs/specs/00-CORE-ARCHITECTURE.md) - 核心概念和5层DIP架构
+2. [实现指南](docs/specs/01-IMPLEMENTATION-GUIDE.md) - 实现模式和接口设计
 
 **开发参考**:
-4. [接口设计规范](docs/specs/06-interface-design-spec.md) - 所有接口定义和数据模型
-5. [任务调度设计](docs/specs/03-task-scheduling-design.md) - 任务优先级和依赖管理
-6. [测试指南](docs/specs/10-testing-guide.md) - 测试策略（70%单元，25%集成，5%E2E）
+3. [任务调度设计](docs/specs/03-task-scheduling-design.md) - 任务优先级和依赖管理
+4. [测试指南](docs/specs/10-testing-guide.md) - 测试策略（70%单元，25%集成，5%E2E）
+5. [MS AF 集成](docs/specs/MICROSOFT_AGENT_FRAMEWORK_INTEGRATION.md) - 微软 Agent框架集成
 
 **运维参考**:
-7. [性能基准](docs/specs/13-performance-benchmarks.md) - 性能指标和优化策略
-8. [错误处理指南](docs/specs/14-error-handling-guide.md) - 错误处理、重试、熔断、降级
-9. [部署指南](docs/specs/08-deployment-guide.md) - Docker/Kubernetes部署
+6. [性能基准](docs/specs/13-performance-benchmarks.md) - 性能指标和优化策略
+7. [错误处理指南](docs/specs/14-error-handling-guide.md) - 错误处理、重试、熔断、降级
+8. [部署指南](docs/specs/08-deployment-guide.md) - Docker/Kubernetes 部署
 
 完整文档索引: [docs/specs/README.md](docs/specs/README.md)
 
+### 开发指南 / Development Guides
+
+- [LLM Agent 快速入门](docs/guides/LLM_AGENT_QUICK_START.md)
+- [LLM 配置加载指南](docs/guides/how-to-load-llm-config.md)
+- [Prometheus 监控使用](docs/guides/how-to-use-prometheus.md)
+- [数据库 Dapper 指南](docs/guides/database-dapper-guide.md)
+- [SignalR 实时通信](docs/guides/how-to-use-signalr.md)
+
 ### 使用示例 / Usage Examples
 
-- [长对话优化功能使用指南](docs/examples/long-dialog-usage.md) - 详细的使用示例和最佳实践
-- 更多示例正在添加中...
+- [长对话优化使用指南](docs/examples/long-dialog-usage.md)
+- [对话管理使用示例](docs/examples/dialog-management-usage.md)
 
 ---
 
 ## 项目状态 / Project Status
 
-**当前阶段**: 设计和架构完成（15个文档，约384KB）
+**当前阶段**: 功能开发完成，生产就绪准备中
 
-**实现进度**: Phase 1-7 完成 ✅
+**实现进度**: Phase 1-10 完成 ✅
 
 ### 已完成功能 / Completed Features
 
-- ✅ **Phase 1**: 接口定义（IDialogStateManager、IContextCompressor、IMemoryClassifier）
-- ✅ **Phase 2**: DialogStateManager 实现（400+ 行）
-- ✅ **Phase 3**: ContextCompressor 实现（LLM 驱动的对话压缩）
-- ✅ **Phase 4**: MemoryClassifier 实现（智能记忆分类和遗忘策略）
-- ✅ **Phase 5**: 组件增强（SlotManager 支持 DialogContext）
-- ✅ **Phase 6**: SmartHomeMainAgent 集成
-- ✅ **Phase 7**: 文档和示例
+- ✅ **Phase 1-7**: 核心框架（对话管理、上下文压缩、记忆分类、意图识别）
+- ✅ **Phase 8**: 安全加固（XSS 防护、输入验证、SignalR 安全、环境变量隔离）
+- ✅ **Phase 9**: 持久化增强（对话历史、PostgreSQL 初始化器、Dapper 指南）
+- ✅ **Phase 10**: 功能完善 + 性能基准
+  - ✅ CustomerService 管理后台（运营仪表盘、工单管理、知识库管理、人工坐席切换）
+  - ✅ SmartHome 功能增强（对话历史列表页、设备监控仪表盘）
+  - ✅ BenchmarkDotNet 性能基准测试（优先级计算、调度、编排、并发）
+  - ✅ 5 大 LLM 提供商 Agent（智谱AI、通义千问、文心一言、讯飞星火、MiniMax）
+  - ✅ RAG 管道（文档解析 + 向量嵌入 + 语义搜索）
+  - ✅ Prometheus 监控指标（Agent/Task/LLM 三层仪表盘）
+
+### Demo 应用 / Demo Applications
+
+| Demo | 描述 | Agent 数量 | 主要功能 |
+|------|------|-----------|---------|
+| **SmartHome** | 智能家居控制 | 6 | 设备控制、温度查询、场景联动、对话历史、设备监控 |
+| **CustomerService** | 智能客服系统 | 5+ | 订单查询、工单处理、知识库 FAQ、人工坐席切换、管理后台 |
 
 ### 测试覆盖 / Test Coverage
 
-- ✅ **单元测试**: DialogStateManager、ContextCompressor、MemoryClassifier
-- ✅ **集成测试**: 对话状态管理、上下文压缩、记忆分类
-- ✅ **E2E测试**: 7个长对话场景测试用例
+- ✅ **单元测试**: 385+ 通过
+- ✅ **集成测试**: 167+ 通过
+- ✅ **端到端测试**: 33 通过
+- ✅ **性能基准**: BenchmarkDotNet 4 组基准（调度、编排、NLP、并发）
 
 **覆盖率目标**:
 - Services 层: 90%
@@ -489,35 +524,63 @@ else
 
 ## 路线图 / Roadmap
 
-### Phase 1-7: 长对话优化 ✅ **COMPLETED**
+### Phase 1-10: 核心功能 ✅ **COMPLETED**
 
-- ✅ 对话状态管理
-- ✅ 上下文压缩
-- ✅ 记忆分类
-- ✅ SubAgent槽位自动恢复
-- ✅ E2E测试
-- ✅ 文档和示例
+- ✅ 对话状态管理 / 上下文压缩 / 记忆分类
+- ✅ SubAgent 槽位自动恢复
+- ✅ RAG 管道（文档解析 + 向量嵌入）
+- ✅ 安全加固（XSS、输入验证、SignalR）
+- ✅ 持久化增强（SQLite + PostgreSQL）
+- ✅ Demo 应用（SmartHome + CustomerService 管理后台）
+- ✅ BenchmarkDotNet 性能基准测试
 
-### Phase 8-10: 生产就绪 (计划中)
+### Phase 11+: 生产部署 (计划中)
 
-- ⏳ 性能优化和基准测试
-- ⏳ 安全增强（认证、授权、加密）
-- ⏳ 监控和告警集成
 - ⏳ Kubernetes 部署配置
-- ⏳ 生产环境验证
-
-### Phase 11-12: 高级特性 (计划中)
-
+- ⏳ 生产环境压力测试（NBomber/k6）
 - ⏳ 多模态支持（图像、语音）
-- ⏳ 多语言支持
 - ⏳ 插件系统
 - ⏳ Agent Marketplace
-
-完整路线图: [docs/specs/11-implementation-roadmap.md](docs/specs/11-implementation-roadmap.md)
 
 ---
 
 ## 性能基准 / Performance Benchmarks
+
+### 实测基准结果 / Actual Benchmark Results
+
+> 环境: .NET 10.0.2, Intel Core i7-6700 CPU 3.40GHz, Windows 11
+
+#### 优先级计算器 / Priority Calculator
+
+| 场景 | Mean | Allocated |
+|------|------|-----------|
+| 简单优先级计算 | 63 ns | 64 B |
+| 复杂优先级计算（含依赖+超期） | 162 ns | 184 B |
+| 批量优先级计算 (1000个) | 93 μs | 69,600 B |
+
+#### 任务调度器 / Task Scheduler
+
+| 场景 | TaskCount | Mean | Allocated |
+|------|-----------|------|-----------|
+| 调度独立任务 | 10 | 5.9 μs | 10.4 KB |
+| 调度独立任务 | 200 | 107 μs | 173 KB |
+| 执行单任务（含并发控制） | - | 563 ns | 968 B |
+
+#### 意图识别器 (规则引擎) / Intent Recognizer
+
+| 场景 | Mean | Allocated |
+|------|------|-----------|
+| 单条简单意图识别 | 2.0 μs | 1.02 KB |
+| 单条复杂意图识别 | 6.3 μs | 1.7 KB |
+| 批量意图识别 (100条) | 247 μs | 120 KB |
+
+#### 并发场景 / Concurrency
+
+| 场景 | 并发用户 | Mean |
+|------|---------|------|
+| 并发缓存读取 | 100 | 192 μs |
+| 并发缓存读写混合 (80%读/20%写) | 100 | 366 μs |
+| 并发任务调度模拟 | 100 | 46 μs |
 
 ### 响应时间目标 / Response Time Targets
 

@@ -72,14 +72,9 @@ namespace CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant
                 var qdrantPoints = new List<PointStruct>();
                 foreach (var point in pointList)
                 {
-                    var pointId = Guid.Parse(point.Id);
-                    var payloadDict = new Dictionary<string, Value>();
-                    foreach (var kvp in point.Metadata)
-                    {
-                        payloadDict[kvp.Key] = new Value { StringValue = kvp.Value?.ToString() ?? "" };
-                    }
+                    var pointId = ParsePointId(point.Id);
+                    var payloadDict = ConvertMetadataToPayload(point.Metadata);
 
-                    // 创建带payload的点
                     var pointStruct = new PointStruct
                     {
                         Id = pointId,
@@ -116,9 +111,12 @@ namespace CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant
                 _logger.LogDebug("Searching in collection: {CollectionName}, TopK: {TopK}",
                     collectionName, topK);
 
+                var searchFilter = BuildFilter(filter);
+
                 var results = await _client.SearchAsync(
                     collectionName,
                     vector,
+                    filter: searchFilter,
                     limit: (ulong)topK,
                     payloadSelector: new WithPayloadSelector { Enable = true },
                     cancellationToken: ct);
@@ -155,7 +153,12 @@ namespace CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant
                 _logger.LogInformation("Deleting {Count} points from collection: {CollectionName}",
                     idList.Count, collectionName);
 
-                var pointIds = idList.Select(id => Guid.Parse(id)).ToList();
+                var pointIds = idList.Select(id =>
+                {
+                    if (Guid.TryParse(id, out var guid))
+                        return guid;
+                    throw new ArgumentException($"Invalid point ID format: '{id}'. Expected UUID format.");
+                }).ToList();
 
                 await _client.DeleteAsync(
                     collectionName,
@@ -206,7 +209,14 @@ namespace CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant
             };
         }
 
-        private static IReadOnlyDictionary<string, Value> ConvertMetadataToPayload(Dictionary<string, object> metadata)
+        private static Guid ParsePointId(string id)
+        {
+            if (Guid.TryParse(id, out var guid))
+                return guid;
+            throw new ArgumentException($"Invalid point ID format: '{id}'. Expected UUID format.");
+        }
+
+        private static Dictionary<string, Value> ConvertMetadataToPayload(Dictionary<string, object> metadata)
         {
             if (metadata == null || metadata.Count == 0)
                 return new Dictionary<string, Value>();
@@ -214,9 +224,23 @@ namespace CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant
             var payload = new Dictionary<string, Value>();
             foreach (var kvp in metadata)
             {
-                payload[kvp.Key] = new Value { StringValue = kvp.Value?.ToString() ?? "" };
+                payload[kvp.Key] = ConvertToValue(kvp.Value);
             }
             return payload;
+        }
+
+        private static Value ConvertToValue(object? value)
+        {
+            return value switch
+            {
+                null => new Value { StringValue = "" },
+                bool b => new Value { BoolValue = b },
+                int i => new Value { IntegerValue = i },
+                long l => new Value { IntegerValue = l },
+                float f => new Value { DoubleValue = f },
+                double d => new Value { DoubleValue = d },
+                _ => new Value { StringValue = value.ToString() ?? "" }
+            };
         }
 
         private static Dictionary<string, object> ConvertPayloadToMetadata(IReadOnlyDictionary<string, Value> payload)
@@ -225,10 +249,45 @@ namespace CKY.MultiAgentFramework.Infrastructure.Vectorization.Qdrant
 
             foreach (var kvp in payload)
             {
-                metadata[kvp.Key] = kvp.Value.StringValue ?? string.Empty;
+                metadata[kvp.Key] = kvp.Value.KindCase switch
+                {
+                    Value.KindOneofCase.BoolValue => kvp.Value.BoolValue,
+                    Value.KindOneofCase.IntegerValue => kvp.Value.IntegerValue,
+                    Value.KindOneofCase.DoubleValue => kvp.Value.DoubleValue,
+                    _ => kvp.Value.StringValue ?? string.Empty
+                };
             }
 
             return metadata;
+        }
+
+        private static Filter? BuildFilter(Dictionary<string, object>? filterDict)
+        {
+            if (filterDict == null || filterDict.Count == 0)
+                return null;
+
+            var conditions = new List<Condition>();
+            foreach (var kvp in filterDict)
+            {
+                var match = kvp.Value switch
+                {
+                    bool b => new Match { Boolean = b },
+                    int i => new Match { Integer = i },
+                    long l => new Match { Integer = l },
+                    _ => new Match { Keyword = kvp.Value?.ToString() ?? "" }
+                };
+
+                conditions.Add(new Condition
+                {
+                    Field = new FieldCondition
+                    {
+                        Key = kvp.Key,
+                        Match = match
+                    }
+                });
+            }
+
+            return new Filter { Must = { conditions } };
         }
 
         #endregion

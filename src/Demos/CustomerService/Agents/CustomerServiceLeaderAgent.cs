@@ -13,7 +13,7 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
     /// 智能客服主控 Agent
     /// 负责意图识别、路由、多轮对话管理和结果聚合
     /// </summary>
-    public class CustomerServiceMainAgent : MafBusinessAgentBase
+    public class CustomerServiceLeaderAgent : MafBusinessAgentBase
     {
         private readonly IIntentRecognizer _intentRecognizer;
         private readonly IEntityExtractor _entityExtractor;
@@ -23,9 +23,10 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
         private readonly IUserBehaviorService _userBehaviorService;
         private readonly IDegradationManager _degradationManager;
         private readonly IRuleEngine _ruleEngine;
+        private readonly IEscalationService? _escalationService;
 
-        public override string AgentId => "cs:main-agent:001";
-        public override string Name => "CustomerServiceMainAgent";
+        public override string AgentId => "cs:leader-agent:001";
+        public override string Name => "CustomerServiceLeaderAgent";
         public override string Description => "智能客服主控 Agent，协调所有子 Agent 为用户提供服务";
         public override IReadOnlyList<string> Capabilities =>
         [
@@ -34,7 +35,7 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
             "customer-service:multi-turn",
         ];
 
-        public CustomerServiceMainAgent(
+        public CustomerServiceLeaderAgent(
             IIntentRecognizer intentRecognizer,
             IEntityExtractor entityExtractor,
             KnowledgeBaseAgent knowledgeBaseAgent,
@@ -44,7 +45,8 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
             IDegradationManager degradationManager,
             IRuleEngine ruleEngine,
             IMafAiAgentRegistry llmRegistry,
-            ILogger<CustomerServiceMainAgent> logger)
+            ILogger<CustomerServiceLeaderAgent> logger,
+            IEscalationService? escalationService = null)
             : base(llmRegistry, logger)
         {
             _intentRecognizer = intentRecognizer
@@ -63,6 +65,7 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
                 ?? throw new ArgumentNullException(nameof(degradationManager));
             _ruleEngine = ruleEngine
                 ?? throw new ArgumentNullException(nameof(ruleEngine));
+            _escalationService = escalationService;
         }
 
         public override async Task<MafTaskResponse> ExecuteBusinessLogicAsync(
@@ -74,7 +77,7 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
             activity?.SetTag("user_input.length", request.UserInput.Length);
 
             var startTime = DateTime.UtcNow;
-            Logger.LogInformation("CustomerServiceMainAgent processing: {UserInput}", request.UserInput);
+            Logger.LogInformation("CustomerServiceLeaderAgent processing: {UserInput}", request.UserInput);
 
             try
             {
@@ -115,7 +118,7 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
             catch (Exception ex)
             {
                 activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                Logger.LogError(ex, "CustomerServiceMainAgent failed");
+                Logger.LogError(ex, "CustomerServiceLeaderAgent failed");
                 return new MafTaskResponse
                 {
                     TaskId = request.TaskId,
@@ -135,6 +138,15 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
 
             // 0. 情绪检测：识别用户负面情绪
             var emotionLevel = DetectEmotion(userInput);
+
+            // CS-04: 投诉+订单场景 → OrderAgent + TicketAgent 协作 + 自动升级
+            if (emotionLevel >= EmotionLevel.Angry
+                && ContainsAny(userInput, ["投诉", "举报", "曝光", "太过分"])
+                && ContainsAny(userInput, ["订单", "退款", "退货", "快递", "物流"]))
+            {
+                Logger.LogInformation("Complaint with order context detected, coordinating OrderAgent + TicketAgent");
+                return await HandleComplaintCoordinationAsync(request, emotionLevel, ct);
+            }
 
             // 订单相关意图
             if (intent.PrimaryIntent is "QueryOrder" or "CancelOrder" or "TrackShipping" or "RequestRefund"
@@ -186,9 +198,80 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
         }
 
         /// <summary>
+        /// CS-04: 投诉建议协作处理
+        /// 当用户情绪激动且投诉涉及订单时，OrderAgent 和 TicketAgent 协作，同时自动升级
+        /// </summary>
+        private async Task<MafTaskResponse> HandleComplaintCoordinationAsync(
+            MafTaskRequest request,
+            EmotionLevel emotionLevel,
+            CancellationToken ct)
+        {
+            using var activity = MafActivitySource.Agent.StartActivity("cs.complaint_coordination");
+            activity?.SetTag("emotion_level", emotionLevel.ToString());
+
+            var results = new List<string>();
+
+            // 1. OrderAgent: 查询订单信息（获取上下文）
+            try
+            {
+                var orderResponse = await _orderAgent.ExecuteBusinessLogicAsync(request, ct);
+                if (orderResponse.Success)
+                {
+                    results.Add($"📦 订单信息：{orderResponse.Result}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "OrderAgent failed during complaint coordination");
+            }
+
+            // 2. TicketAgent: 自动创建紧急工单
+            request.Parameters["emotionEscalation"] = "true";
+            request.Parameters["priority"] = "urgent";
+            try
+            {
+                var ticketResponse = await _ticketAgent.ExecuteBusinessLogicAsync(request, ct);
+                results.Add($"📋 {ticketResponse.Result}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "TicketAgent failed during complaint coordination");
+                results.Add("📋 工单创建失败，请稍后重试");
+            }
+
+            // 3. EscalationService: 自动升级到人工客服
+            if (_escalationService != null)
+            {
+                try
+                {
+                    var escalation = await _escalationService.EscalateToHumanAsync(
+                        request.UserId, "投诉升级：用户情绪激动", "urgent", ct);
+                    if (escalation.Success)
+                    {
+                        results.Add($"👤 {escalation.Message}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "EscalationService failed during complaint coordination");
+                }
+            }
+
+            var combinedResult = string.Join("\n\n", results);
+            var response = new MafTaskResponse
+            {
+                TaskId = request.TaskId,
+                Success = true,
+                Result = combinedResult,
+            };
+
+            return ApplyEmotionResponse(response, emotionLevel);
+        }
+
+        /// <summary>
         /// 检测用户情绪等级
         /// </summary>
-        internal static EmotionLevel DetectEmotion(string input)
+        public static EmotionLevel DetectEmotion(string input)
         {
             // 强烈负面情绪关键词
             if (ContainsAny(input, ["愤怒", "气死", "太过分", "垃圾", "骗子", "投诉你们", "要举报", "曝光"]))
@@ -226,7 +309,7 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
         }
 
         /// <summary>用户情绪等级</summary>
-        internal enum EmotionLevel
+        public enum EmotionLevel
         {
             Neutral = 0,
             Upset = 1,

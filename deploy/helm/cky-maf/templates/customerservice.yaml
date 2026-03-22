@@ -1,0 +1,101 @@
+{{- if .Values.customerservice.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cky-maf.fullname" . }}-customerservice
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: customerservice
+    {{- include "cky-maf.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.customerservice.autoscaling.enabled }}
+  replicas: {{ .Values.customerservice.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: customerservice
+      {{- include "cky-maf.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: customerservice
+        {{- include "cky-maf.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: customerservice
+          image: "{{ .Values.customerservice.image.repository }}:{{ .Values.customerservice.image.tag }}"
+          imagePullPolicy: {{ .Values.customerservice.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.customerservice.service.targetPort }}
+              protocol: TCP
+          env:
+            {{- range $key, $value := .Values.customerservice.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: ConnectionStrings__Redis
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cky-maf.fullname" . }}-secrets
+                  key: redis-connection
+            - name: LLM__ZhipuAI__ApiKey
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cky-maf.fullname" . }}-secrets
+                  key: llm-zhipu-apikey
+            - name: Qdrant__Host
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cky-maf.fullname" . }}-secrets
+                  key: qdrant-host
+            - name: Qdrant__Port
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cky-maf.fullname" . }}-secrets
+                  key: qdrant-port
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.customerservice.health.path }}
+              port: {{ .Values.customerservice.service.targetPort }}
+            initialDelaySeconds: {{ .Values.customerservice.health.initialDelaySeconds }}
+            periodSeconds: {{ .Values.customerservice.health.periodSeconds }}
+            failureThreshold: {{ .Values.customerservice.health.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.customerservice.health.path }}
+              port: {{ .Values.customerservice.service.targetPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          startupProbe:
+            httpGet:
+              path: {{ .Values.customerservice.health.path }}
+              port: {{ .Values.customerservice.service.targetPort }}
+            failureThreshold: 30
+            periodSeconds: 2
+          resources:
+            {{- toYaml .Values.customerservice.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cky-maf.fullname" . }}-customerservice
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: customerservice
+    {{- include "cky-maf.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.customerservice.service.type }}
+  ports:
+    - port: {{ .Values.customerservice.service.port }}
+      targetPort: {{ .Values.customerservice.service.targetPort }}
+      protocol: TCP
+  selector:
+    app: customerservice
+    {{- include "cky-maf.selectorLabels" . | nindent 4 }}
+{{- end }}

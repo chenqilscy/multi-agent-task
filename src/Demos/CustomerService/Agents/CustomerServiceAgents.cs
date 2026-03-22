@@ -1,5 +1,6 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Agents;
+using CKY.MultiAgentFramework.Core.Models.LLM;
 using CKY.MultiAgentFramework.Core.Models.Task;
 using CKY.MultiAgentFramework.Demos.CustomerService.Services;
 using Microsoft.Extensions.Logging;
@@ -9,6 +10,7 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
     /// <summary>
     /// 知识库查询 Agent
     /// 处理 FAQ 查询和知识库检索（RAG）
+    /// 支持LLM增强：将检索结果通过LLM生成更专业的客服回答
     /// </summary>
     public class KnowledgeBaseAgent : MafBusinessAgentBase
     {
@@ -40,11 +42,15 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
 
             if (result.GeneratedAnswer != null && result.Confidence > 0.6)
             {
+                // 尝试用LLM优化回答
+                var enhancedAnswer = await EnhanceAnswerWithLlmAsync(
+                    request.UserInput, result.GeneratedAnswer, ct);
+
                 return new MafTaskResponse
                 {
                     TaskId = request.TaskId,
                     Success = true,
-                    Result = result.GeneratedAnswer,
+                    Result = enhancedAnswer,
                     Data = new { Sources = result.SourceReferences, Confidence = result.Confidence },
                 };
             }
@@ -52,11 +58,17 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
             if (result.RelevantFaqs.Count > 0)
             {
                 var bestFaq = result.RelevantFaqs.First();
+                var faqContext = string.Join("\n", result.RelevantFaqs.Select(f => f.Answer));
+
+                // 尝试用LLM整合多个FAQ回答
+                var enhancedAnswer = await EnhanceAnswerWithLlmAsync(
+                    request.UserInput, faqContext, ct);
+
                 return new MafTaskResponse
                 {
                     TaskId = request.TaskId,
                     Success = true,
-                    Result = $"根据您的问题，为您提供以下解答：\n\n{bestFaq.Answer}",
+                    Result = enhancedAnswer,
                     Data = new { FaqId = bestFaq.Id, Confidence = result.Confidence },
                 };
             }
@@ -69,6 +81,44 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
                 Result = "抱歉，我暂时无法解答您的问题。建议您提交工单，由专属客服为您处理。",
                 Data = new { ShouldEscalate = true },
             };
+        }
+
+        /// <summary>
+        /// 通过LLM增强知识库回答，生成更专业的客服回复
+        /// LLM不可用时降级为原始回答
+        /// </summary>
+        private async Task<string> EnhanceAnswerWithLlmAsync(
+            string question, string rawAnswer, CancellationToken ct)
+        {
+            try
+            {
+                var prompt = $"你是专业的客服助手。请根据以下知识库内容，为客户生成专业、友好的回复。\n\n" +
+                             $"【客户问题】\n{question}\n\n" +
+                             $"【知识库参考内容】\n{rawAnswer}\n\n" +
+                             $"【回复要求】\n" +
+                             $"1. 基于知识库内容回答，不要编造\n" +
+                             $"2. 语气亲切专业\n" +
+                             $"3. 如有操作步骤请用编号列出\n" +
+                             $"4. 回复控制在200字以内";
+
+                var llmAnswer = await CallLlmAsync(
+                    prompt,
+                    LlmScenario.Chat,
+                    "你是电商平台的智能客服助手，负责解答客户关于订单、退款、物流等问题。",
+                    ct);
+
+                if (!string.IsNullOrWhiteSpace(llmAnswer))
+                {
+                    Logger.LogInformation("LLM增强客服回答生成成功");
+                    return llmAnswer;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "LLM增强回答失败，使用原始知识库回答");
+            }
+
+            return $"根据您的问题，为您提供以下解答：\n\n{rawAnswer}";
         }
     }
 

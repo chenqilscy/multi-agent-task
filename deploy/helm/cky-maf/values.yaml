@@ -1,0 +1,139 @@
+# 全局配置
+global:
+  namespace: cky-maf
+  environment: production
+
+# SmartHome Demo
+smarthome:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: cky-maf/smarthome
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  health:
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 3
+  env:
+    ASPNETCORE_ENVIRONMENT: Production
+    MafStorage__RelationalDatabase__Provider: SQLite
+    MafStorage__RelationalDatabase__SqlitePath: /app/data/maf_smart_home.db
+
+# CustomerService Demo
+customerservice:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: cky-maf/customerservice
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  health:
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 3
+  env:
+    ASPNETCORE_ENVIRONMENT: Production
+
+# Redis
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+  service:
+    port: 6379
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+
+# Qdrant
+qdrant:
+  enabled: true
+  image:
+    repository: qdrant/qdrant
+    tag: v1.9.0
+  service:
+    restPort: 6333
+    grpcPort: 6334
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+
+# Ingress
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: smarthome.maf.local
+      paths:
+        - path: /
+          service: smarthome
+    - host: customerservice.maf.local
+      paths:
+        - path: /
+          service: customerservice
+
+# Secrets (override via --set or external secret management)
+secrets:
+  redis:
+    connectionString: redis:6379
+  llm:
+    zhipuApiKey: ""
+  qdrant:
+    host: qdrant
+    port: "6334"

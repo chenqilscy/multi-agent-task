@@ -13,7 +13,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(maf_agent_invocations_total[5m])) * 60",
+          "expr": "sum(rate(maf_agent_executions_total[5m])) * 60",
           "legendFormat": "任务/分钟"
         }
       ],
@@ -37,7 +37,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum(rate(maf_agent_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.5, sum(rate(maf_agent_execution_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "P50"
         }
       ],
@@ -61,7 +61,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(maf_agent_invocations_total{status=\"success\"}[5m])) / sum(rate(maf_agent_invocations_total[5m])) * 100",
+          "expr": "sum(rate(maf_agent_executions_total{status=\"success\"}[5m])) / sum(rate(maf_agent_executions_total[5m])) * 100",
           "legendFormat": "成功率"
         }
       ],
@@ -111,19 +111,19 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(maf_agent_invocations_total{priority=\"Critical\"}[5m])) or vector(0)",
+          "expr": "sum(rate(maf_agent_executions_total{priority=\"Critical\"}[5m])) or vector(0)",
           "legendFormat": "Critical"
         },
         {
-          "expr": "sum(rate(maf_agent_invocations_total{priority=\"High\"}[5m])) or vector(0)",
+          "expr": "sum(rate(maf_agent_executions_total{priority=\"High\"}[5m])) or vector(0)",
           "legendFormat": "High"
         },
         {
-          "expr": "sum(rate(maf_agent_invocations_total{priority=\"Normal\"}[5m])) or vector(0)",
+          "expr": "sum(rate(maf_agent_executions_total{priority=\"Normal\"}[5m])) or vector(0)",
           "legendFormat": "Normal"
         },
         {
-          "expr": "sum(rate(maf_agent_invocations_total{priority=\"Low\"}[5m])) or vector(0)",
+          "expr": "sum(rate(maf_agent_executions_total{priority=\"Low\"}[5m])) or vector(0)",
           "legendFormat": "Low"
         }
       ],
@@ -152,19 +152,19 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum(rate(maf_agent_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.5, sum(rate(maf_agent_execution_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "P50"
         },
         {
-          "expr": "histogram_quantile(0.90, sum(rate(maf_agent_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.90, sum(rate(maf_agent_execution_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "P90"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(maf_agent_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(maf_agent_execution_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "P95"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(maf_agent_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(maf_agent_execution_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "P99"
         }
       ],
@@ -190,11 +190,11 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(increase(maf_agent_invocations_total{status=\"success\"}[1h]))",
+          "expr": "sum(increase(maf_agent_executions_total{status=\"success\"}[1h]))",
           "legendFormat": "成功"
         },
         {
-          "expr": "sum(increase(maf_agent_invocations_total{status=\"failure\"}[1h]))",
+          "expr": "sum(increase(maf_agent_executions_total{status=\"failure\"}[1h]))",
           "legendFormat": "失败"
         }
       ],
@@ -239,7 +239,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(maf_agent_invocations_total[5m])) by (app)",
+          "expr": "sum(rate(maf_agent_executions_total[5m])) by (app)",
           "legendFormat": "{{app}}"
         }
       ],

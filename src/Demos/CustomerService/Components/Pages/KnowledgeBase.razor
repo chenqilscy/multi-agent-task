@@ -1,0 +1,274 @@
+@page "/knowledge"
+@using CKY.MultiAgentFramework.Core.Abstractions
+@using CKY.MultiAgentFramework.Core.Models.RAG
+@using CKY.MultiAgentFramework.Demos.CustomerService.Services
+@rendermode InteractiveServer
+@inject IKnowledgeBaseService KnowledgeBaseService
+@inject IRagPipeline RagPipeline
+
+<PageTitle>知识库管理 - 智能客服</PageTitle>
+
+<div class="kb-container">
+    <div class="kb-header">
+        <h2>📚 客服知识库</h2>
+        <p class="kb-desc">搜索FAQ和产品知识，支持关键词匹配 + RAG语义检索</p>
+    </div>
+
+    <div class="kb-search-section">
+        <div class="search-row">
+            <input @bind="searchQuery"
+                   @bind:event="oninput"
+                   @onkeydown="HandleKeyDown"
+                   placeholder="输入问题，例如：如何申请退款？"
+                   disabled="@isSearching" />
+            <button @onclick="Search" disabled="@(string.IsNullOrWhiteSpace(searchQuery) || isSearching)">
+                @(isSearching ? "⏳" : "🔍") 搜索
+            </button>
+        </div>
+
+        <div class="quick-tags">
+            <button class="tag" @onclick="@(() => QuickSearch("如何查询订单"))">📦 订单查询</button>
+            <button class="tag" @onclick="@(() => QuickSearch("如何申请退款"))">💰 退款流程</button>
+            <button class="tag" @onclick="@(() => QuickSearch("物流配送"))">🚚 物流查询</button>
+            <button class="tag" @onclick="@(() => QuickSearch("产品质量问题"))">🔧 质量问题</button>
+            <button class="tag" @onclick="@(() => QuickSearch("提交工单"))">📋 工单系统</button>
+            <button class="tag" @onclick="@(() => QuickSearch("会员权益"))">⭐ 会员服务</button>
+        </div>
+    </div>
+
+    @if (searchResult != null)
+    {
+        <div class="search-results">
+            <div class="result-header">
+                <h3>搜索结果</h3>
+                <span class="result-info">
+                    置信度: @searchResult.Confidence.ToString("P0") |
+                    找到 @searchResult.RelevantFaqs.Count 条结果
+                </span>
+            </div>
+
+            @if (!string.IsNullOrEmpty(searchResult.GeneratedAnswer))
+            {
+                <div class="answer-card">
+                    <div class="answer-label">💡 最佳匹配</div>
+                    <div class="answer-text">@searchResult.GeneratedAnswer</div>
+                </div>
+            }
+
+            @foreach (var faq in searchResult.RelevantFaqs)
+            {
+                <div class="faq-card">
+                    <div class="faq-meta">
+                        <span class="faq-category">@faq.Category</span>
+                        <span class="faq-score">相似度: @faq.Relevance.ToString("P0")</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(faq.Question))
+                    {
+                        <div class="faq-question">❓ @faq.Question</div>
+                    }
+                    <div class="faq-answer">@faq.Answer</div>
+                </div>
+            }
+
+            @if (searchResult.RelevantFaqs.Count == 0)
+            {
+                <div class="no-result">
+                    <p>未找到相关内容，建议提交工单获取人工支持。</p>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .kb-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 1.5rem;
+    }
+
+    .kb-header {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .kb-header h2 { color: #1a1a2e; margin-bottom: 0.3rem; }
+    .kb-desc { color: #888; font-size: 0.9rem; }
+
+    .kb-search-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        margin-bottom: 1.5rem;
+    }
+
+    .search-row {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .search-row input {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1rem;
+        outline: none;
+    }
+
+    .search-row input:focus { border-color: #4361ee; }
+
+    .search-row button {
+        background: linear-gradient(135deg, #4361ee, #3a0ca3);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.75rem 1.5rem;
+        cursor: pointer;
+        font-size: 0.95rem;
+        white-space: nowrap;
+    }
+
+    .search-row button:hover:not(:disabled) { opacity: 0.9; }
+    .search-row button:disabled { opacity: 0.5; cursor: default; }
+
+    .quick-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 1rem;
+    }
+
+    .tag {
+        background: #f0f0f0;
+        border: 1px solid #ddd;
+        border-radius: 16px;
+        padding: 0.3rem 0.7rem;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+    }
+
+    .tag:hover { background: #4361ee; color: white; border-color: #4361ee; }
+
+    .search-results {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .result-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .result-header h3 { margin: 0; color: #1a1a2e; }
+    .result-info { color: #888; font-size: 0.85rem; }
+
+    .answer-card {
+        background: #f0f7ff;
+        border: 1px solid #b8d4fe;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .answer-label {
+        font-weight: 600;
+        color: #4361ee;
+        margin-bottom: 0.5rem;
+    }
+
+    .answer-text {
+        color: #333;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    .faq-card {
+        border: 1px solid #eee;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .faq-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+    .faq-meta {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+
+    .faq-category {
+        background: #e8eaed;
+        color: #555;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+
+    .faq-score { color: #888; font-size: 0.8rem; }
+
+    .faq-question {
+        font-weight: 600;
+        color: #1a1a2e;
+        margin-bottom: 0.4rem;
+    }
+
+    .faq-answer {
+        color: #555;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    .no-result {
+        text-align: center;
+        padding: 2rem;
+        color: #888;
+    }
+</style>
+
+@code {
+    private string searchQuery = string.Empty;
+    private bool isSearching;
+    private KnowledgeSearchResult? searchResult;
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(searchQuery) && !isSearching)
+            await Search();
+    }
+
+    private async Task QuickSearch(string query)
+    {
+        searchQuery = query;
+        await Search();
+    }
+
+    private async Task Search()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery) || isSearching) return;
+
+        isSearching = true;
+        StateHasChanged();
+
+        try
+        {
+            searchResult = await KnowledgeBaseService.SearchAsync(searchQuery.Trim(), 5);
+        }
+        catch (Exception)
+        {
+            searchResult = new KnowledgeSearchResult();
+        }
+        finally
+        {
+            isSearching = false;
+            StateHasChanged();
+        }
+    }
+}

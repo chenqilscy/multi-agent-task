@@ -65,7 +65,7 @@ namespace CKY.MultiAgentFramework.Services.Session
                 _l1CacheManager.Add(session.SessionId, session);
 
                 // 使用写入策略同步到三层存储
-                await _writeStrategy.WriteAsync(session, this, _l2Store, _l3Store, cancellationToken);
+                await _writeStrategy.WriteAsync(session, _l1CacheManager, _l2Store, _l3Store, cancellationToken);
 
                 _logger.LogDebug("[SessionManager] Saved session: {SessionId}", session.SessionId);
             }
@@ -92,7 +92,7 @@ namespace CKY.MultiAgentFramework.Services.Session
                 }
 
                 // 使用读取策略从三层存储加载
-                var session = await _readStrategy.ReadAsync(sessionId, this, _l2Store, _l3Store, cancellationToken);
+                var session = await _readStrategy.ReadAsync(sessionId, _l1CacheManager, _l2Store, _l3Store, cancellationToken);
 
                 if (session != null)
                 {
@@ -442,16 +442,10 @@ namespace CKY.MultiAgentFramework.Services.Session
         /// <summary>
         /// 从 L1 缓存获取用户会话（内部辅助方法）
         /// </summary>
-        private async Task<List<MafSessionState>> GetL1SessionsByUserAsync(string userId)
+        private Task<List<MafSessionState>> GetL1SessionsByUserAsync(string userId)
         {
-            // L1CacheManager 目前不提供按用户遍历接口，返回空列表。
-            // 如需支持按用户查询，需扩展 L1CacheManager 添加遍历能力。
-            var sessions = new List<MafSessionState>();
-            var stats = _l1CacheManager.GetStats();
-
-            // 由于 L1CacheManager 目前不提供遍历接口，返回空列表
-            // 实际项目中应该扩展 L1CacheManager 接口
-            return await Task.FromResult(sessions);
+            var sessions = _l1CacheManager.GetByUserId(userId);
+            return Task.FromResult(sessions);
         }
     }
 }

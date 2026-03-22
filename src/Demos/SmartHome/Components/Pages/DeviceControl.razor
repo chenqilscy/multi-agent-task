@@ -1,0 +1,369 @@
+@page "/devices"
+@using CKY.MultiAgentFramework.Demos.SmartHome.Services
+@rendermode InteractiveServer
+@inject ILightingService LightingService
+@inject IClimateService ClimateService
+@inject ISecurityService SecurityService
+
+<PageTitle>设备管理 - 智能家居</PageTitle>
+
+<div class="device-page">
+    <div class="page-header">
+        <h1>🎛️ 设备管理中心</h1>
+        <button class="btn-refresh" @onclick="RefreshAll">🔄 刷新状态</button>
+    </div>
+
+    <!-- 照明设备 -->
+    <section class="device-section">
+        <h2>💡 照明设备</h2>
+        <div class="device-grid">
+            @foreach (var light in lights)
+            {
+                <div class="device-card @(light.IsOn ? "device-on" : "device-off")">
+                    <div class="device-icon">💡</div>
+                    <div class="device-info">
+                        <h3>@light.Room</h3>
+                        <span class="device-status">@(light.IsOn ? "已开启" : "已关闭")</span>
+                    </div>
+                    <div class="device-controls">
+                        <button class="toggle-btn @(light.IsOn ? "on" : "off")"
+                                @onclick="@(() => ToggleLight(light))">
+                            @(light.IsOn ? "关闭" : "开启")
+                        </button>
+                        @if (light.IsOn)
+                        {
+                            <div class="brightness-control">
+                                <label>亮度: @light.Brightness%</label>
+                                <input type="range" min="10" max="100" value="@light.Brightness"
+                                       @onchange="@(e => SetBrightness(light, int.Parse(e.Value?.ToString() ?? "50")))" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+
+    <!-- 气候设备 -->
+    <section class="device-section">
+        <h2>🌡️ 气候控制</h2>
+        <div class="device-grid">
+            @foreach (var climate in climateDevices)
+            {
+                <div class="device-card @(climate.IsOn ? "device-on" : "device-off")">
+                    <div class="device-icon">🌡️</div>
+                    <div class="device-info">
+                        <h3>@climate.Room</h3>
+                        <span class="device-status">
+                            @if (climate.IsOn)
+                            {
+                                @($"当前 {climate.CurrentTemp}°C → 目标 {climate.TargetTemp}°C | {GetModeLabel(climate.Mode)}")
+                            }
+                            else
+                            {
+                                @("已关闭")
+                            }
+                        </span>
+                    </div>
+                    <div class="device-controls">
+                        <div class="temp-controls">
+                            <button class="temp-btn" @onclick="@(() => AdjustTemp(climate, -1))" disabled="@(!climate.IsOn)">➖</button>
+                            <span class="temp-display">@climate.TargetTemp°C</span>
+                            <button class="temp-btn" @onclick="@(() => AdjustTemp(climate, 1))" disabled="@(!climate.IsOn)">➕</button>
+                        </div>
+                        <div class="mode-selector">
+                            <button class="mode-btn @(climate.Mode == "cooling" ? "active" : "")"
+                                    @onclick="@(() => SetClimateMode(climate, "cooling"))">❄️ 制冷</button>
+                            <button class="mode-btn @(climate.Mode == "heating" ? "active" : "")"
+                                    @onclick="@(() => SetClimateMode(climate, "heating"))">🔥 制热</button>
+                            <button class="mode-btn @(climate.Mode == "auto" ? "active" : "")"
+                                    @onclick="@(() => SetClimateMode(climate, "auto"))">🔄 自动</button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+
+    <!-- 安防设备 -->
+    <section class="device-section">
+        <h2>🔒 安防系统</h2>
+        <div class="device-grid">
+            <div class="device-card @(doorLocked ? "device-on" : "device-off")">
+                <div class="device-icon">🚪</div>
+                <div class="device-info">
+                    <h3>大门门锁</h3>
+                    <span class="device-status">@(doorLocked ? "🔒 已锁定" : "🔓 已解锁")</span>
+                </div>
+                <div class="device-controls">
+                    <button class="toggle-btn @(doorLocked ? "on" : "off")"
+                            @onclick="ToggleDoorLock">
+                        @(doorLocked ? "解锁" : "锁定")
+                    </button>
+                </div>
+            </div>
+
+            @foreach (var cam in cameras)
+            {
+                <div class="device-card @(cam.IsActive ? "device-on" : "device-off")">
+                    <div class="device-icon">📹</div>
+                    <div class="device-info">
+                        <h3>@cam.Location 摄像头</h3>
+                        <span class="device-status">@(cam.IsActive ? "监控中" : "已关闭")</span>
+                    </div>
+                    <div class="device-controls">
+                        <button class="toggle-btn @(cam.IsActive ? "on" : "off")"
+                                @onclick="@(() => ToggleCamera(cam))">
+                            @(cam.IsActive ? "关闭" : "开启")
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="status-toast @statusClass">@statusMessage</div>
+    }
+</div>
+
+<style>
+    .device-page { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+
+    .page-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .page-header h1 { margin: 0; color: #333; }
+
+    .btn-refresh {
+        background: #667eea; color: white; border: none;
+        padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer;
+    }
+
+    .btn-refresh:hover { background: #5a6fd6; }
+
+    .device-section { margin-bottom: 2rem; }
+    .device-section h2 { color: #555; margin-bottom: 1rem; border-bottom: 2px solid #eee; padding-bottom: 0.5rem; }
+
+    .device-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1rem;
+    }
+
+    .device-card {
+        background: white; border-radius: 12px; padding: 1.2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border-left: 4px solid #ccc;
+        transition: all 0.3s;
+    }
+
+    .device-card.device-on { border-left-color: #52c41a; }
+    .device-card.device-off { border-left-color: #d9d9d9; }
+
+    .device-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+
+    .device-info h3 { margin: 0 0 0.3rem 0; font-size: 1rem; color: #333; }
+    .device-status { font-size: 0.85rem; color: #888; }
+
+    .device-controls { margin-top: 0.8rem; }
+
+    .toggle-btn {
+        padding: 0.4rem 1rem; border-radius: 6px; border: none;
+        cursor: pointer; font-size: 0.85rem;
+    }
+
+    .toggle-btn.on { background: #ff4d4f; color: white; }
+    .toggle-btn.off { background: #52c41a; color: white; }
+    .toggle-btn:hover { opacity: 0.85; }
+
+    .brightness-control { margin-top: 0.5rem; }
+    .brightness-control label { font-size: 0.8rem; color: #666; }
+    .brightness-control input[type=range] { width: 100%; }
+
+    .temp-controls {
+        display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;
+    }
+
+    .temp-btn {
+        width: 32px; height: 32px; border-radius: 50%; border: 1px solid #ddd;
+        background: white; cursor: pointer; font-size: 0.9rem;
+    }
+
+    .temp-btn:hover:not(:disabled) { background: #f0f0f0; }
+    .temp-btn:disabled { opacity: 0.4; cursor: default; }
+    .temp-display { font-size: 1.2rem; font-weight: bold; min-width: 60px; text-align: center; }
+
+    .mode-selector { display: flex; gap: 0.4rem; }
+
+    .mode-btn {
+        padding: 0.3rem 0.6rem; border-radius: 6px;
+        border: 1px solid #ddd; background: white;
+        cursor: pointer; font-size: 0.8rem;
+    }
+
+    .mode-btn.active { background: #667eea; color: white; border-color: #667eea; }
+    .mode-btn:hover:not(.active) { background: #f5f5f5; }
+
+    .status-toast {
+        position: fixed; bottom: 2rem; right: 2rem;
+        padding: 0.8rem 1.5rem; border-radius: 8px;
+        color: white; font-size: 0.9rem; z-index: 100;
+        animation: slideIn 0.3s ease;
+    }
+
+    .status-toast.success { background: #52c41a; }
+    .status-toast.error { background: #ff4d4f; }
+
+    @@keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+</style>
+
+@code {
+    private List<LightDevice> lights = new();
+    private List<ClimateDevice> climateDevices = new();
+    private bool doorLocked;
+    private List<CameraStatus> cameras = new();
+    private string statusMessage = string.Empty;
+    private string statusClass = string.Empty;
+
+    private class LightDevice
+    {
+        public string Room { get; set; } = string.Empty;
+        public bool IsOn { get; set; }
+        public int Brightness { get; set; } = 80;
+    }
+
+    private class ClimateDevice
+    {
+        public string Room { get; set; } = string.Empty;
+        public bool IsOn { get; set; }
+        public int CurrentTemp { get; set; }
+        public int TargetTemp { get; set; } = 24;
+        public string Mode { get; set; } = "auto";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        lights = new List<LightDevice>
+        {
+            new() { Room = "客厅", IsOn = false, Brightness = 80 },
+            new() { Room = "卧室", IsOn = false, Brightness = 50 },
+            new() { Room = "厨房", IsOn = false, Brightness = 100 }
+        };
+
+        var rooms = new[] { "客厅", "卧室" };
+        foreach (var room in rooms)
+        {
+            var temp = await ClimateService.GetCurrentTemperatureAsync(room);
+            climateDevices.Add(new ClimateDevice
+            {
+                Room = room,
+                IsOn = false,
+                CurrentTemp = temp,
+                TargetTemp = 24
+            });
+        }
+
+        var lockStatus = await SecurityService.GetDoorLockStatusAsync();
+        doorLocked = lockStatus.IsLocked;
+        cameras = await SecurityService.GetCameraStatusListAsync();
+    }
+
+    private async Task ToggleLight(LightDevice light)
+    {
+        if (light.IsOn)
+        {
+            await LightingService.TurnOffAsync(light.Room);
+            light.IsOn = false;
+        }
+        else
+        {
+            await LightingService.TurnOnAsync(light.Room);
+            light.IsOn = true;
+        }
+        ShowStatus($"{light.Room}灯已{(light.IsOn ? "开启" : "关闭")}", "success");
+    }
+
+    private async Task SetBrightness(LightDevice light, int brightness)
+    {
+        light.Brightness = brightness;
+        await LightingService.SetBrightnessAsync(light.Room, brightness);
+        ShowStatus($"{light.Room}亮度已调至 {brightness}%", "success");
+    }
+
+    private async Task AdjustTemp(ClimateDevice device, int delta)
+    {
+        device.TargetTemp = Math.Clamp(device.TargetTemp + delta, 16, 32);
+        await ClimateService.SetTemperatureAsync(device.Room, device.TargetTemp);
+        device.IsOn = true;
+        ShowStatus($"{device.Room}空调温度设为 {device.TargetTemp}°C", "success");
+    }
+
+    private async Task SetClimateMode(ClimateDevice device, string mode)
+    {
+        device.Mode = mode;
+        await ClimateService.SetModeAsync(device.Room, mode);
+        device.IsOn = true;
+        ShowStatus($"{device.Room}空调已切换到{GetModeLabel(mode)}模式", "success");
+    }
+
+    private async Task ToggleDoorLock()
+    {
+        if (doorLocked)
+        {
+            await SecurityService.UnlockDoorAsync();
+            doorLocked = false;
+        }
+        else
+        {
+            await SecurityService.LockDoorAsync();
+            doorLocked = true;
+        }
+        ShowStatus($"大门已{(doorLocked ? "锁定" : "解锁")}", "success");
+    }
+
+    private async Task ToggleCamera(CameraStatus cam)
+    {
+        var newState = !cam.IsActive;
+        await SecurityService.SetCameraActiveAsync(cam.Location, newState);
+        cam.IsActive = newState;
+        ShowStatus($"{cam.Location}摄像头已{(newState ? "开启" : "关闭")}", "success");
+    }
+
+    private async Task RefreshAll()
+    {
+        foreach (var climate in climateDevices)
+        {
+            climate.CurrentTemp = await ClimateService.GetCurrentTemperatureAsync(climate.Room);
+        }
+        var lockStatus = await SecurityService.GetDoorLockStatusAsync();
+        doorLocked = lockStatus.IsLocked;
+        cameras = await SecurityService.GetCameraStatusListAsync();
+        ShowStatus("设备状态已刷新", "success");
+    }
+
+    private void ShowStatus(string message, string cssClass)
+    {
+        statusMessage = message;
+        statusClass = cssClass;
+        _ = Task.Delay(3000).ContinueWith(_ =>
+        {
+            statusMessage = string.Empty;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private static string GetModeLabel(string mode) => mode switch
+    {
+        "cooling" => "制冷",
+        "heating" => "制热",
+        "auto" => "自动",
+        _ => mode
+    };
+}

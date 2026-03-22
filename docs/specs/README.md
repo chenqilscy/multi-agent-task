@@ -1,8 +1,12 @@
 # CKY.MAF 框架设计文档
 
-> **最后更新**: 2026-03-13
-> **框架版本**: v1.2
-> **状态**: 设计阶段
+> **⚠️ 遗留文档**: 此目录为旧版规范文档 (v1.3)，**已不再维护**。  
+> 权威设计文档已迁移至 [`docs/design-docs/`](../design-docs/index.md) (v2.1)。  
+> 如需查阅最新架构，请参阅 [核心架构](../design-docs/core-architecture.md) 和 [实现指南](../design-docs/implementation-guide.md)。
+
+> **最后更新**: 2026-03-20
+> **框架版本**: v1.3 (**已过时 — 当前 v2.1**)
+> **状态**: 🔒 已归档
 > **核心依赖**: Microsoft Agent Framework (Preview)
 
 ---
@@ -100,18 +104,6 @@ docs/specs/
 3. [13-性能基准测试](./13-performance-benchmarks.md) ⭐ **重点**
 4. [14-错误处理指南](./14-error-handling-guide.md) ⭐ **重点**
 5. [02-架构图表集](./02-architecture-diagrams.md)
-1. [01-架构设计概览](./01-architecture-overview.md)
-2. [07-UI设计规范](./07-ui-design-spec.md) ⭐ **重点**
-3. [02-架构图表集](./02-architecture-diagrams.md)
-4. [09-实现指南](./09-implementation-guide.md)
-
-### 🔧 运维人员
-1. [01-架构设计概览](./01-architecture-overview.md)
-2. [08-部署指南](./08-deployment-guide.md) ⭐ **重点**
-3. [13-性能基准测试](./13-performance-benchmarks.md) ⭐ **重点**
-4. [14-错误处理指南](./14-error-handling-guide.md) ⭐ **重点**
-5. [02-架构图表集](./02-architecture-diagrams.md)
-6. [11-实施路线图](./11-implementation-roadmap.md)
 
 ---
 
@@ -312,15 +304,15 @@ docs/specs/
   - `IRelationalDatabase` - 关系数据库接口
 
 **文档新增**:
-- ✅ [12-分层依赖架构](./12-layered-architecture.md) - 32KB
+- ✅ 12-分层依赖架构（已整合至 [00-CORE-ARCHITECTURE.md](./00-CORE-ARCHITECTURE.md)）
   - 5层架构设计详解
   - 依赖规则和设计原则
   - 完整代码示例
   - 测试策略和扩展性指南
 
 **文档更新**:
-- ✅ [06-接口设计规范](./06-interface-design-spec.md) - 新增6.1存储抽象接口章节
-- ✅ [11-实施路线图](./11-implementation-roadmap.md) - 重构依赖结构
+- ✅ 06-接口设计规范（已整合至 [01-IMPLEMENTATION-GUIDE.md](./01-IMPLEMENTATION-GUIDE.md)）- 新增6.1存储抽象接口章节
+- ✅ 11-实施路线图（已整合至 [01-IMPLEMENTATION-GUIDE.md](./01-IMPLEMENTATION-GUIDE.md)）- 重构依赖结构
   - 具体实现包全部移至 Infrastructure 层
   - 添加分层依赖架构图
   - 明确 Core 层零外部依赖原则
@@ -364,9 +356,9 @@ docs/specs/
 序号-文档主题.md
 
 例如：
-- 01-architecture-overview.md
-- 06-interface-design-spec.md
-- 09-implementation-guide.md
+- 00-CORE-ARCHITECTURE.md
+- 01-IMPLEMENTATION-GUIDE.md
+- 03-task-scheduling-design.md
 ```
 
 ### 版本控制

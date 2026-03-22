@@ -145,9 +145,9 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var reader = new StreamReader(stream);
 
-            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            string? line;
+            while ((line = await reader.ReadLineAsync(ct)) != null && !ct.IsCancellationRequested)
             {
-                var line = await reader.ReadLineAsync(ct);
                 if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                     continue;
 
@@ -166,9 +166,9 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
                     continue;
                 }
 
-                if (chunk?.Choices?.Length > 0 && chunk.Choices[0].Delta?.Content != null)
+                if (chunk?.Choices is { Length: > 0 } choices && choices[0].Delta?.Content is { } deltaContent)
                 {
-                    yield return chunk.Choices[0].Delta.Content;
+                    yield return deltaContent;
                 }
             }
         }

@@ -55,9 +55,19 @@ namespace CKY.MultiAgentFramework.Services.Monitoring
 
         // LLM 调用相关
         public const string LlmRequestsTotal = "maf_llm_requests_total";
+        public const string LlmCallsTotal = "maf_llm_calls_total";
         public const string LlmRequestDuration = "maf_llm_request_duration_seconds";
+        public const string LlmLatencySeconds = "maf_llm_latency_seconds";
         public const string LlmRequestErrors = "maf_llm_request_errors_total";
         public const string LlmTokensUsed = "maf_llm_tokens_used_total";
+        public const string LlmPromptTokensTotal = "maf_llm_prompt_tokens_total";
+        public const string LlmResponseTokensTotal = "maf_llm_response_tokens_total";
+
+        // 降级相关
+        public const string DegradationLevel = "maf_degradation_level";
+
+        // 任务并发相关
+        public const string TaskConcurrentExecutions = "maf_task_concurrent_executions";
 
         // 系统资源相关
         public const string MemoryUsage = "maf_memory_usage_bytes";

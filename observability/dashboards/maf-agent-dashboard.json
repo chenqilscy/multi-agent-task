@@ -13,7 +13,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(increase(maf_agent_invocations_total[1h]))",
+          "expr": "sum(increase(maf_agent_executions_total[1h]))",
           "legendFormat": "调用次数"
         }
       ],
@@ -37,7 +37,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(maf_agent_invocations_total{status=\"success\"}[5m])) / sum(rate(maf_agent_invocations_total[5m])) * 100",
+          "expr": "sum(rate(maf_agent_executions_total{status=\"success\"}[5m])) / sum(rate(maf_agent_executions_total[5m])) * 100",
           "legendFormat": "成功率"
         }
       ],
@@ -63,7 +63,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(maf_agent_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(maf_agent_execution_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "P95"
         }
       ],
@@ -87,7 +87,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "count(count by (agent_name)(maf_agent_invocations_total))",
+          "expr": "count(count by (agent_name)(maf_agent_executions_total))",
           "legendFormat": "Agent 数"
         }
       ],
@@ -109,7 +109,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(maf_agent_invocations_total[5m])) by (agent_name)",
+          "expr": "sum(rate(maf_agent_executions_total[5m])) by (agent_name)",
           "legendFormat": "{{agent_name}}"
         }
       ],
@@ -132,15 +132,15 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum(rate(maf_agent_duration_seconds_bucket[5m])) by (le, agent_name))",
+          "expr": "histogram_quantile(0.5, sum(rate(maf_agent_execution_duration_seconds_bucket[5m])) by (le, agent_name))",
           "legendFormat": "{{agent_name}} P50"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(maf_agent_duration_seconds_bucket[5m])) by (le, agent_name))",
+          "expr": "histogram_quantile(0.95, sum(rate(maf_agent_execution_duration_seconds_bucket[5m])) by (le, agent_name))",
           "legendFormat": "{{agent_name}} P95"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(maf_agent_duration_seconds_bucket[5m])) by (le, agent_name))",
+          "expr": "histogram_quantile(0.99, sum(rate(maf_agent_execution_duration_seconds_bucket[5m])) by (le, agent_name))",
           "legendFormat": "{{agent_name}} P99"
         }
       ],
@@ -162,11 +162,11 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(increase(maf_agent_invocations_total{status=\"success\"}[1h])) by (agent_name)",
+          "expr": "sum(increase(maf_agent_executions_total{status=\"success\"}[1h])) by (agent_name)",
           "legendFormat": "{{agent_name}} 成功"
         },
         {
-          "expr": "sum(increase(maf_agent_invocations_total{status=\"failure\"}[1h])) by (agent_name)",
+          "expr": "sum(increase(maf_agent_executions_total{status=\"failure\"}[1h])) by (agent_name)",
           "legendFormat": "{{agent_name}} 失败"
         }
       ],
@@ -186,7 +186,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(maf_agent_invocations_total{status=\"success\"}[5m])) by (agent_name) / sum(rate(maf_agent_invocations_total[5m])) by (agent_name) * 100",
+          "expr": "sum(rate(maf_agent_executions_total{status=\"success\"}[5m])) by (agent_name) / sum(rate(maf_agent_executions_total[5m])) by (agent_name) * 100",
           "legendFormat": "{{agent_name}}"
         }
       ],

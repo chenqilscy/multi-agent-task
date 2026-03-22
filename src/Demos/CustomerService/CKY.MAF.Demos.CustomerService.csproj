@@ -8,6 +8,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.0" />
     <PackageReference Include="OpenTelemetry" Version="1.9.0" />
     <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.9.0" />
@@ -24,6 +28,7 @@
     <RootNamespace>CKY.MultiAgentFramework.Demos.CustomerService</RootNamespace>
     <AssemblyName>CKY.MAF.Demos.CustomerService</AssemblyName>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>cky-maf-customerservice-dev</UserSecretsId>
   </PropertyGroup>
 
 </Project>

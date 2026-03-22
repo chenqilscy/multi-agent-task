@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using Microsoft.EntityFrameworkCore;
+using Qdrant.Client;
 
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Infrastructure.Caching.Memory;
@@ -14,6 +15,8 @@ using CKY.MultiAgentFramework.Infrastructure.Repository.Relational;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
 using CKY.MultiAgentFramework.Infrastructure.Dapper;
+using CKY.MultiAgentFramework.Infrastructure.Embedding;
+using CKY.MultiAgentFramework.Infrastructure.Parsing;
 
 namespace CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
 
@@ -78,6 +81,21 @@ public static class MafServiceRegistrationExtensions
         }
         else if (vectorImpl == QdrantVectorImplementation)
         {
+            // 绑定 Qdrant 配置选项
+            services.Configure<QdrantVectorStoreOptions>(
+                configuration.GetSection("Qdrant"));
+
+            // 注册 QdrantClient（gRPC 客户端）
+            services.AddSingleton(sp =>
+            {
+                var options = sp.GetRequiredService<IOptions<QdrantVectorStoreOptions>>().Value;
+                return new QdrantClient(
+                    host: options.Host,
+                    port: options.Port,
+                    https: options.UseHttps,
+                    apiKey: options.ApiKey);
+            });
+
             services.AddSingleton<IVectorStore, QdrantVectorStore>();
         }
         else
@@ -109,6 +127,11 @@ public static class MafServiceRegistrationExtensions
         {
             services.AddScoped<IMafAiSessionStore, DatabaseMafAiSessionStore>();
         }
+
+        // ========================================
+        // 文档解析器服务注册
+        // ========================================
+        services.AddMafDocumentParsers();
 
         return services;
     }
@@ -209,6 +232,9 @@ public static class MafServiceRegistrationExtensions
             var options = sp.GetService<IOptions<DatabaseSessionOptions>>()?.Value;
             return new DatabaseMafAiSessionStore(() => dbContext, logger, options);
         });
+
+        // 注册文档解析器
+        services.AddMafDocumentParsers();
     }
 
     /// <summary>
@@ -275,7 +301,24 @@ public static class MafServiceRegistrationExtensions
                     throw new InvalidOperationException(
                         "PostgreSQL connection string is required when Provider is set to PostgreSQL");
                 }
-                options.UseNpgsql(connectionString);
+
+                options.UseNpgsql(connectionString, npgsqlOptions =>
+                {
+                    // 连接弹性：自动重试暂时性故障
+                    npgsqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: configuration.GetValue("MafStorage:PostgreSQL:MaxRetryCount", 3),
+                        maxRetryDelay: TimeSpan.FromSeconds(
+                            configuration.GetValue("MafStorage:PostgreSQL:MaxRetryDelaySeconds", 30)),
+                        errorCodesToAdd: null);
+
+                    // 命令超时
+                    npgsqlOptions.CommandTimeout(
+                        configuration.GetValue("MafStorage:PostgreSQL:CommandTimeoutSeconds", 30));
+
+                    // 迁移程序集
+                    npgsqlOptions.MigrationsAssembly(
+                        typeof(MafDbContext).Assembly.GetName().Name);
+                });
             }
             else
             {
@@ -292,5 +335,69 @@ public static class MafServiceRegistrationExtensions
             var logger = sp.GetRequiredService<ILogger<EfCoreRelationalDatabase>>();
             return new EfCoreRelationalDatabase(dbContext, logger);
         });
+    }
+
+    /// <summary>
+    /// 注册文档解析器及工厂
+    /// </summary>
+    public static IServiceCollection AddMafDocumentParsers(this IServiceCollection services)
+    {
+        services.AddSingleton<IDocumentParser, TxtDocumentParser>();
+        services.AddSingleton<IDocumentParser, MarkdownDocumentParser>();
+        services.AddSingleton<IDocumentParser, HtmlDocumentParser>();
+        services.AddSingleton<IDocumentParser, CsvDocumentParser>();
+        services.AddSingleton<DocumentParserFactory>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// 注册智谱AI嵌入服务
+    /// </summary>
+    /// <param name="services">服务集合</param>
+    /// <param name="configuration">配置对象</param>
+    /// <returns>服务集合（链式调用）</returns>
+    /// <remarks>
+    /// 需要在 appsettings.json 中配置:
+    /// <code>
+    /// {
+    ///   "ZhipuAI": {
+    ///     "ApiKey": "your-api-key",
+    ///     "EmbeddingModel": "embedding-3",
+    ///     "EmbeddingDimension": 2048
+    ///   }
+    /// }
+    /// </code>
+    /// </remarks>
+    public static IServiceCollection AddZhipuAIEmbeddingService(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var apiKey = configuration["ZhipuAI:ApiKey"];
+        var model = configuration.GetValue("ZhipuAI:EmbeddingModel",
+            ZhipuAIEmbeddingService.DefaultModel)!;
+        var dimension = configuration.GetValue("ZhipuAI:EmbeddingDimension",
+            ZhipuAIEmbeddingService.DefaultDimension);
+
+        services.AddHttpClient(nameof(ZhipuAIEmbeddingService), client =>
+        {
+            client.BaseAddress = new Uri("https://open.bigmodel.cn/api/paas/v4/");
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+            }
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
+        services.AddSingleton<IEmbeddingService>(sp =>
+        {
+            var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+            var httpClient = httpClientFactory.CreateClient(nameof(ZhipuAIEmbeddingService));
+            var logger = sp.GetRequiredService<ILogger<ZhipuAIEmbeddingService>>();
+            return new ZhipuAIEmbeddingService(httpClient, logger, model, dimension);
+        });
+
+        return services;
     }
 }

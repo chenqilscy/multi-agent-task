@@ -168,13 +168,79 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Services.Implementations
             var result = new RefundResult
             {
                 Success = true,
-                RefundId = $"REF-{Guid.NewGuid():N[..8]}",
+                RefundId = $"REF-{Guid.NewGuid():N}"[..12],
                 Message = $"退款申请已提交，预计3-5个工作日内退回到您的账户",
                 RefundAmount = refundAmount,
                 EstimatedDays = 5,
             };
 
             _logger.LogInformation("Refund requested for order {OrderId}: {Amount}", orderId, refundAmount);
+            return Task.FromResult(result);
+        }
+
+        public Task<ExchangeResult> RequestExchangeAsync(
+            string orderId, ExchangeRequest request, CancellationToken ct = default)
+        {
+            if (!_orders.TryGetValue(orderId, out var order))
+            {
+                return Task.FromResult(new ExchangeResult
+                {
+                    Success = false,
+                    Message = $"未找到订单 {orderId}"
+                });
+            }
+
+            if (order.Status != "delivered")
+            {
+                return Task.FromResult(new ExchangeResult
+                {
+                    Success = false,
+                    Message = $"订单状态为 {order.Status}，仅已签收订单可申请换货"
+                });
+            }
+
+            var result = new ExchangeResult
+            {
+                Success = true,
+                ExchangeId = $"EXC-{Guid.NewGuid():N}"[..12],
+                Message = "换货申请已提交，请将商品寄回指定地址，收到后1-3个工作日发出新商品"
+            };
+
+            _logger.LogInformation("Exchange requested for order {OrderId}", orderId);
+            return Task.FromResult(result);
+        }
+
+        public Task<ReturnEligibility> CheckReturnEligibilityAsync(
+            string orderId, CancellationToken ct = default)
+        {
+            if (!_orders.TryGetValue(orderId, out var order))
+            {
+                return Task.FromResult(new ReturnEligibility
+                {
+                    IsEligible = false,
+                    Reason = $"未找到订单 {orderId}"
+                });
+            }
+
+            // 模拟7天退货期限
+            var daysSinceDelivery = (DateTime.Now - order.CreatedAt).Days;
+            var isWithinPeriod = daysSinceDelivery <= 7;
+
+            // 模拟特殊商品限制（内衣、食品等不可退）
+            var specialItems = new[] { "内衣", "食品", "定制商品" };
+            var isSpecial = order.Items.Any(i =>
+                specialItems.Any(s => i.ProductName.Contains(s, StringComparison.OrdinalIgnoreCase)));
+
+            var result = new ReturnEligibility
+            {
+                IsEligible = isWithinPeriod && !isSpecial,
+                RemainingDays = Math.Max(0, 7 - daysSinceDelivery),
+                IsSpecialItem = isSpecial,
+                Reason = !isWithinPeriod ? "已超过7天退货期限"
+                    : isSpecial ? "该商品属于特殊品类，不支持退货"
+                    : "符合退货条件"
+            };
+
             return Task.FromResult(result);
         }
     }
@@ -415,6 +481,50 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Services.Implementations
 
             profile.LastActiveTime = record.Timestamp;
             profile.TotalInteractions++;
+        }
+    }
+
+    /// <summary>
+    /// 问题升级服务模拟实现
+    /// 生产环境应对接客服工作台系统
+    /// </summary>
+    public class SimulatedEscalationService : IEscalationService
+    {
+        public Task<EscalationResult> EscalateToHumanAsync(
+            string userId, string reason, string priority = "normal", CancellationToken ct = default)
+        {
+            var waitMinutes = priority switch
+            {
+                "urgent" => 1,
+                "high" => 3,
+                _ => 10,
+            };
+
+            return Task.FromResult(new EscalationResult
+            {
+                Success = true,
+                AgentId = $"AGENT-{Random.Shared.Next(100, 999)}",
+                EstimatedWaitMinutes = waitMinutes,
+                Message = $"已为您转接人工客服，预计等待{waitMinutes}分钟，请稍候。"
+            });
+        }
+
+        public Task<VipLevel> GetVipLevelAsync(string userId, CancellationToken ct = default)
+        {
+            // 模拟: user-001 是 Gold VIP
+            var level = userId == "user-001" ? VipLevel.Gold : VipLevel.Normal;
+            return Task.FromResult(level);
+        }
+
+        public Task<TransferResult> TransferToDepartmentAsync(
+            string ticketId, string department, CancellationToken ct = default)
+        {
+            return Task.FromResult(new TransferResult
+            {
+                Success = true,
+                Department = department,
+                Message = $"工单 {ticketId} 已转接至{department}部门，专人将在1个工作日内联系您。"
+            });
         }
     }
 }

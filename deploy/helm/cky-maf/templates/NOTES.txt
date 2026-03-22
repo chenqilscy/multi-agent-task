@@ -1,0 +1,21 @@
+CKY.MAF 已成功部署！
+
+获取应用 URL：
+
+{{- if .Values.ingress.enabled }}
+  SmartHome:       http://{{ (index .Values.ingress.hosts 0).host }}
+  CustomerService: http://{{ (index .Values.ingress.hosts 1).host }}
+{{- else }}
+  # SmartHome
+  kubectl port-forward svc/smarthome 5001:80 -n {{ .Values.global.namespace }}
+  # CustomerService
+  kubectl port-forward svc/customerservice 5002:80 -n {{ .Values.global.namespace }}
+{{- end }}
+
+检查部署状态：
+  kubectl get pods -n {{ .Values.global.namespace }}
+  kubectl get hpa -n {{ .Values.global.namespace }}
+
+查看日志：
+  kubectl logs -f deployment/smarthome -n {{ .Values.global.namespace }}
+  kubectl logs -f deployment/customerservice -n {{ .Values.global.namespace }}

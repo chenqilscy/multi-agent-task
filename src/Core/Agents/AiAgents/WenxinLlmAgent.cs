@@ -110,7 +110,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string modelId,
             string prompt,
             string? systemPrompt = null,
-            CancellationToken ct = default)
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
             Logger.LogDebug("[WenxinLlmAgent] ExecuteStreamingAsync called with model: {Model}", modelId);
 
@@ -186,9 +186,10 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
 
         private static async IAsyncEnumerable<string> ReadStreamLinesAsync(StreamReader reader, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
-            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            string? line;
+            while ((line = await reader.ReadLineAsync(ct)) != null && !ct.IsCancellationRequested)
             {
-                yield return await reader.ReadLineAsync(ct) ?? string.Empty;
+                yield return line;
             }
         }
 

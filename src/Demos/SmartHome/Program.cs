@@ -2,6 +2,7 @@ using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Agents;
 using CKY.MultiAgentFramework.Core.Agents.Specialized;
 using CKY.MultiAgentFramework.Core.Resilience;
+using CKY.MAF.Demos.SmartHome.Api;
 using CKY.MAF.Demos.SmartHome.Components;
 using CKY.MAF.Demos.SmartHome.Hubs;
 using CKY.MultiAgentFramework.Demos.SmartHome;
@@ -11,12 +12,12 @@ using CKY.MultiAgentFramework.Demos.SmartHome.Services;
 using CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations;
 using CKY.MultiAgentFramework.Services.Registry;
 using CKY.MultiAgentFramework.Infrastructure.DependencyInjection;
+using CKY.MultiAgentFramework.Services.DependencyInjection;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Data;
 using CKY.MultiAgentFramework.Infrastructure.Repository.Repositories;
 using CKY.MultiAgentFramework.Core.Diagnostics;
 using CKY.MultiAgentFramework.Services.Monitoring;
 using CKY.MultiAgentFramework.Services.NLP;
-using CKY.MultiAgentFramework.Services.Registry;
 using CKY.MultiAgentFramework.Services.RealTime;
 using CKY.MultiAgentFramework.Services.Resilience;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +28,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 🚀 使用快速注册方法（推荐）
 builder.Services.AddMafBuiltinServices(builder.Configuration);
+
+// 注册 LLM Agent 工厂及 HttpClient
+builder.Services.AddLlmAgentFactory();
 
 // 注册工作单元和仓储
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -168,9 +172,16 @@ builder.Services.AddSingleton<MusicAgent>();
 builder.Services.AddSingleton<WeatherAgent>();
 builder.Services.AddSingleton<TemperatureHistoryAgent>();
 builder.Services.AddSingleton<SecurityAgent>();
+builder.Services.AddSingleton<KnowledgeBaseAgent>();
 
 // 智能家居控制服务（聚合多个 Agent）
 builder.Services.AddSingleton<SmartHomeControlService>();
+
+// 对话历史持久化服务
+builder.Services.AddScoped<SmartHomeChatHistoryService>();
+
+// 知识库种子数据服务（启动时初始化知识库）
+builder.Services.AddHostedService<KnowledgeBaseSeedService>();
 
 // ========================================
 // 降级策略注册
@@ -202,6 +213,7 @@ builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
     options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.MaximumReceiveMessageSize = 32 * 1024; // 32KB 最大消息大小
 });
 
 // 注册实时通知服务
@@ -210,6 +222,18 @@ builder.Services.AddSingleton<IRealTimeNotificationService, RealTimeNotification
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// CORS for maf-board dev server
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("MafBoard", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
 
 var app = builder.Build();
 
@@ -223,10 +247,17 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found");
 app.UseHttpsRedirection();
 
+app.UseCors("MafBoard");
+
 app.UseAntiforgery();
 
 // 映射 SignalR Hub
 app.MapHub<MafHub>("/hub/maf");
+
+// ========================================
+// MAF Board REST API endpoints
+// ========================================
+app.MapMafBoardApi();
 
 // 映射 Prometheus 指标端点
 app.MapPrometheusScrapingEndpoint();

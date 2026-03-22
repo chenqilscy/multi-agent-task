@@ -299,8 +299,10 @@ namespace CKY.MultiAgentFramework.Demos.SmartHome.Services.Implementations
         private readonly Dictionary<string, DoorLockStatus> _doorLocks = new();
         private readonly Dictionary<string, CameraStatus> _cameras = new();
         private readonly List<SecurityAlert> _alerts = new();
+#pragma warning disable CS0414 // 模拟状态字段：当前仅写入，未来可扩展查询
         private bool _awayMode;
         private bool _presenceSimulation;
+#pragma warning restore CS0414
 
         public SimulatedSecurityService(ILogger<SimulatedSecurityService> logger)
         {

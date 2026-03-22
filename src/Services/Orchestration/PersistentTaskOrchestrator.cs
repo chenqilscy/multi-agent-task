@@ -121,6 +121,47 @@ namespace CKY.MultiAgentFramework.Services.Orchestration
         }
 
         /// <inheritdoc />
+        public async Task<List<TaskExecutionResult>> ExecutePlanAsync(
+            ExecutionPlan plan,
+            Func<DecomposedTask, CancellationToken, Task<TaskExecutionResult>> taskExecutor,
+            CancellationToken ct = default)
+        {
+            _logger.LogInformation("Executing plan {PlanId} with custom executor and persistence tracking", plan.PlanId);
+
+            await UpdatePlanStatusAsync(plan.PlanId, ExecutionPlanStatus.Running, ct: ct);
+
+            try
+            {
+                var results = await _innerOrchestrator.ExecutePlanAsync(plan, taskExecutor, ct);
+
+                await SaveExecutionResultsAsync(plan.PlanId, results, ct);
+
+                var allSuccess = results.All(r => r.Success);
+                var finalStatus = allSuccess ? ExecutionPlanStatus.Completed : ExecutionPlanStatus.PartiallyCompleted;
+
+                await UpdatePlanStatusAsync(
+                    plan.PlanId,
+                    finalStatus,
+                    completedTasks: results.Count(r => r.Success),
+                    failedTasks: results.Count(r => !r.Success),
+                    ct: ct);
+
+                return results;
+            }
+            catch (OperationCanceledException)
+            {
+                await UpdatePlanStatusAsync(plan.PlanId, ExecutionPlanStatus.Cancelled, errorMessage: "Operation was cancelled", ct: ct);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await UpdatePlanStatusAsync(plan.PlanId, ExecutionPlanStatus.Failed, errorMessage: ex.Message, ct: ct);
+                _logger.LogError(ex, "Plan {PlanId} execution failed", plan.PlanId);
+                throw;
+            }
+        }
+
+        /// <inheritdoc />
         public async Task CancelAsync(string planId, CancellationToken ct = default)
         {
             _logger.LogInformation("Cancelling plan {PlanId}", planId);

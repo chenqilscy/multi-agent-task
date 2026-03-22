@@ -31,7 +31,7 @@ namespace CKY.MultiAgentFramework.Services.Session.Strategies
         /// <returns>会话状态，如果不存在或已过期则返回 null</returns>
         Task<MafSessionState?> ReadAsync(
             string sessionId,
-            IMafAiSessionStore l1Cache,
+            IL1SessionCache l1Cache,
             IMafAiSessionStore? l2Store,
             IMafAiSessionStore? l3Store,
             CancellationToken cancellationToken);

@@ -89,9 +89,9 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
                 var responseBody = await response.Content.ReadAsStringAsync(ct);
                 var result = JsonSerializer.Deserialize<MiniMaxResponse>(responseBody);
 
-                if (result?.Choices?.Length > 0 && result.Choices[0].Text != null)
+                if (result?.Choices is { Length: > 0 } choices && choices[0].Text is { } text)
                 {
-                    return result.Choices[0].Text;
+                    return text;
                 }
 
                 throw new InvalidOperationException("Invalid response from MiniMax API");
@@ -108,7 +108,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string modelId,
             string prompt,
             string? systemPrompt = null,
-            CancellationToken ct = default)
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
             Logger.LogDebug("[MiniMaxLlmAgent] ExecuteStreamingAsync called with model: {Model}", modelId);
 
@@ -135,9 +135,9 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var reader = new StreamReader(stream);
 
-            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            string? line;
+            while ((line = await reader.ReadLineAsync(ct)) != null && !ct.IsCancellationRequested)
             {
-                var line = await reader.ReadLineAsync(ct);
                 if (string.IsNullOrWhiteSpace(line))
                     continue;
 
@@ -151,9 +151,9 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
                     continue;
                 }
 
-                if (chunk?.Choices?.Length > 0 && chunk.Choices[0].Delta?.Text != null)
+                if (chunk?.Choices is { Length: > 0 } chunkChoices && chunkChoices[0].Delta?.Text is { } deltaText)
                 {
-                    yield return chunk.Choices[0].Delta.Text;
+                    yield return deltaText;
                 }
             }
         }

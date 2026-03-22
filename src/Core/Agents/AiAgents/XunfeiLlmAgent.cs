@@ -129,7 +129,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string modelId,
             string prompt,
             string? systemPrompt = null,
-            CancellationToken ct = default)
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
             Logger.LogDebug("[XunfeiLlmAgent] ExecuteStreamingAsync called with model: {Model}", modelId);
 
