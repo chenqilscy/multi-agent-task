@@ -17,6 +17,8 @@
 | Core/Resilience | L1 | 9.0 | 85% | 低 | ✅ 优秀 |
 | Services/Scheduling | L4 | 9.0 | 90%+ | 低 | ✅ 优秀 |
 | Services/Orchestration | L4 | 7.5 | 70% | 中 | ⚠️ 需关注 |
+| Services/Monitoring | L4 | 8.5 | 80%+ | 低 | ✅ 良好 |
+| Services/Factory | L4 | 8.5 | 80%+ | 低 | ✅ 良好 |
 | Services/IntentRecognition | L4 | 8.5 | 80%+ | 低 | ✅ 良好 |
 | Services/DialogManagement | L4 | 8.5 | 80%+ | 低 | ✅ 良好 |
 | Services/NLP | L4 | 8.0 | 75% | 低 | ✅ 良好 |
@@ -24,6 +26,7 @@
 | Infra/Repository | L3 | 9.0 | 90%+ | 低 | ✅ 优秀 |
 | Infra/Caching | L3 | 8.5 | 80%+ | 低 | ✅ 良好 |
 | Infra/Vectorization | L3 | 8.5 | 80%+ | 低 | ✅ 良好 |
+| Infra/Embedding | L3 | 8.5 | 80%+ | 低 | ✅ 良好 |
 | Demos/SmartHome | L5 | 8.5 | 场景模式E2E待补 | 低 | ✅ 良好 |
 | Demos/CustomerService | L5 | 8.0 | 协作逻辑已补充 | 中 | ✅ 良好 |
 
@@ -33,10 +36,10 @@
 
 | 类型 | 数量 | 通过 | 目标 | 状态 |
 |------|------|------|------|------|
-| 单元测试 (含场景) | 901 | 901 | ≥400 (Phase 2) | ✅ 已超额 |
+| 单元测试 (含场景) | 997 | 997 | ≥400 (Phase 2) | ✅ 已超额 |
 | 集成测试 | 193 | 193 | ≥120 (Phase 2) | ✅ 已超额 |
 | 容器集成测试 | 7 | — | 需 Docker | ⚠️ 跳过 |
-| **合计** | **1101** | **1094** | | ✅ 非容器全部通过 |
+| **合计** | **1197** | **1190** | | ✅ 非容器全部通过 |
 
 ### 编译状态
 
@@ -68,7 +71,7 @@
 |----|------|------|------|
 | TD-003 | ~~Demos/CS~~ | ~~CustomerService 用例覆盖度仅 42%~~ | ✅ **已修复** → 65%+ (新增 CS-07 更多事件、CS-04 情绪分级、CS-06 升级) |
 | TD-004 | ~~Demos/SH~~ | ~~SmartHome 用例覆盖度仅 58%~~ | ✅ **已修复** → 75%+ (新增 SH-06 外出监控、SH-08 个性化场景) |
-| TD-005 | Services/NLP | 向量嵌入对接未完整验证 | RAG 管道可靠性 |
+| TD-005 | ~~Services/NLP~~ | ~~向量嵌入对接未完整验证~~ | ✅ **已修复** — OpenAiEmbeddingService 新增 + 15 测试 |
 
 ### 低优先级
 
@@ -118,6 +121,7 @@
 | 2026-03-22 | 覆盖度扩展+文档同步 | 9.0 → 9.2 | 新增 SH-07 紧急/CS-08 闭环等 10 个场景测试; 修复 Redis/RAG 集成测试; 测试 1058→1068 全pass; 文档 v2.1 同步; TD-006 解决; specs/ 标记遗留 |
 | 2026-03-22 | 内置Agent+质量门禁+CI/CD | 9.2 维持 | RagKnowledgeAgent + 8种内置Agent; AddMafBuiltinAgents(); TreatWarningsAsErrors; CI/CD 覆盖率门禁; 测试 1068→1101 |
 | 2026-03-22 | LeaderAgent 继承重构 | 9.2 维持 | SmartHomeLeaderAgent 重构为继承 MafLeaderAgent (8 虚钩子); CustomerServiceLeaderAgent 保留直接路由模式; Phase 3 规划完成 |
+| 2026-03-22 | Phase 3a/b/c 执行 | 9.2 维持 | OpenAI/Azure LLM JSON反序列化修复; OpenAiEmbeddingService 新增; PrometheusMetricsCollector 覆盖 0%→~80%; 测试 939→997 (+58); 覆盖率持续提升 |
 
 ---
 

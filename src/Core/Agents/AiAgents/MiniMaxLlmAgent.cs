@@ -1,5 +1,6 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Models.LLM;
+using CKY.MultiAgentFramework.Core.Resilience;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
@@ -33,6 +34,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
     {
         private readonly HttpClient _httpClient;
         private readonly string _groupId;
+        private readonly ILlmResiliencePipeline? _resiliencePipeline;
 
         /// <summary>
         /// 初始化 MiniMaxLlmAgent 类的新实例
@@ -40,7 +42,8 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
         public MiniMaxLlmAgent(
             LlmProviderConfig config,
             ILogger logger,
-            HttpClient? httpClient = null)
+            HttpClient? httpClient = null,
+            ILlmResiliencePipeline? resiliencePipeline = null)
             : base(config, logger)
         {
             _httpClient = httpClient ?? new HttpClient
@@ -54,6 +57,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
                 throw new ArgumentException("MiniMax requires 'GroupId' in AdditionalParameters", nameof(config));
             }
             _groupId = groupIdObj.ToString() ?? string.Empty;
+            _resiliencePipeline = resiliencePipeline;
         }
 
         /// <inheritdoc />
@@ -62,6 +66,24 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string prompt,
             string? systemPrompt = null,
             CancellationToken ct = default)
+        {
+            if (_resiliencePipeline != null)
+            {
+                return await _resiliencePipeline.ExecuteAsync(
+                    AgentId,
+                    innerCt => ExecuteInternalAsync(modelId, prompt, systemPrompt, innerCt),
+                    timeout: TimeSpan.FromSeconds(60),
+                    ct);
+            }
+
+            return await ExecuteInternalAsync(modelId, prompt, systemPrompt, ct);
+        }
+
+        private async Task<string> ExecuteInternalAsync(
+            string modelId,
+            string prompt,
+            string? systemPrompt,
+            CancellationToken ct)
         {
             Logger.LogDebug("[MiniMaxLlmAgent] ExecuteAsync called with model: {Model}", modelId);
 

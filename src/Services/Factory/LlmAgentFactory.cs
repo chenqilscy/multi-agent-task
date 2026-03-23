@@ -2,6 +2,7 @@ using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Agents;
 using CKY.MultiAgentFramework.Core.Agents.Providers;
 using CKY.MultiAgentFramework.Core.Models.LLM;
+using CKY.MultiAgentFramework.Core.Resilience;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
 
@@ -26,17 +27,20 @@ namespace CKY.MultiAgentFramework.Services.Factory
         private readonly ILlmProviderConfigRepository _configRepository;
         private readonly ILoggerFactory _loggerFactory;
         private readonly IHttpClientFactory? _httpClientFactory;
+        private readonly ILlmResiliencePipeline? _resiliencePipeline;
 
         public LlmAgentFactory(
             ILogger<LlmAgentFactory> logger,
             ILlmProviderConfigRepository configRepository,
             ILoggerFactory? loggerFactory = null,
-            IHttpClientFactory? httpClientFactory = null)
+            IHttpClientFactory? httpClientFactory = null,
+            ILlmResiliencePipeline? resiliencePipeline = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _configRepository = configRepository ?? throw new ArgumentNullException(nameof(configRepository));
             _loggerFactory = loggerFactory ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
             _httpClientFactory = httpClientFactory;
+            _resiliencePipeline = resiliencePipeline;
         }
 
         #region 核心创建方法
@@ -86,9 +90,11 @@ namespace CKY.MultiAgentFramework.Services.Factory
                 "xunfei" => await CreateXunfeiAgentAsync(config, ct),
                 "baichuan" => await CreateBaichuanAgentAsync(config, ct),
                 "minimax" => await CreateMiniMaxAgentAsync(config, ct),
+                "openai" => await CreateOpenAiAgentAsync(config, ct),
+                "azure-openai" or "azureopenai" => await CreateAzureOpenAiAgentAsync(config, ct),
                 _ => throw new NotSupportedException(
                     $"Provider {config.ProviderName} is not supported. " +
-                    $"Supported providers: zhipuai, tongyi, qwen, wenxin, xunfei, baichuan, minimax")
+                    $"Supported providers: zhipuai, tongyi, qwen, wenxin, xunfei, baichuan, minimax, openai, azure-openai")
             };
 
             _logger.LogInformation(
@@ -310,7 +316,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
             httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {GetApiKey(config)}");
             httpClient.DefaultRequestHeaders.Add("Content-Type", "application/json");
 
-            return new ZhipuAIAgent(config, logger, httpClient);
+            return new ZhipuAIAgent(config, logger, httpClient, _resiliencePipeline);
         }
 
         /// <summary>
@@ -332,7 +338,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
                 httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {GetApiKey(config)}");
             }
 
-            return new TongyiLlmAgent(config, logger, httpClient);
+            return new TongyiLlmAgent(config, logger, httpClient, _resiliencePipeline);
         }
 
         /// <summary>
@@ -364,7 +370,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
                 httpClient.BaseAddress = new Uri(config.ApiBaseUrl ?? "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat");
             }
 
-            return new WenxinLlmAgent(config, logger, httpClient);
+            return new WenxinLlmAgent(config, logger, httpClient, _resiliencePipeline);
         }
 
         /// <summary>
@@ -384,7 +390,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
                 httpClient = _httpClientFactory.CreateClient(nameof(XunfeiLlmAgent));
             }
 
-            return new XunfeiLlmAgent(config, logger, httpClient);
+            return new XunfeiLlmAgent(config, logger, httpClient, _resiliencePipeline);
         }
 
         /// <summary>
@@ -405,7 +411,7 @@ namespace CKY.MultiAgentFramework.Services.Factory
                 httpClient.BaseAddress = new Uri(config.ApiBaseUrl ?? "https://api.baichuan-ai.com/v1");
             }
 
-            return new BaichuanLlmAgent(config, logger, httpClient);
+            return new BaichuanLlmAgent(config, logger, httpClient, _resiliencePipeline);
         }
 
         /// <summary>
@@ -426,7 +432,52 @@ namespace CKY.MultiAgentFramework.Services.Factory
                 httpClient.BaseAddress = new Uri(config.ApiBaseUrl ?? "https://api.minimax.chat/v1");
             }
 
-            return new MiniMaxLlmAgent(config, logger, httpClient);
+            return new MiniMaxLlmAgent(config, logger, httpClient, _resiliencePipeline);
+        }
+
+        /// <summary>
+        /// 创建 OpenAI Agent
+        /// </summary>
+        private async Task<MafAiAgent> CreateOpenAiAgentAsync(
+            LlmProviderConfig config,
+            CancellationToken ct)
+        {
+            await Task.CompletedTask;
+
+            var logger = _loggerFactory.CreateLogger<OpenAiLlmAgent>();
+            HttpClient? httpClient = null;
+
+            if (_httpClientFactory != null)
+            {
+                httpClient = _httpClientFactory.CreateClient(nameof(OpenAiLlmAgent));
+                httpClient.BaseAddress = new Uri(config.ApiBaseUrl ?? "https://api.openai.com/v1/");
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {GetApiKey(config)}");
+            }
+
+            return new OpenAiLlmAgent(config, logger, httpClient, _resiliencePipeline);
+        }
+
+        /// <summary>
+        /// 创建 Azure OpenAI Agent
+        /// </summary>
+        private async Task<MafAiAgent> CreateAzureOpenAiAgentAsync(
+            LlmProviderConfig config,
+            CancellationToken ct)
+        {
+            await Task.CompletedTask;
+
+            var logger = _loggerFactory.CreateLogger<AzureOpenAiLlmAgent>();
+            HttpClient? httpClient = null;
+
+            if (_httpClientFactory != null)
+            {
+                httpClient = _httpClientFactory.CreateClient(nameof(AzureOpenAiLlmAgent));
+                httpClient.BaseAddress = new Uri(
+                    (config.ApiBaseUrl ?? "").EndsWith('/') ? config.ApiBaseUrl! : config.ApiBaseUrl + "/");
+                httpClient.DefaultRequestHeaders.Add("api-key", GetApiKey(config));
+            }
+
+            return new AzureOpenAiLlmAgent(config, logger, httpClient, _resiliencePipeline);
         }
 
         /// <summary>

@@ -1,5 +1,6 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Models.LLM;
+using CKY.MultiAgentFramework.Core.Resilience;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
@@ -38,6 +39,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
     public class TongyiLlmAgent : MafAiAgent
     {
         private readonly HttpClient _httpClient;
+        private readonly ILlmResiliencePipeline? _resiliencePipeline;
 
         /// <summary>
         /// 初始化 TongyiLlmAgent 类的新实例
@@ -45,10 +47,12 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
         /// <param name="config">LLM 配置</param>
         /// <param name="logger">日志记录器</param>
         /// <param name="httpClient">HTTP 客户端（可选，用于测试）</param>
+        /// <param name="resiliencePipeline">弹性管道（可选）</param>
         public TongyiLlmAgent(
             LlmProviderConfig config,
             ILogger logger,
-            HttpClient? httpClient = null)
+            HttpClient? httpClient = null,
+            ILlmResiliencePipeline? resiliencePipeline = null)
             : base(config, logger)
         {
             _httpClient = httpClient ?? new HttpClient
@@ -56,6 +60,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
                 BaseAddress = new Uri(config.ApiBaseUrl ?? "https://dashscope.aliyuncs.com/compatible-mode/v1")
             };
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {GetApiKey()}");
+            _resiliencePipeline = resiliencePipeline;
         }
 
         /// <inheritdoc />
@@ -64,6 +69,24 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string prompt,
             string? systemPrompt = null,
             CancellationToken ct = default)
+        {
+            if (_resiliencePipeline != null)
+            {
+                return await _resiliencePipeline.ExecuteAsync(
+                    AgentId,
+                    innerCt => ExecuteInternalAsync(modelId, prompt, systemPrompt, innerCt),
+                    timeout: TimeSpan.FromSeconds(60),
+                    ct);
+            }
+
+            return await ExecuteInternalAsync(modelId, prompt, systemPrompt, ct);
+        }
+
+        private async Task<string> ExecuteInternalAsync(
+            string modelId,
+            string prompt,
+            string? systemPrompt,
+            CancellationToken ct)
         {
             Logger.LogDebug("[TongyiLlmAgent] ExecuteAsync called with model: {Model}", modelId);
 

@@ -27,7 +27,7 @@ namespace CKY.MultiAgentFramework.Core.Agents
     public class ZhipuAIAgent : MafAiAgent
     {
         private readonly HttpClient _httpClient;
-        private readonly LlmResiliencePipeline _resiliencePipeline;
+        private readonly ILlmResiliencePipeline _resiliencePipeline;
 
         /// <summary>
         /// 构造函数
@@ -41,7 +41,7 @@ namespace CKY.MultiAgentFramework.Core.Agents
             LlmProviderConfig config,
             ILogger<ZhipuAIAgent> logger,
             HttpClient httpClient,
-            LlmResiliencePipeline? resiliencePipeline = null)
+            ILlmResiliencePipeline? resiliencePipeline = null)
             : base(config, logger)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));

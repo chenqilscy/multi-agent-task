@@ -1,5 +1,6 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
 using CKY.MultiAgentFramework.Core.Models.LLM;
+using CKY.MultiAgentFramework.Core.Resilience;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
@@ -35,6 +36,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
         private readonly string _appId;
         private readonly string _apiKey;
         private readonly string _apiSecret;
+        private readonly ILlmResiliencePipeline? _resiliencePipeline;
 
         /// <summary>
         /// 初始化 XunfeiLlmAgent 类的新实例
@@ -42,7 +44,8 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
         public XunfeiLlmAgent(
             LlmProviderConfig config,
             ILogger logger,
-            HttpClient? httpClient = null)
+            HttpClient? httpClient = null,
+            ILlmResiliencePipeline? resiliencePipeline = null)
             : base(config, logger)
         {
             _httpClient = httpClient ?? new HttpClient();
@@ -57,6 +60,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             _appId = keyParts[0];
             _apiKey = keyParts[1];
             _apiSecret = keyParts[2];
+            _resiliencePipeline = resiliencePipeline;
         }
 
         /// <inheritdoc />
@@ -65,6 +69,24 @@ namespace CKY.MultiAgentFramework.Core.Agents.Providers
             string prompt,
             string? systemPrompt = null,
             CancellationToken ct = default)
+        {
+            if (_resiliencePipeline != null)
+            {
+                return await _resiliencePipeline.ExecuteAsync(
+                    AgentId,
+                    innerCt => ExecuteInternalAsync(modelId, prompt, systemPrompt, innerCt),
+                    timeout: TimeSpan.FromSeconds(60),
+                    ct);
+            }
+
+            return await ExecuteInternalAsync(modelId, prompt, systemPrompt, ct);
+        }
+
+        private async Task<string> ExecuteInternalAsync(
+            string modelId,
+            string prompt,
+            string? systemPrompt,
+            CancellationToken ct)
         {
             Logger.LogDebug("[XunfeiLlmAgent] ExecuteAsync called with model: {Model}", modelId);
 

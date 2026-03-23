@@ -1,6 +1,8 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Resilience;
 using CKY.MultiAgentFramework.Services.Factory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace CKY.MultiAgentFramework.Services.DependencyInjection;
 
@@ -52,6 +54,23 @@ public static class LlmAgentFactoryServiceExtensions
         services.AddHttpClient("MiniMaxLlmAgent", client =>
         {
             client.Timeout = options.DefaultTimeout;
+        });
+
+        services.AddHttpClient("OpenAiLlmAgent", client =>
+        {
+            client.Timeout = options.DefaultTimeout;
+        });
+
+        services.AddHttpClient("AzureOpenAiLlmAgent", client =>
+        {
+            client.Timeout = options.DefaultTimeout;
+        });
+
+        // 注册 ILlmResiliencePipeline（弹性管道，可选）
+        services.AddSingleton<ILlmResiliencePipeline>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<LlmResiliencePipeline>>();
+            return new LlmResiliencePipeline(logger);
         });
 
         // 注册 LlmAgentFactory
