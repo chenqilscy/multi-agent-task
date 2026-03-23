@@ -13,6 +13,11 @@ namespace CKY.MultiAgentFramework.Demos.CustomerService.Agents
     /// 智能客服主控 Agent
     /// 负责意图识别、路由、多轮对话管理和结果聚合
     /// </summary>
+    /// <remarks>
+    /// 设计决策：继承 <see cref="MafBusinessAgentBase"/> 而非 <see cref="CKY.MultiAgentFramework.Core.Agents.Specialized.MafLeaderAgent"/>
+    /// 原因：客服场景采用 **直接路由** 模式（意图 → 具体Agent），而非 MafLeaderAgent 的
+    /// 任务分解→Agent匹配→编排执行 流水线。直接路由更适合固定 Agent 集合 + 情绪检测 + 降级管理的需求。
+    /// </remarks>
     public class CustomerServiceLeaderAgent : MafBusinessAgentBase
     {
         private readonly IIntentRecognizer _intentRecognizer;

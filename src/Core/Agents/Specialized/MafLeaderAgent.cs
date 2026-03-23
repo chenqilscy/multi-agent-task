@@ -56,7 +56,7 @@ namespace CKY.MultiAgentFramework.Core.Agents.Specialized
             ITaskOrchestrator taskOrchestrator,
             IResultAggregator resultAggregator,
             IMafAiAgentRegistry llmRegistry,
-            ILogger<MafLeaderAgent> logger)
+            ILogger logger)
             : base(llmRegistry, logger)
         {
             _intentRecognizer = intentRecognizer ?? throw new ArgumentNullException(nameof(intentRecognizer));

@@ -33,10 +33,10 @@
 
 | 类型 | 数量 | 通过 | 目标 | 状态 |
 |------|------|------|------|------|
-| 单元测试 (含场景) | 893 | 893 | ≥400 (Phase 2) | ✅ 已超额 |
+| 单元测试 (含场景) | 901 | 901 | ≥400 (Phase 2) | ✅ 已超额 |
 | 集成测试 | 193 | 193 | ≥120 (Phase 2) | ✅ 已超额 |
 | 容器集成测试 | 7 | — | 需 Docker | ⚠️ 跳过 |
-| **合计** | **1093** | **1086** | | ✅ 非容器全部通过 |
+| **合计** | **1101** | **1094** | | ✅ 非容器全部通过 |
 
 ### 编译状态
 
@@ -75,7 +75,7 @@
 | ID | 模块 | 描述 | 影响 |
 |----|------|------|------|
 | TD-006 | ~~Docs~~ | ~~设计文档与实际代码不完全同步~~ | ✅ **已修复** — core-architecture/implementation-guide/index 已同步至 v2.1; specs/ 标记为遗留并添加重定向 |
-| TD-007 | CI/CD | 缺少自动化 CI/CD 流水线 | 手动验证低效 |
+| TD-007 | ~~CI/CD~~ | ~~缺少自动化 CI/CD 流水线~~ | ✅ **已修复** — GitHub Actions + 覆盖率门禁 |
 | TD-008 | E2E | 缺少端到端自动化测试 | 集成验证不足 |
 
 ---
@@ -116,9 +116,12 @@
 | 2026-03-22 | 场景覆盖度提升 | 8.8 → 9.0 | SH 58%→72%, CS 42%→65%, 测试 472→863, CS-04 协作逻辑 |
 | 2026-03-22 | 覆盖度修复+扩展 | 9.0 维持 | 新增 OrderStatusChange/SatisfactionSurvey Handler; SmartHome SecurityControl 关键词扩展; 测试 863→1058; SH 72%→75%, CS 65%→68% |
 | 2026-03-22 | 覆盖度扩展+文档同步 | 9.0 → 9.2 | 新增 SH-07 紧急/CS-08 闭环等 10 个场景测试; 修复 Redis/RAG 集成测试; 测试 1058→1068 全pass; 文档 v2.1 同步; TD-006 解决; specs/ 标记遗留 |
+| 2026-03-22 | 内置Agent+质量门禁+CI/CD | 9.2 维持 | RagKnowledgeAgent + 8种内置Agent; AddMafBuiltinAgents(); TreatWarningsAsErrors; CI/CD 覆盖率门禁; 测试 1068→1101 |
+| 2026-03-22 | LeaderAgent 继承重构 | 9.2 维持 | SmartHomeLeaderAgent 重构为继承 MafLeaderAgent (8 虚钩子); CustomerServiceLeaderAgent 保留直接路由模式; Phase 3 规划完成 |
 
 ---
 
 ## 下一步行动
 
-→ 详见 [Phase 2 执行计划](exec-plans/active/phase2-consolidation.md)
+→ Phase 2 已完成，详见 [Phase 2](exec-plans/active/phase2-consolidation.md)  
+→ **Phase 3: LLM 集成 + 生产运维**，详见 [Phase 3 执行计划](exec-plans/active/phase3-production.md)
