@@ -374,7 +374,10 @@ public static class MafServiceRegistrationExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var apiKey = configuration["ZhipuAI:ApiKey"];
+        // 优先读 LLM:ZhipuAI:ApiKey（推荐路径），向后兼容 ZhipuAI:ApiKey
+        var apiKey = configuration["LLM:ZhipuAI:ApiKey"];
+        if (string.IsNullOrEmpty(apiKey))
+            apiKey = configuration["ZhipuAI:ApiKey"];
         var model = configuration.GetValue("ZhipuAI:EmbeddingModel",
             ZhipuAIEmbeddingService.DefaultModel)!;
         var dimension = configuration.GetValue("ZhipuAI:EmbeddingDimension",

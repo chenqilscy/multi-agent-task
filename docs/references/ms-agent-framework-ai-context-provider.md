@@ -863,8 +863,8 @@ builder.Services.AddSingleton<IAIContextProvider, ContextCompressionProvider>();
 
 - [Microsoft Agent Framework 官方文档](https://learn.microsoft.com/zh-cn/agent-framework/)
 - [AIContextProvider API 参考](https://learn.microsoft.com/zh-cn/agent-framework/agents/conversations/context-providers)
-- [CKY.MAF 架构文档](../specs/12-layered-architecture.md)
-- [对话管理设计](../specs/06-interface-design-spec.md)
+- [CKY.MAF 架构文档](../design-docs/core-architecture.md)
+- [对话管理设计](../design-docs/implementation-guide.md)
 - [ConversationHistoryProvider 源码](../../src/Infrastructure/Context/ConversationHistoryProvider.cs)
 - [ContextCompressionProvider 源码](../../src/Infrastructure/Context/ContextCompressionProvider.cs)
 

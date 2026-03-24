@@ -1,6 +1,6 @@
 # CKY.MultiAgentFramework 快速参考卡片
 
-> **最后更新**: 2026-03-16 | **版本**: v2.0
+> **最后更新**: 2026-03-23 | **版本**: v2.1
 
 ---
 
@@ -177,6 +177,22 @@ MafTaskOrchestrator    // 任务编排器
 DegradationManager     // 降级管理器
 ```
 
+### CustomerService Demo (REST API)
+```csharp
+// 服务层
+IChatService / ChatService     // 聊天服务（解耦 UI 与 Agent）
+ConversationManager            // 多轮上下文（ConcurrentDictionary，线程安全）
+
+// REST API 端点
+POST /api/chat/send            // 发送消息 → Agent 路由 → 回复
+POST /api/chat/handoff         // 请求转人工 → 工单创建
+
+// Agent 路由 (CustomerServiceLeaderAgent)
+// 订单 → OrderStatusAgent
+// 投诉 → ComplaintAgent
+// 知识库 → KnowledgeBaseAgent → LLM Fallback → 工单建议
+```
+
 ---
 
 ## 🛡️ 弹性策略
@@ -269,13 +285,14 @@ docker-compose logs -f smart-home
 ## 📚 文档导航
 
 ### 核心文档
-- [架构设计](specs/00-CORE-ARCHITECTURE.md) - 完整架构说明
-- [实现指南](specs/01-IMPLEMENTATION-GUIDE.md) - 代码实现细节
+- [架构设计](design-docs/core-architecture.md) - 完整架构说明
+- [实现指南](design-docs/implementation-guide.md) - 代码实现细节
 
 ### 操作指南
 - [LLM快速入门](guides/LLM_AGENT_QUICK_START.md)
 - [集成LLM](guides/how-to-integrate-llm-with-agent-framework.md)
 - [使用MafAiAgent](guides/how-to-use-mafaiagent.md)
+- [CustomerService Chat API](guides/how-to-use-customer-service-chat-api.md)
 
 ### 历史文档
 - [开发计划归档](archives/plans/) - 历史开发记录

@@ -34,6 +34,7 @@ internal sealed class PostgreSqlDatabaseInitializer
                 CreateSubTasksTable();
                 CreateMafAiSessionsTable();
                 CreateChatMessagesTable();
+                CreateLlmProviderConfigsTable();
                 CreateSchemaVersionTable();
 
                 _logger.LogInformation("PostgreSQL database tables created successfully.");
@@ -147,6 +148,37 @@ internal sealed class PostgreSqlDatabaseInitializer
             """;
 
         ExecuteSql(sql, "ChatMessages");
+    }
+
+    private void CreateLlmProviderConfigsTable()
+    {
+        const string sql = """
+            CREATE TABLE IF NOT EXISTS "LlmProviderConfigs" (
+                "Id" SERIAL PRIMARY KEY,
+                "ProviderName" TEXT NOT NULL,
+                "ProviderDisplayName" TEXT NOT NULL DEFAULT '',
+                "ApiBaseUrl" TEXT NOT NULL DEFAULT '',
+                "ApiKey" TEXT NOT NULL DEFAULT '',
+                "ModelId" TEXT NOT NULL DEFAULT '',
+                "ModelDisplayName" TEXT NOT NULL DEFAULT '',
+                "SupportedScenariosJson" TEXT NOT NULL DEFAULT '[]',
+                "MaxTokens" INTEGER NOT NULL DEFAULT 2000,
+                "Temperature" DOUBLE PRECISION NOT NULL DEFAULT 0.7,
+                "IsEnabled" BOOLEAN NOT NULL DEFAULT TRUE,
+                "Priority" INTEGER NOT NULL DEFAULT 0,
+                "CostPer1kTokens" NUMERIC NOT NULL DEFAULT 0,
+                "AdditionalParametersJson" TEXT,
+                "CreatedAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+                "UpdatedAt" TIMESTAMP,
+                "LastUsedAt" TIMESTAMP,
+                "Notes" TEXT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_llm_provider_name ON "LlmProviderConfigs"("ProviderName");
+            CREATE INDEX IF NOT EXISTS idx_llm_provider_enabled ON "LlmProviderConfigs"("IsEnabled");
+            CREATE INDEX IF NOT EXISTS idx_llm_provider_priority ON "LlmProviderConfigs"("Priority");
+            """;
+
+        ExecuteSql(sql, "LlmProviderConfigs");
     }
 
     private void CreateSchemaVersionTable()

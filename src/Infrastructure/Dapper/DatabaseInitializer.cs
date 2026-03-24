@@ -36,6 +36,7 @@ internal sealed class DatabaseInitializer
                 CreateSubTasksTable();
                 CreateMafAiSessionsTable();
                 CreateChatMessagesTable();
+                CreateLlmProviderConfigsTable();
                 CreateSchemaVersionTable();
 
                 _logger.LogInformation("Database tables created successfully.");
@@ -170,6 +171,36 @@ CREATE TABLE IF NOT EXISTS ChatMessages (
 );";
 
         ExecuteSql(sql, "ChatMessages");
+    }
+
+    private void CreateLlmProviderConfigsTable()
+    {
+        const string sql = @"
+CREATE TABLE IF NOT EXISTS LlmProviderConfigs (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ProviderName TEXT NOT NULL,
+    ProviderDisplayName TEXT NOT NULL DEFAULT '',
+    ApiBaseUrl TEXT NOT NULL DEFAULT '',
+    ApiKey TEXT NOT NULL DEFAULT '',
+    ModelId TEXT NOT NULL DEFAULT '',
+    ModelDisplayName TEXT NOT NULL DEFAULT '',
+    SupportedScenariosJson TEXT NOT NULL DEFAULT '[]',
+    MaxTokens INTEGER NOT NULL DEFAULT 2000,
+    Temperature REAL NOT NULL DEFAULT 0.7,
+    IsEnabled INTEGER NOT NULL DEFAULT 1,
+    Priority INTEGER NOT NULL DEFAULT 0,
+    CostPer1kTokens REAL NOT NULL DEFAULT 0,
+    AdditionalParametersJson TEXT,
+    CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+    UpdatedAt TEXT,
+    LastUsedAt TEXT,
+    Notes TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_llm_provider_name ON LlmProviderConfigs(ProviderName);
+CREATE INDEX IF NOT EXISTS idx_llm_provider_enabled ON LlmProviderConfigs(IsEnabled);
+CREATE INDEX IF NOT EXISTS idx_llm_provider_priority ON LlmProviderConfigs(Priority);";
+
+        ExecuteSql(sql, "LlmProviderConfigs");
     }
 
     private void CreateSchemaVersionTable()

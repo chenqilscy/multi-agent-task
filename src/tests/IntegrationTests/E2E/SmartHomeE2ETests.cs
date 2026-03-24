@@ -58,6 +58,7 @@ public class SmartHomeE2ETests
             lightingAgent, climateAgent, musicAgent, weatherAgent,
             temperatureHistoryAgent, securityAgent, knowledgeBaseAgent,
             mockDegradation.Object, mockRuleEngine.Object,
+            Mock.Of<ILlmAgentFactory>(),
             NullLogger<SmartHomeControlService>.Instance);
     }
 
@@ -195,6 +196,7 @@ public class SmartHomeE2ETests
             new SecurityAgent(securityService, mockRegistry.Object, NullLogger<SecurityAgent>.Instance),
             new KnowledgeBaseAgent(_mockRagPipeline.Object, mockRegistry.Object, NullLogger<KnowledgeBaseAgent>.Instance),
             mockDegradation.Object, mockRuleEngine.Object,
+            Mock.Of<ILlmAgentFactory>(),
             NullLogger<SmartHomeControlService>.Instance);
 
         var result = await controlService.ProcessCommandAsync("打开灯");

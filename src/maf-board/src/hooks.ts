@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { MafTask } from './types';
 import type { TaskFilter } from './api';
 import { api } from './api';
+import { useSignalR } from './useSignalR';
 
 /**
- * 自定义 Hook：获取任务列表，支持搜索/筛选/自动刷新
+ * 自定义 Hook：获取任务列表，支持搜索/筛选/自动刷新 + SignalR 实时更新
  */
 export function useTasks(filter: TaskFilter, refreshInterval = 0) {
   const [tasks, setTasks] = useState<MafTask[]>([]);
@@ -29,7 +30,7 @@ export function useTasks(filter: TaskFilter, refreshInterval = 0) {
     load();
   }, [load]);
 
-  // 自动刷新
+  // 自动刷新（作为 SignalR 的 fallback）
   useEffect(() => {
     if (refreshInterval > 0) {
       timerRef.current = setInterval(load, refreshInterval);
@@ -38,6 +39,16 @@ export function useTasks(filter: TaskFilter, refreshInterval = 0) {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [load, refreshInterval]);
+
+  // SignalR 实时更新
+  useSignalR({
+    onTaskCreated: (task) => {
+      setTasks((prev) => [task, ...prev]);
+    },
+    onTaskUpdated: (task) => {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+    },
+  });
 
   return { tasks, loading, error, refresh: load };
 }

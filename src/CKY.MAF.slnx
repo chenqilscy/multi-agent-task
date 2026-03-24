@@ -35,14 +35,7 @@
     <Project Path="Services/CKY.MAF.Services.csproj" />
   </Folder>
 
-  <!-- Layer 5: Demos -->
-  <Folder Name="/src/Demos/" />
-  <Folder Name="/src/Demos/SmartHome/">
-    <Project Path="Demos/SmartHome/CKY.MAF.Demos.SmartHome.csproj" />
-  </Folder>
-  <Folder Name="/src/Demos/CustomerService/">
-    <Project Path="Demos/CustomerService/CKY.MAF.Demos.CustomerService.csproj" />
-  </Folder>
+
 
   <!-- Tests -->
   <Folder Name="/src/tests/" />
@@ -56,3 +49,4 @@
     <Project Path="tests/Benchmarks/CKY.MAF.Benchmarks.csproj" />
   </Folder>
 </Solution>
+

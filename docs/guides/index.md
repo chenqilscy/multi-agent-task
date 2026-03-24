@@ -36,6 +36,18 @@
 | [database-dapper-guide.md](database-dapper-guide.md) | Dapper ORM 使用 |
 | [deep-dive-redis-implementation.md](deep-dive-redis-implementation.md) | Redis 实现深度分析 |
 
+## CustomerService Demo
+
+| 指南 | 说明 |
+|------|------|
+| [how-to-use-customer-service-chat-api.md](how-to-use-customer-service-chat-api.md) | Chat REST API 使用指南（IChatService + Minimal API） |
+
+## 外部框架集成
+
+| 指南 | 说明 |
+|------|------|
+| [how-to-integrate-deerflow.md](how-to-integrate-deerflow.md) | .NET/Java 系统集成 DeerFlow Agent 框架 |
+
 ## 运维部署
 
 | 指南 | 说明 |

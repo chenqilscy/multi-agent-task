@@ -1,7 +1,7 @@
 # CKY.MAF 核心架构文档
 
-> **文档版本**: v2.0 (最终整合版)
-> **更新日期**: 2026-03-16
+> **文档版本**: v2.1 (ChatService 服务层 + REST API 更新)
+> **更新日期**: 2026-03-23
 > **整合来源**: 01-architecture-overview.md + 12-layered-architecture.md + LLM架构决策
 
 ---

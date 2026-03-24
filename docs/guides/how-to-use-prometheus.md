@@ -330,9 +330,9 @@ metrics.IncrementCounter("requests", new[] { userTier });  // ✓
 
 ## 相关文档
 
-- [架构设计规范](./specs/12-layered-architecture.md)
+- [架构设计规范](../design-docs/core-architecture.md)
 - [性能基准测试](./specs/13-performance-benchmarks.md)
-- [错误处理指南](./specs/14-error-handling-guide.md)
+- [错误处理指南](../design-docs/error-handling.md)
 
 ## API 参考
 

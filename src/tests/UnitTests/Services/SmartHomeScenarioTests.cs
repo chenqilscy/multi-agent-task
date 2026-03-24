@@ -1,4 +1,6 @@
 using CKY.MultiAgentFramework.Core.Abstractions;
+using CKY.MultiAgentFramework.Core.Agents;
+using CKY.MultiAgentFramework.Core.Models.LLM;
 using CKY.MultiAgentFramework.Core.Models.Task;
 using CKY.MultiAgentFramework.Core.Resilience;
 using CKY.MultiAgentFramework.Demos.SmartHome.Agents;
@@ -870,6 +872,166 @@ namespace CKY.MAF.Tests.SmartHome
         }
 
         // =============================================
+        // LLM Fallback 单元测试
+        // =============================================
+
+        private static LlmProviderConfig CreateTestLlmConfig()
+        {
+            return new LlmProviderConfig
+            {
+                ProviderName = "test-provider",
+                ProviderDisplayName = "Test",
+                ApiBaseUrl = "https://test.example.com/api/",
+                ApiKey = "test-key",
+                ModelId = "test-model",
+                SupportedScenarios = [LlmScenario.Chat],
+                IsEnabled = true,
+                Priority = 1,
+            };
+        }
+
+        private static SmartHomeControlService CreateServiceWithLlm(
+            Mock<ILlmAgentFactory> mockFactory,
+            Mock<IDegradationManager>? mockDegradation = null)
+        {
+            var lightingAgent = CreateLightingAgent(Mock.Of<ILightingService>());
+            var climateAgent = CreateClimateAgent(Mock.Of<IClimateService>());
+            var musicAgent = CreateMusicAgent();
+            var weatherAgent = CreateWeatherAgent(Mock.Of<IWeatherService>());
+            var tempHistoryAgent = new TemperatureHistoryAgent(
+                Mock.Of<ISensorDataService>(),
+                Mock.Of<IMafAiAgentRegistry>(),
+                Mock.Of<ILogger<TemperatureHistoryAgent>>());
+            var securityAgent = new SecurityAgent(
+                Mock.Of<ISecurityService>(),
+                Mock.Of<IMafAiAgentRegistry>(),
+                Mock.Of<ILogger<SecurityAgent>>());
+            var knowledgeAgent = new KnowledgeBaseAgent(
+                Mock.Of<IRagPipeline>(),
+                Mock.Of<IMafAiAgentRegistry>(),
+                Mock.Of<ILogger<KnowledgeBaseAgent>>());
+
+            if (mockDegradation == null)
+            {
+                mockDegradation = new Mock<IDegradationManager>();
+                mockDegradation.Setup(d => d.IsFeatureEnabled(It.IsAny<string>())).Returns(true);
+            }
+
+            var mockRuleEngine = new Mock<IRuleEngine>();
+            mockRuleEngine.Setup(r => r.CanHandle(It.IsAny<string>())).Returns(false);
+
+            return new SmartHomeControlService(
+                lightingAgent,
+                climateAgent,
+                musicAgent,
+                weatherAgent,
+                tempHistoryAgent,
+                securityAgent,
+                knowledgeAgent,
+                mockDegradation.Object,
+                mockRuleEngine.Object,
+                mockFactory.Object,
+                Mock.Of<ILogger<SmartHomeControlService>>());
+        }
+
+        [Fact]
+        public async Task LLM_Fallback_Success_ShouldReturnLlmResponse()
+        {
+            // Arrange
+            var mockAgent = new Mock<MafAiAgent>(
+                CreateTestLlmConfig(),
+                Mock.Of<ILogger>(),
+                null!) { CallBase = false };
+            mockAgent
+                .Setup(a => a.ExecuteAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync("我是智能家居助手，有什么可以帮您？");
+
+            var mockFactory = new Mock<ILlmAgentFactory>();
+            mockFactory
+                .Setup(f => f.CreateBestAgentForScenarioAsync(LlmScenario.Chat, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(mockAgent.Object);
+
+            var service = CreateServiceWithLlm(mockFactory);
+
+            // Act — 使用不匹配任何关键词的命令
+            var result = await service.ProcessCommandAsync("今天心情不错");
+
+            // Assert
+            result.Success.Should().BeTrue();
+            result.Result.Should().Be("我是智能家居助手，有什么可以帮您？");
+            mockFactory.Verify(f => f.CreateBestAgentForScenarioAsync(LlmScenario.Chat, It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task LLM_Fallback_EmptyResponse_ShouldFallbackToDefault()
+        {
+            var mockAgent = new Mock<MafAiAgent>(
+                CreateTestLlmConfig(),
+                Mock.Of<ILogger>(),
+                null!) { CallBase = false };
+            mockAgent
+                .Setup(a => a.ExecuteAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(string.Empty);
+
+            var mockFactory = new Mock<ILlmAgentFactory>();
+            mockFactory
+                .Setup(f => f.CreateBestAgentForScenarioAsync(LlmScenario.Chat, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(mockAgent.Object);
+
+            var service = CreateServiceWithLlm(mockFactory);
+            var result = await service.ProcessCommandAsync("随便聊聊");
+
+            result.Success.Should().BeFalse();
+            result.Result.Should().Contain("无法理解");
+        }
+
+        [Fact]
+        public async Task LLM_Fallback_Exception_ShouldFallbackToDefault()
+        {
+            var mockFactory = new Mock<ILlmAgentFactory>();
+            mockFactory
+                .Setup(f => f.CreateBestAgentForScenarioAsync(LlmScenario.Chat, It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("No provider available"));
+
+            var service = CreateServiceWithLlm(mockFactory);
+            var result = await service.ProcessCommandAsync("随便聊聊");
+
+            result.Success.Should().BeFalse();
+            result.Result.Should().Contain("无法理解");
+        }
+
+        [Fact]
+        public async Task LLM_Fallback_DegradationDisabled_ShouldSkipLlm()
+        {
+            var mockFactory = new Mock<ILlmAgentFactory>();
+            var mockDegradation = new Mock<IDegradationManager>();
+            mockDegradation.Setup(d => d.IsFeatureEnabled("llm")).Returns(false);
+            // 其它功能保持启用
+            mockDegradation.Setup(d => d.IsFeatureEnabled(It.Is<string>(s => s != "llm"))).Returns(true);
+
+            var service = CreateServiceWithLlm(mockFactory, mockDegradation);
+            var result = await service.ProcessCommandAsync("随便聊聊");
+
+            result.Success.Should().BeFalse();
+            result.Result.Should().Contain("无法理解");
+            // LLM factory 不应被调用
+            mockFactory.Verify(f => f.CreateBestAgentForScenarioAsync(It.IsAny<LlmScenario>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task LLM_Fallback_KeywordStillPriority_ShouldNotCallLlm()
+        {
+            var mockFactory = new Mock<ILlmAgentFactory>();
+
+            var service = CreateServiceWithLlm(mockFactory);
+            var result = await service.ProcessCommandAsync("打开客厅的灯");
+
+            result.Success.Should().BeTrue();
+            // 关键词匹配成功时不应调用 LLM
+            mockFactory.Verify(f => f.CreateBestAgentForScenarioAsync(It.IsAny<LlmScenario>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        // =============================================
         // 辅助工厂方法
         // =============================================
 
@@ -911,6 +1073,7 @@ namespace CKY.MAF.Tests.SmartHome
                 knowledgeAgent,
                 mockDegradation.Object,
                 mockRuleEngine.Object,
+                Mock.Of<ILlmAgentFactory>(),
                 Mock.Of<ILogger<SmartHomeControlService>>());
         }
 

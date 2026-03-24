@@ -89,6 +89,7 @@ public static class DapperServiceRegistrationExtensions
         }
 
         services.AddScoped<IRelationalDatabase, DapperRelationalDatabase>();
+        services.AddScoped<ILlmProviderConfigRepository, DapperLlmProviderConfigRepository>();
 
         return services;
     }

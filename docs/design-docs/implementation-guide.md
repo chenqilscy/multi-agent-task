@@ -98,10 +98,28 @@ CKY.MAF/
 │   │   ├── Session/                            # 会话管理
 │   │   └── Storage/                            # 分层存储
 │   │
-│   └── Demos/SmartHome/                        # Layer 5: Demo应用层
-│       ├── Pages/                              # Blazor页面
-│       ├── Components/
-│       └── Program.cs                          # 服务注册
+│   ├── Demos/SmartHome/                        # Layer 5: Demo应用层
+│   │   ├── Pages/                              # Blazor页面
+│   │   ├── Components/
+│   │   └── Program.cs                          # 服务注册
+│   │
+│   └── Demos/CustomerService/                  # Layer 5: 客服Demo
+│       ├── Agents/                             # 业务Agent
+│       │   ├── CustomerServiceLeaderAgent.cs   # 主控Agent（意图路由 + LLM Fallback）
+│       │   ├── KnowledgeBaseAgent.cs           # 知识库Agent
+│       │   ├── OrderStatusAgent.cs             # 订单查询Agent
+│       │   └── TicketAgent.cs                  # 工单Agent
+│       ├── Api/
+│       │   └── ChatApiEndpoints.cs             # REST API (Minimal API)
+│       ├── Components/Pages/
+│       │   └── Chat.razor                      # 聊天UI + 上下文面板
+│       ├── Models/
+│       │   └── CustomerServiceModels.cs        # ConversationManager (线程安全)
+│       ├── Services/
+│       │   ├── IChatService.cs                 # 聊天服务接口
+│       │   └── Implementations/
+│       │       └── ChatService.cs              # 消息编排实现
+│       └── Program.cs                          # DI + API路由注册
 │
 └── tests/
     ├── UnitTests/                              # 单元测试
@@ -119,7 +137,8 @@ CKY.MAF/
 - `CKY.MultiAgentFramework.Infrastructure.Repository` - 数据访问实现
 - `CKY.MultiAgentFramework.Infrastructure.Caching` - 缓存实现
 - `CKY.MultiAgentFramework.Services` - 业务服务层
-- `CKY.MultiAgentFramework.Demos.SmartHome` - Demo应用
+- `CKY.MultiAgentFramework.Demos.SmartHome` - SmartHome Demo
+- `CKY.MultiAgentFramework.Demos.CustomerService` - CustomerService Demo
 
 **文件命名**:
 - 接口：`I`前缀 (如 `ICacheStore`)

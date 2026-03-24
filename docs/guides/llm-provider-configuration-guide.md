@@ -279,9 +279,9 @@ ORDER BY last_used_at DESC;
 
 ## 📚 相关文档
 
-- [架构设计规范](../specs/12-layered-architecture.md)
-- [接口设计规范](../specs/06-interface-design-spec.md)
-- [错误处理指南](../specs/14-error-handling-guide.md)
+- [架构设计规范](../design-docs/core-architecture.md)
+- [接口设计规范](../design-docs/implementation-guide.md)
+- [错误处理指南](../design-docs/error-handling.md)
 
 ---
 

@@ -32,14 +32,19 @@ MafBusinessAgentBase (业务层基类, 不继承 AIAgent, 组合调用 LLM)
 
 | SmartHome | CustomerService |
 |-----------|----------------|
-| SmartHomeLeaderAgent | CustomerServiceLeaderAgent |
+| SmartHomeLeaderAgent | CustomerServiceLeaderAgent (+LLM Fallback) |
 | LightingAgent | OrderStatusAgent |
 | ClimateAgent | ComplaintAgent |
 | MusicAgent | RefundAgent |
 | SecurityAgent | KnowledgeBaseAgent |
-| WeatherAgent | |
-| TemperatureHistoryAgent | |
-| KnowledgeBaseAgent | |
+| WeatherAgent | — |
+| TemperatureHistoryAgent | — |
+| KnowledgeBaseAgent | — |
+
+**CustomerService 服务层新增**:
+- `IChatService` / `ChatService` — 解耦 UI 与 Agent 逻辑
+- `ChatApiEndpoints` — REST API (Minimal API: POST /api/chat/send, /api/chat/handoff)
+- `ConversationManager` — 线程安全多轮上下文 (ConcurrentDictionary)
 
 ---
 

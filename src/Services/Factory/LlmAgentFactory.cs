@@ -314,7 +314,6 @@ namespace CKY.MultiAgentFramework.Services.Factory
             // 配置 HttpClient
             httpClient.BaseAddress = new Uri(config.ApiBaseUrl ?? "https://open.bigmodel.cn/api/paas/v4/");
             httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {GetApiKey(config)}");
-            httpClient.DefaultRequestHeaders.Add("Content-Type", "application/json");
 
             return new ZhipuAIAgent(config, logger, httpClient, _resiliencePipeline);
         }

@@ -1,9 +1,9 @@
 # CKY.MAF 质量评估报告
 
 > **初始评估日期**: 2026-03-22  
-> **最新评估日期**: 2026-03-22 (覆盖度修复+扩展)  
-> **评估基线**: Phase 1 + 场景覆盖度提升 + 覆盖度修复  
-> **总体评分**: 9.2 / 10
+> **最新评估日期**: 2026-03-23 (ChatService 服务层 + REST API + 多轮上下文)  
+> **评估基线**: Phase 1 + 场景覆盖度提升 + 覆盖度修复 + 系统集成验证 + LLM Agent 集成 + ChatService  
+> **总体评分**: 9.3 / 10
 
 ---
 
@@ -27,8 +27,8 @@
 | Infra/Caching | L3 | 8.5 | 80%+ | 低 | ✅ 良好 |
 | Infra/Vectorization | L3 | 8.5 | 80%+ | 低 | ✅ 良好 |
 | Infra/Embedding | L3 | 8.5 | 80%+ | 低 | ✅ 良好 |
-| Demos/SmartHome | L5 | 8.5 | 场景模式E2E待补 | 低 | ✅ 良好 |
-| Demos/CustomerService | L5 | 8.0 | 协作逻辑已补充 | 中 | ✅ 良好 |
+| Demos/SmartHome | L5 | 8.8 | LLM fallback 已集成 + 5测试 | 低 | ✅ 良好 |
+| Demos/CustomerService | L5 | 8.8 | ChatService 服务层 + REST API + 29测试 + E2E验证 | 低 | ✅ 良好 |
 
 ---
 
@@ -36,10 +36,10 @@
 
 | 类型 | 数量 | 通过 | 目标 | 状态 |
 |------|------|------|------|------|
-| 单元测试 (含场景) | 997 | 997 | ≥400 (Phase 2) | ✅ 已超额 |
+| 单元测试 (含场景) | 1100 | 1100 | ≥400 (Phase 2) | ✅ 已超额 |
 | 集成测试 | 193 | 193 | ≥120 (Phase 2) | ✅ 已超额 |
 | 容器集成测试 | 7 | — | 需 Docker | ⚠️ 跳过 |
-| **合计** | **1197** | **1190** | | ✅ 非容器全部通过 |
+| **合计** | **1300** | **1293** | | ✅ 非容器全部通过 |
 
 ### 编译状态
 
@@ -122,6 +122,9 @@
 | 2026-03-22 | 内置Agent+质量门禁+CI/CD | 9.2 维持 | RagKnowledgeAgent + 8种内置Agent; AddMafBuiltinAgents(); TreatWarningsAsErrors; CI/CD 覆盖率门禁; 测试 1068→1101 |
 | 2026-03-22 | LeaderAgent 继承重构 | 9.2 维持 | SmartHomeLeaderAgent 重构为继承 MafLeaderAgent (8 虚钩子); CustomerServiceLeaderAgent 保留直接路由模式; Phase 3 规划完成 |
 | 2026-03-22 | Phase 3a/b/c 执行 | 9.2 维持 | OpenAI/Azure LLM JSON反序列化修复; OpenAiEmbeddingService 新增; PrometheusMetricsCollector 覆盖 0%→~80%; 测试 939→997 (+58); 覆盖率持续提升 |
+| 2026-03-23 | 系统集成验证 | 9.2 维持 | DapperLlmProviderConfigRepository 新增; SmartHome/CustomerService DI 修复; EF Core EnsureCreated; POST /api/tasks API; maf-board useMockData=false; 测试 997→1066 (单元) + 193 (集成); 三服务联调通过 |
+| 2026-03-23 | LLM Agent 集成 + Embedding 修复 | 9.2 → 9.3 | LLM fallback 关键词兜底; ZhipuAI Chat+Embedding 真实调用 200; Embedding 401 修复 (配置路径 LLM:ZhipuAI:ApiKey 向后兼容); LLM fallback 5 单元测试; Content-Type DefaultRequestHeaders 修复; 测试 1066→1071; SmartHome+CustomerService E2E 全通过 |
+| 2026-03-23 | ChatService 服务层 + REST API | 9.3 维持 | IChatService 服务层解耦 UI; ChatApiEndpoints (Minimal API POST /api/chat/send,handoff); ConversationManager 线程安全 (ConcurrentDictionary); LeaderAgent LLM Fallback (TryLlmFallbackAsync); Chat.razor 上下文面板; ChatServiceTests 15 + ChatApiEndpointTests 14; 测试 1071→1100; E2E 4 端点验证全通过 |
 
 ---
 
